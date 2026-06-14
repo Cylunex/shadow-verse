@@ -15,6 +15,7 @@ from pathlib import Path
 
 import base64
 
+from . import chat as chatmod
 from . import codex, config, export, forge, importer, lenses, llm, memory, nexus, recipes, util
 from .config import UNIVERSE, read_jsonl
 from .entity import LocalEntity
@@ -114,6 +115,13 @@ def api_export_thread(wid: str, tid: str) -> dict:
 
 def api_config() -> dict:
     return config.settings_snapshot()
+
+
+def api_chat(wid: str, eid: str) -> dict:
+    w = World.load(wid); e = LocalEntity.load(w, eid)
+    return {"world": wid, "entity": eid, "name": e.card().get("name", eid),
+            "greeting": chatmod.greeting(e), "history": chatmod.history(e),
+            "llm_available": llm.available()}
 
 
 def api_timeline(wid: str) -> dict:
@@ -269,6 +277,16 @@ def post_hook_alpha(b: dict) -> dict:
     _, t = _thr(b); t.set_alpha(b.get("text", "")); return {"ok": True}
 
 
+def post_chat(b: dict) -> dict:
+    w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
+    return chatmod.turn(w, e, b.get("message", ""))
+
+
+def post_chat_clear(b: dict) -> dict:
+    w = World.load(b["world"]); chatmod.clear(LocalEntity.load(w, b["entity"]))
+    return {"ok": True}
+
+
 def post_import_card(b: dict) -> dict:
     w = World.load(b["world"])
     if b.get("png_b64"):
@@ -349,6 +367,7 @@ GET_ROUTES = [
     (re.compile(r"^/api/export/thread/([\w-]+)/([\w-]+)$"), lambda m, q: api_export_thread(m.group(1), m.group(2))),
     (re.compile(r"^/api/config$"), lambda m, q: api_config()),
     (re.compile(r"^/api/timeline/([\w-]+)$"), lambda m, q: api_timeline(m.group(1))),
+    (re.compile(r"^/api/chat/([\w-]+)/([\w-]+)$"), lambda m, q: api_chat(m.group(1), m.group(2))),
     (re.compile(r"^/api/prep/narrate$"), lambda m, q: api_narrate_prep(q)),
     (re.compile(r"^/api/prep/play$"), lambda m, q: api_play_prep(q)),
     (re.compile(r"^/api/prep/world$"), lambda m, q: api_world_prep(q)),
@@ -385,6 +404,8 @@ POST_ROUTES = [
     (re.compile(r"^/api/hook/set$"), post_hook_set),
     (re.compile(r"^/api/hook/alpha$"), post_hook_alpha),
     (re.compile(r"^/api/import/card$"), post_import_card),
+    (re.compile(r"^/api/chat$"), post_chat),
+    (re.compile(r"^/api/chat/clear$"), post_chat_clear),
 ]
 
 

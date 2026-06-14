@@ -11,7 +11,7 @@ from pathlib import Path
 TESTS = ["sim.test_memory", "sim.test_forge", "sim.test_lenses", "sim.test_nexus",
          "sim.test_llm", "sim.test_narrate", "sim.test_codex", "sim.test_manage",
          "sim.test_render", "sim.test_config", "sim.test_checks", "sim.test_hooks",
-         "sim.test_import", "sim.smoke"]
+         "sim.test_import", "sim.test_chat", "sim.smoke"]
 ROOT = Path(__file__).resolve().parent.parent
 
 

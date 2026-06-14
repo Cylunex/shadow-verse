@@ -79,6 +79,13 @@
   .node text{fill:var(--ink);font-size:13px;text-anchor:middle}
   .edge{stroke:var(--acc);stroke-width:1.5;stroke-dasharray:5 5;opacity:.55}
   .edge-label{fill:var(--faint);font-size:10px;text-anchor:middle}
+  .chat{display:flex;flex-direction:column;gap:10px;max-width:720px;margin-top:6px}
+  .bubble{padding:10px 14px;border-radius:14px;max-width:80%;line-height:1.75;white-space:pre-wrap}
+  .bubble.char{background:var(--panel2);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px}
+  .bubble.user{background:var(--acc);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+  .chat-input{display:flex;gap:8px;margin-top:14px;max-width:720px;position:sticky;bottom:14px}
+  .chat-input input{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:11px 14px;font:inherit}
+  .chat-input input:focus{outline:none;border-color:var(--acc)}
   .gallery{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
   .gallery img{max-width:200px;max-height:300px;border-radius:10px;border:1px solid var(--line);background:var(--panel)}
   .incarn{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
@@ -409,6 +416,31 @@ function route(){
   else if(p[0]==='codex')viewCodex(m);
   else if(p[0]==='settings')viewSettings(m);
   else if(p[0]==='timeline'&&p[1])viewTimeline(m,p[1]);
+  else if(p[0]==='chat'&&p[2])viewChat(m,p[1],p[2]);
+}
+
+function _addBubble(role,text){const box=document.getElementById('chatbox');const d=document.createElement('div');
+  d.className='bubble '+role;d.textContent=text;box.appendChild(d);window.scrollTo(0,document.body.scrollHeight);return d;}
+async function chatClear(){if(!window._chat)return;if(!confirm('清空与该角色的对话?'))return;
+  await post('/chat/clear',{world:window._chat.wid,entity:window._chat.eid});route();}
+async function viewChat(m,wid,eid){
+  let d;try{d=await api('/chat/'+wid+'/'+eid)}catch(e){m.innerHTML=`<div class="empty">${esc(e.message)}</div>`;return}
+  window._chat={wid,eid};
+  const bubbles=d.history.length?d.history:[{role:'char',text:d.greeting}];
+  m.innerHTML=`<div class="crumb"><a href="#/">总览</a> / <a href="#/world/${wid}">${esc(wid)}</a> / <a href="#/entity/${wid}/${eid}">${esc(d.name)}</a> / 对话</div>
+    <h1>💬 ${esc(d.name)}</h1>
+    ${d.llm_available?'':'<p class="lead" style="color:var(--gold)">还没配 LLM —— 去左边 <a href="#/settings" style="color:var(--acc2)">⚙ 设置</a> 填一个 provider + key,回来就能真聊。</p>'}
+    <div class="actions"><button class="btn ghost" onclick="chatClear()">🗑 重置对话</button></div>
+    <div class="chat" id="chatbox">${bubbles.map(b=>`<div class="bubble ${b.role==='user'?'user':'char'}">${esc(b.text)}</div>`).join('')}</div>
+    <div class="chat-input"><input id="chatmsg" placeholder="对 ${esc(d.name)} 说…(回车发送)"><button class="btn" id="chatsend">发送</button></div>`;
+  const send=async()=>{const inp=document.getElementById('chatmsg');const msg=inp.value.trim();if(!msg)return;
+    inp.value='';inp.disabled=true;_addBubble('user',msg);const w=_addBubble('char','…');
+    try{const r=await post('/chat',{world:wid,entity:eid,message:msg});w.textContent=r.reply;}
+    catch(e){w.textContent='✗ '+e.message}
+    inp.disabled=false;inp.focus();};
+  document.getElementById('chatsend').onclick=send;
+  document.getElementById('chatmsg').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();send();}});
+  document.getElementById('chatmsg').focus();
 }
 
 async function viewTimeline(m,wid){
@@ -506,7 +538,8 @@ function showCh(i){const c=window._chs[i];document.querySelectorAll('.ch-nav but
 async function viewEntity(m,wid,eid){try{const d=await api('/entity/'+wid+'/'+eid);const c=d.card,st=d.state;
   m.innerHTML=`<div class="crumb"><a href="#/">总览</a> / <a href="#/world/${wid}">${esc(wid)}</a> / ${esc(c.name)}</div>
     <h1>👤 ${esc(c.name)} <small><span class="tag role-${c.role}">${esc(c.role)}</span></small></h1>
-    <div class="actions">${(c.role==='main'||c.role==='secondary')?`<button class="btn ghost" onclick="actAscend('${wid}','${eid}','${esc(c.name)}')">⬆ 升格为跨世界实体</button>`:''}
+    <div class="actions"><button class="btn" onclick="location.hash='#/chat/${wid}/${eid}'">💬 对话</button>
+      ${(c.role==='main'||c.role==='secondary')?`<button class="btn ghost" onclick="actAscend('${wid}','${eid}','${esc(c.name)}')">⬆ 升格为跨世界实体</button>`:''}
       <button class="btn ghost" onclick="actRenderEntity('${wid}','${eid}',${JSON.stringify(d.appearance||'')})">🖼 生成立绘</button>
       <button class="btn ghost" onclick="actDelEntity('${wid}','${eid}','${esc(c.name)}')">🗑 删除实体</button></div>
     ${(d.portraits&&d.portraits.length)?`<div class="section"><h2>立绘</h2><div class="gallery">${d.portraits.map(p=>`<img src="/img/${esc(p)}" loading="lazy">`).join('')}</div></div>`:''}
@@ -601,7 +634,7 @@ async function testLLM(){const box=document.getElementById('cf_test');box.style.
   }catch(e){box.textContent='✗ '+e.message}}
 
 window.showCh=showCh;
-['actNewWorld','actNewEntity','actNewThread','actNewCodex','actSeedCodex','actLink','actAscend','actSummon','actWriteChapter','actPlay','actEditWorldMd','actNarrateRun','actReflect','actExportThread','actDelWorld','actDelThread','actDelEntity','actDelCodex','actRenderEntity','actRenderScene','actSetAlpha','actAddHook','actSetHook','actImportCard','saveSettings','clearSecret','testLLM','closeModal'].forEach(f=>window[f]=eval(f));
+['actNewWorld','actNewEntity','actNewThread','actNewCodex','actSeedCodex','actLink','actAscend','actSummon','actWriteChapter','actPlay','actEditWorldMd','actNarrateRun','actReflect','actExportThread','actDelWorld','actDelThread','actDelEntity','actDelCodex','actRenderEntity','actRenderScene','actSetAlpha','actAddHook','actSetHook','actImportCard','chatClear','saveSettings','clearSecret','testLLM','closeModal'].forEach(f=>window[f]=eval(f));
 window.addEventListener('hashchange',route);
 (async()=>{try{await refresh()}catch(e){}route()})();
 </script>

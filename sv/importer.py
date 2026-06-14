@@ -96,8 +96,12 @@ def import_card(world: World, card: dict, *, role: str = "secondary", as_id: str
     eid = as_id if (as_id and util.is_id(as_id)) else _unique_id(world, util.slug(name))
     prov = provenance.stamp("import", prompt=f"ST card:{name}")
     e = LocalEntity.create(world, eid, name, role=role, prov=prov, body=_profile_md(card, eid, role))
+    c = e.card()
     if card["tags"]:
-        c = e.card(); c["tags"] = card["tags"]; save_json(e.card_path, c)
+        c["tags"] = card["tags"]
+    if card.get("first_mes"):
+        c["greeting"] = card["first_mes"].strip()   # 开场白,对话时用
+    save_json(e.card_path, c)
     n = import_lorebook(world, card.get("character_book")) if card.get("character_book") else 0
     return {"entity": eid, "name": name, "lorebook_entries": n}
 
