@@ -408,6 +408,21 @@ function route(){
   else if(p[0]==='nexus')viewNexus(m);
   else if(p[0]==='codex')viewCodex(m);
   else if(p[0]==='settings')viewSettings(m);
+  else if(p[0]==='timeline'&&p[1])viewTimeline(m,p[1]);
+}
+
+async function viewTimeline(m,wid){
+  let d;try{d=await api('/timeline/'+wid)}catch(e){m.innerHTML=`<div class="empty">${esc(e.message)}</div>`;return}
+  const ev=d.events.map(e=>{
+    if(e.kind==='growth')
+      return `<div class="ev l-身份"><div class="w">${esc(e.where)} · <span class="tag role-main">★成长</span> ${esc(e.name)}</div>${esc(e.text)}</div>`;
+    return `<div class="ev"><div class="w">${esc(e.where)} · <span class="tag lens">${esc(e.lens)}</span> <span style="color:var(--faint)">${esc(e.thread_title)}</span></div>${esc(e.text)}</div>`;
+  }).join('');
+  m.innerHTML=`<div class="crumb"><a href="#/">总览</a> / <a href="#/world/${wid}">${esc(d.name)}</a> / 时间线</div>
+    <h1>📜 ${esc(d.name)} · 故事时间线 <small>${d.threads.length} 线 · ${d.entity_count} 实体</small></h1>
+    <p class="lead">这个世界发生过的事(跨所有叙事线的 beats)与角色的<span style="color:var(--gold)">★成长时刻</span>,按时间合在一条轴上。</p>
+    ${d.cross_world.length?`<div class="section"><h2>跨世界实体(在此有化身)</h2><div>${d.cross_world.map(id=>`<a class="tag role-main" href="#/nexus/${id}">👤 ${esc(id)}</a>`).join('')}</div></div>`:''}
+    <div class="section"><h2>时间轴(${d.events.length})</h2><div class="timeline">${ev||'<div class="empty">还没有事件 — 写几章或玩一场就有了</div>'}</div></div>`;
 }
 
 /* ---------- views ---------- */
@@ -446,6 +461,7 @@ async function viewWorld(m,id){try{const d=await api('/world/'+id);const meta=d.
     <div>${(meta.links||[]).map(l=>`<span class="tag">⇄ ${esc(l.to)} (${esc(l.relation)})</span>`).join('')}${meta.provenance&&meta.provenance.source==='forge'?'<span class="tag forge">AIGC锻造</span>':''}</div>
     <div class="actions"><button class="btn" onclick="actNewThread('${id}')">＋ 叙事线</button>
       <button class="btn ghost" onclick="actNewEntity('${id}')">＋ 实体</button>
+      <button class="btn ghost" onclick="location.hash='#/timeline/${id}'">📜 故事时间线</button>
       <button class="btn ghost" onclick="actEditWorldMd('${id}')">✎ 编辑设定</button>
       <button class="btn ghost" onclick="actImportCard('${id}')">📥 导入ST角色卡</button>
       <button class="btn ghost" onclick="actDelWorld('${id}','${esc(meta.name)}')">🗑 删除世界</button></div>

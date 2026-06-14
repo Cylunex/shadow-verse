@@ -116,6 +116,31 @@ def api_config() -> dict:
     return config.settings_snapshot()
 
 
+def api_timeline(wid: str) -> dict:
+    """世界故事时间线:所有线的 beats(跨透镜)+ 各实体的身份级成长时刻,按时间合并。"""
+    w = World.load(wid)
+    events = []
+    for tid in w.list_threads():
+        t = Thread.load(w, tid)
+        title = t.meta().get("title", tid)
+        for b in t.beats():
+            events.append({"ts": b.get("ts", ""), "kind": "beat", "thread": tid, "thread_title": title,
+                           "lens": b.get("lens", ""), "where": b.get("where", ""), "text": b.get("text", "")})
+    for eid in w.list_entities():
+        e = LocalEntity(w, eid)
+        nm = e.card().get("name", eid)
+        for x in memory.all_experiences(e.dir):
+            if x.get("level") == "身份":
+                events.append({"ts": x.get("ts", ""), "kind": "growth", "entity": eid, "name": nm,
+                               "where": x.get("where", ""), "text": x.get("text", "")})
+    events.sort(key=lambda x: x.get("ts", ""))
+    # 在本世界有化身的跨世界实体
+    cross = [k["id"] for k in nexus.kept_entities()
+             if wid in (NexusEntity(k["id"]).incarnations() if NexusEntity(k["id"]).exists() else [])]
+    return {"world": wid, "name": w.meta().get("name", wid), "events": events,
+            "threads": w.list_threads(), "entity_count": len(w.list_entities()), "cross_world": cross}
+
+
 def api_narrate_prep(q: dict) -> dict:
     w = World.load(q["world"]); t = Thread.load(w, q["thread"])
     return lenses.narrate_prep(w, t, brief=q.get("intent", ""))
@@ -323,6 +348,7 @@ GET_ROUTES = [
     (re.compile(r"^/api/codex$"), lambda m, q: api_codex()),
     (re.compile(r"^/api/export/thread/([\w-]+)/([\w-]+)$"), lambda m, q: api_export_thread(m.group(1), m.group(2))),
     (re.compile(r"^/api/config$"), lambda m, q: api_config()),
+    (re.compile(r"^/api/timeline/([\w-]+)$"), lambda m, q: api_timeline(m.group(1))),
     (re.compile(r"^/api/prep/narrate$"), lambda m, q: api_narrate_prep(q)),
     (re.compile(r"^/api/prep/play$"), lambda m, q: api_play_prep(q)),
     (re.compile(r"^/api/prep/world$"), lambda m, q: api_world_prep(q)),
