@@ -5,6 +5,7 @@ __pycache__/
 # 运行时/生成的创作数据(demo 可用 `python -m sim.seed` 重建)——保持代码仓干净
 universe/
 
-# 密钥 / 本机配置(参照 Doll:密钥别入库,部署用系统 env 或本机 sv.conf)
+# 密钥 / 本机配置(密钥别入库;网页设置面板写这里)
+sv.local.conf
 Properties.md
 *.key

@@ -108,6 +108,10 @@ def api_export_thread(wid: str, tid: str) -> dict:
     return export.compile_thread_book(w, Thread.load(w, tid))
 
 
+def api_config() -> dict:
+    return config.settings_snapshot()
+
+
 def api_narrate_prep(q: dict) -> dict:
     w = World.load(q["world"]); t = Thread.load(w, q["thread"])
     return lenses.narrate_prep(w, t, brief=q.get("intent", ""))
@@ -156,6 +160,21 @@ def post_render_entity(b: dict) -> dict:
 def post_render_scene(b: dict) -> dict:
     w = World.load(b["world"]); t = Thread.load(w, b["thread"])
     return lenses.render_scene(w, t, b.get("subject", ""), appearance=b.get("appearance", ""))
+
+
+def post_config(b: dict) -> dict:
+    """保存设置到 sv.local.conf 并热加载(免重启)。只接受空字符串才清除某键。"""
+    config.save_setting(b or {})
+    return {"ok": True, **config.settings_snapshot()}
+
+
+def post_llm_test(b: dict) -> dict:
+    """探活当前 LLM:生成一小段。stub 也返回(占位)。"""
+    try:
+        out = llm.generate("你是测试助手,只回最短的话。", "回复两个字:在的", max_tokens=24, temperature=0.0)
+        return {"ok": True, "provider": config.PROVIDER, "stub": config.PROVIDER == "stub", "sample": out[:160]}
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "provider": config.PROVIDER, "error": str(e)}
 
 
 def post_thread_create(b: dict) -> dict:
@@ -270,6 +289,7 @@ GET_ROUTES = [
     (re.compile(r"^/api/nexus/([\w-]+)$"), lambda m, q: api_nexus_entity(m.group(1))),
     (re.compile(r"^/api/codex$"), lambda m, q: api_codex()),
     (re.compile(r"^/api/export/thread/([\w-]+)/([\w-]+)$"), lambda m, q: api_export_thread(m.group(1), m.group(2))),
+    (re.compile(r"^/api/config$"), lambda m, q: api_config()),
     (re.compile(r"^/api/prep/narrate$"), lambda m, q: api_narrate_prep(q)),
     (re.compile(r"^/api/prep/play$"), lambda m, q: api_play_prep(q)),
     (re.compile(r"^/api/prep/world$"), lambda m, q: api_world_prep(q)),
@@ -300,6 +320,8 @@ POST_ROUTES = [
     (re.compile(r"^/api/unlink$"), post_unlink),
     (re.compile(r"^/api/render/entity$"), post_render_entity),
     (re.compile(r"^/api/render/scene$"), post_render_scene),
+    (re.compile(r"^/api/config$"), post_config),
+    (re.compile(r"^/api/llm-test$"), post_llm_test),
 ]
 
 

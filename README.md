@@ -70,9 +70,14 @@ sim/        run_tests(总跑) · test_memory/forge/lenses/nexus · smoke · seed
 ARCHITECTURE.md · sv.conf · deploy/
 ```
 
+## 两种用法
+
+- **独立运行**:`python -m sv.webapp` 起网页控制台,在 **⚙ 设置** 页填自己的 LLM(OpenAI/兼容端/Anthropic/Ollama)与渲染 key——保存即时生效、无需重启,密钥只存本机 `sv.local.conf`(gitignore,不入库)。一切自包含。
+- **嵌入 Agent**:作为 OpenClaw/Hermes 的 MCP skill,**不用配 LLM**——生成/写作走宿主 Agent 的模型(Model A)。见 `deploy/`。
+
 ## 网页控制台
 
-`python -m sv.webapp` → http://127.0.0.1:8787 起一个零依赖网页控制台(读写同一批 `universe/` 文件,直接调引擎;深色"暗宇宙"主题):
+`python -m sv.webapp` → http://127.0.0.1:8787 起一个零依赖网页控制台(读写同一批 `universe/` 文件,直接调引擎;深色"暗宇宙"主题;只绑 `127.0.0.1`):
 
 **看**:多元宇宙地图(世界节点+连接边)、世界设定、章节阅读器、角色经历时间线、**跨世界实体的各世界化身对照**(灵魂一致/记忆独立)、元件库。
 
@@ -82,6 +87,7 @@ ARCHITECTURE.md · sv.conf · deploy/
 - **✨ AI 产线写章**:一键跑 写手→审校→修订→落章,弹窗显示全过程(草稿字数 / 审校 findings / 修订轮数 / 落章回执)
 - **🧠 反思**:横向校验最近数章全局自洽 + 提示漏掉的成长(建议,不自动落)
 - **🎭 玩一场**:场景+过程+按角色勾「触发成长」条件写回
+- **⚙ 设置**:在页面里配 LLM provider/key/model、渲染 key,即时生效;状态面板显示当前 LLM/渲染是否启用
 - **⬆ 升格**角色为跨世界实体、**✦ 召唤**进别的世界、**⇄ 连接**世界
 - **🖼 多模态**:角色「生成立绘」(用固定 appearance 锁脸保持像同一人)、叙事线「生成场景图」,出图存进图库展示 —— 配 `SV_RENDER=gitee + GITEE_API_KEY` 才出图(Gitee z-image,~18s),没配则休眠
 - **📖 导出全书**(把一条线的全部章节下载成单个 markdown)、**🗑 删除**世界/线/实体/元件(带确认,删世界自动清枢纽里它的连接与化身)

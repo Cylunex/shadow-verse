@@ -357,6 +357,7 @@ function renderNav(active){
     <a href="#/" class="${active==='/'?'on':''}">🌌 多元宇宙总览</a>
     <a href="#/nexus" class="${active==='nexus'?'on':''}">🔗 枢纽 <span class="b">${OV.nexus.entities.length}</span></a>
     <a href="#/codex" class="${active==='codex'?'on':''}">🧬 元件库 <span class="b">${OV.codex.count}</span></a>
+    <a href="#/settings" class="${active==='settings'?'on':''}">⚙ 设置 <span class="b" style="${OV.llm&&OV.llm.available?'color:var(--good)':''}">${OV.llm&&OV.llm.available?'LLM✓':'LLM✗'}</span></a>
     <h4>世界 (${OV.worlds.length})</h4>`;
   for(const w of OV.worlds)
     h+=`<a href="#/world/${w.id}" class="${active==='world/'+w.id?'on':''}">🌍 ${esc(w.name)} <span class="b">${w.threads}线</span></a>`;
@@ -375,6 +376,7 @@ function route(){
   else if(p[0]==='nexus'&&p[1])viewNexusEntity(m,p[1]);
   else if(p[0]==='nexus')viewNexus(m);
   else if(p[0]==='codex')viewCodex(m);
+  else if(p[0]==='settings')viewSettings(m);
 }
 
 /* ---------- views ---------- */
@@ -493,8 +495,61 @@ async function viewCodex(m){try{const d=await api('/codex');const byCat={};for(c
       <div class="card" style="cursor:default"><h3>${esc(e.id)} <span class="tag" style="cursor:pointer;float:right" onclick="actDelCodex('${esc(cat)}','${esc(e.id)}')">🗑</span></h3><div class="meta">${esc(e.summary)}</div><div>${(e.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div></div>`).join('')}</div></div>`).join('')||'<div class="empty">空 — 点「＋ 新元件」</div>'}`;
   }catch(e){m.innerHTML=`<div class="empty">${esc(e.message)}</div>`}}
 
+async function viewSettings(m){
+  let c;try{c=await api('/config')}catch(e){m.innerHTML=`<div class="empty">${esc(e.message)}</div>`;return}
+  const opt=(arr,v)=>arr.map(o=>`<option ${o===v?'selected':''}>${o}</option>`).join('');
+  const sec=(k)=>c.secrets[k]||{set:false};
+  const keyField=(id,k,ph)=>{const s=sec(k);return `<div class="field"><label>${esc(ph.label)} ${s.set?`<span style="color:var(--good)">✓ 已配${s.preview?'('+esc(s.preview)+')':''}</span> <a onclick="clearSecret('${k}')" style="color:var(--rose)">清除</a>`:''}</label>
+    <input id="${id}" type="password" placeholder="${s.set?'留空 = 保持不变':esc(ph.ph)}"></div>`};
+  m.innerHTML=`<h1>⚙ 设置 <small>独立运行配置</small></h1>
+    <p class="lead">两种用法:① <b>嵌入 Agent</b>(OpenClaw/Hermes 当 skill)——<b>不用配 LLM</b>,生成走宿主模型;② <b>独立运行</b>——想让本网页/CLI 自己一键生成,在这里配自己的 LLM。配置存本机 <code>sv.local.conf</code>(不入库、不会被提交),<b>保存即时生效,无需重启</b>。</p>
+    <div class="section"><h2>LLM(生成 / 写作)</h2>
+      <div class="row2">
+        <div class="field"><label>provider</label><select id="cf_provider">${opt(['stub','openai','anthropic','ollama'],c.provider)}</select></div>
+        <div class="field"><label>model（留空用各家默认）</label><input id="cf_model" value="${esc(c.model)}" placeholder="gpt-4o-mini / claude-sonnet-4-6 / qwen2.5"></div>
+      </div>
+      ${keyField('cf_openai_key','OPENAI_API_KEY',{label:'OpenAI API Key（兼容端通用：DeepSeek/本地）',ph:'sk-... 或兼容端 key'})}
+      <div class="field"><label>OpenAI Base URL（可指 DeepSeek / 本地兼容端）</label><input id="cf_openai_base" value="${esc(c.openai_base_url)}"></div>
+      ${keyField('cf_anthropic_key','ANTHROPIC_API_KEY',{label:'Anthropic API Key',ph:'sk-ant-...'})}
+      <div class="row2">
+        <div class="field"><label>Ollama Base URL（本地）</label><input id="cf_ollama" value="${esc(c.ollama_base_url)}"></div>
+        <div class="field"><label>temperature</label><input id="cf_temp" value="${esc(c.temperature)}"></div>
+      </div>
+      <div class="actions"><button class="btn" onclick="saveSettings()">💾 保存（即时生效）</button><button class="btn ghost" onclick="testLLM()">🔌 测试连接</button></div>
+      <div class="packet" id="cf_test" style="display:none"></div>
+    </div>
+    <div class="section"><h2>多模态渲染（立绘 / 场景图）</h2>
+      <div class="row2">
+        <div class="field"><label>render</label><select id="cf_render">${opt(['none','gitee'],c.render)}</select></div>
+        <div class="field"><label>图像尺寸</label><input id="cf_imgsize" value="${esc(c.image_size)}"></div>
+      </div>
+      ${keyField('cf_gitee_key','GITEE_API_KEY',{label:'Gitee AI API Key',ph:'Gitee z-image key'})}
+      <div class="actions"><button class="btn" onclick="saveSettings()">💾 保存</button></div>
+    </div>
+    <div class="section"><h2>当前状态</h2><table class="kv">
+      <tr><td>LLM</td><td>${c.llm_available?`<span style="color:var(--good)">✓ ${esc(c.provider)}${c.model?' · '+esc(c.model):''}</span>`:'✗ stub（占位，未启用真实生成）'}</td></tr>
+      <tr><td>渲染</td><td>${c.render==='gitee'&&sec('GITEE_API_KEY').set?'<span style="color:var(--good)">✓ gitee</span>':'✗ 未启用'}</td></tr>
+      <tr><td>向量记忆</td><td>${esc(c.embed_provider)}（none = 关键词检索）</td></tr>
+      <tr><td>自演化</td><td>${c.simulate?'on':'off（默认关）'}</td></tr>
+      ${c.env_overrides.length?`<tr><td>环境变量覆盖</td><td>${esc(c.env_overrides.join(', '))}（优先级最高，UI 改不动）</td></tr>`:''}
+    </table>
+    <p class="lead" style="margin-top:12px">密钥仅存在本机 <code>sv.local.conf</code>。网页只绑 <code>127.0.0.1</code>，不对外。</p></div>`;
+}
+async function saveSettings(){
+  const g=id=>{const e=document.getElementById(id);return e?e.value.trim():''};
+  const body={SV_PROVIDER:g('cf_provider'),SV_MODEL:g('cf_model'),OPENAI_BASE_URL:g('cf_openai_base'),
+    OLLAMA_BASE_URL:g('cf_ollama'),SV_LLM_TEMPERATURE:g('cf_temp'),SV_RENDER:g('cf_render'),SV_IMAGE_SIZE:g('cf_imgsize')};
+  ['cf_openai_key:OPENAI_API_KEY','cf_anthropic_key:ANTHROPIC_API_KEY','cf_gitee_key:GITEE_API_KEY'].forEach(p=>{
+    const [id,k]=p.split(':');const v=g(id);if(v)body[k]=v;});  // 密钥仅填了才发(空=保持不变)
+  try{await post('/config',body);await refresh();toast('✓ 设置已保存，即时生效');route()}catch(e){toast('✗ '+e.message,true)}
+}
+async function clearSecret(k){if(!confirm('清除已存密钥 '+k+'?'))return;try{await post('/config',{[k]:''});await refresh();toast('✓ 已清除');route()}catch(e){toast('✗ '+e.message,true)}}
+async function testLLM(){const box=document.getElementById('cf_test');box.style.display='block';box.textContent='测试中…（先保存再测，测的是已保存配置）';
+  try{const r=await post('/llm-test',{});box.innerHTML=r.ok?`<b style="color:var(--good)">✓ ${esc(r.provider)}${r.stub?'（stub 占位，配真 provider 才是真生成）':''}</b>\n回复样本：${esc(r.sample)}`:`<b style="color:var(--bad)">✗ ${esc(r.provider)} 连接失败</b>\n${esc(r.error)}`;
+  }catch(e){box.textContent='✗ '+e.message}}
+
 window.showCh=showCh;
-['actNewWorld','actNewEntity','actNewThread','actNewCodex','actSeedCodex','actLink','actAscend','actSummon','actWriteChapter','actPlay','actEditWorldMd','actNarrateRun','actReflect','actExportThread','actDelWorld','actDelThread','actDelEntity','actDelCodex','actRenderEntity','actRenderScene','closeModal'].forEach(f=>window[f]=eval(f));
+['actNewWorld','actNewEntity','actNewThread','actNewCodex','actSeedCodex','actLink','actAscend','actSummon','actWriteChapter','actPlay','actEditWorldMd','actNarrateRun','actReflect','actExportThread','actDelWorld','actDelThread','actDelEntity','actDelCodex','actRenderEntity','actRenderScene','saveSettings','clearSecret','testLLM','closeModal'].forEach(f=>window[f]=eval(f));
 window.addEventListener('hashchange',route);
 (async()=>{try{await refresh()}catch(e){}route()})();
 </script>

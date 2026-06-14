@@ -14,11 +14,8 @@ import json
 import re
 import urllib.request
 
-from . import checks, craft, llm, recipes, util
-from .config import (
-    GITEE_API_KEY, GITEE_BASE_URL, IMAGE_MODEL, IMAGE_SIZE, IMAGE_STEPS,
-    RENDER, SIMULATE_ENABLED, SUMMARY_EVERY,
-)
+from . import checks, config, craft, llm, recipes, util
+from .config import SUMMARY_EVERY   # 静态默认(函数签名用)
 from .entity import LocalEntity
 from .thread import Thread
 from .world import World
@@ -288,7 +285,7 @@ def _next_session(thread: Thread) -> str:
 
 # ========== simulate(模拟 / 自演化)—— 能力已建,默认关 ==========
 def simulate_prep(world: World, thread: Thread) -> dict:
-    if not SIMULATE_ENABLED:
+    if not config.SIMULATE_ENABLED:
         return {"lens": "simulate", "enabled": False,
                 "note": "自演化默认关闭(SV_SIMULATE=off)。开启后:世界 pulse 推进 + 实体按欲望自主行动,生成下一个 beat。"}
     blocks = []
@@ -304,7 +301,7 @@ def simulate_prep(world: World, thread: Thread) -> dict:
 
 
 def simulate_commit(world: World, thread: Thread, payload: dict) -> dict:
-    if not SIMULATE_ENABLED:
+    if not config.SIMULATE_ENABLED:
         return {"enabled": False, "note": "自演化未开启,不落盘。"}
     written = []
     for b in payload.get("beats", []) or []:
@@ -320,12 +317,12 @@ def simulate_commit(world: World, thread: Thread, payload: dict) -> dict:
 
 # ========== render(可视化 / 多模态)—— 可插拔,未配则休眠 ==========
 def render_available() -> bool:
-    return RENDER == "gitee" and bool(GITEE_API_KEY)
+    return config.RENDER == "gitee" and bool(config.GITEE_API_KEY)
 
 
 def render_prep(world: World, subject: str, *, appearance: str = "") -> dict:
     prompt = (appearance + ", " if appearance else "") + subject
-    return {"lens": "render", "provider": RENDER, "enabled": render_available(),
+    return {"lens": "render", "provider": config.RENDER, "enabled": render_available(),
             "image_prompt": prompt,
             "note": "据此出图(Gitee z-image-turbo,~18s);未配 SV_RENDER=gitee + GITEE_API_KEY 则休眠。"}
 
@@ -333,11 +330,11 @@ def render_prep(world: World, subject: str, *, appearance: str = "") -> dict:
 def _gen_image(prompt: str) -> bytes:
     """调 Gitee z-image 出图,带空白图重试(满分辨率却 <60KB 多为过滤空图,同 Doll)。"""
     raw = b""
-    body = json.dumps({"model": IMAGE_MODEL, "prompt": prompt, "size": IMAGE_SIZE,
-                       "num_inference_steps": IMAGE_STEPS}).encode("utf-8")
+    body = json.dumps({"model": config.IMAGE_MODEL, "prompt": prompt, "size": config.IMAGE_SIZE,
+                       "num_inference_steps": config.IMAGE_STEPS}).encode("utf-8")
     for _ in range(3):
-        req = urllib.request.Request(f"{GITEE_BASE_URL}/images/generations", data=body,
-                                     headers={"Authorization": f"Bearer {GITEE_API_KEY}", "Content-Type": "application/json"})
+        req = urllib.request.Request(f"{config.GITEE_BASE_URL}/images/generations", data=body,
+                                     headers={"Authorization": f"Bearer {config.GITEE_API_KEY}", "Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=120) as r:
             data = json.loads(r.read().decode("utf-8"))
         item = (data.get("data") or [{}])[0]

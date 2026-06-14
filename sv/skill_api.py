@@ -316,6 +316,15 @@ def cmd_show(a):
         print("未知类型:world|thread|entity|nexus")
 
 
+def cmd_config(a):
+    from . import config as cfg
+    if a.key and a.value is not None:
+        cfg.save_setting({a.key: a.value})
+        print(f"✓ 已设 {a.key}(写入 sv.local.conf,即时生效)")
+    else:
+        _out(cfg.settings_snapshot())
+
+
 def cmd_doctor(a):
     from .config import RENDER, SIMULATE_ENABLED, EMBED_PROVIDER, PROVIDER, MODEL
     print("ShadowVerse 暗宇宙引擎 · 自检")
@@ -395,6 +404,7 @@ def build_parser():
     add("check", cmd_check, ["world", "thread", ("chapter", {"type": int})])
     add("status", cmd_status, [("world", {"nargs": "?"}), ("thread", {"nargs": "?"})])
     add("show", cmd_show, ["kind", "key"])
+    add("config", cmd_config, [("key", {"nargs": "?"}), ("value", {"nargs": "?"})])
     add("doctor", cmd_doctor)
     return p
 
