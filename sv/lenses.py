@@ -164,7 +164,9 @@ def narrate_review(world: World, thread: Thread, chapter_text: str) -> dict:
     findings = [{"dim": "客观", "issue": f} for f in auto["findings"] if "未见明显问题" not in f]
     verdict = "pass"
     if llm.available():
-        sys = "你是暗宇宙的冷面审校,只挑问题、绝不改写正文。" + "；".join(craft.REVIEWER_RUBRIC)
+        dims = recipes.get(m.get("genre", "")).get("audit_dimensions", [])
+        sys = ("你是暗宇宙的冷面审校,只挑问题、绝不改写正文。通用 rubric:" + "；".join(craft.REVIEWER_RUBRIC)
+               + ("；本题材另查:" + "；".join(dims) if dims else ""))
         user = "\n\n".join([
             f"题材:{m.get('genre')};节奏契约:{m.get('pacing')}",
             f"canon 硬事实:\n{util.read_md(world.dir / 'canon.md')[:1500]}",

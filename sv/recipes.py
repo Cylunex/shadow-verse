@@ -68,16 +68,35 @@ DEFAULT = {
 }
 
 
-def get(genre: str) -> dict:
-    """按题材取配方;未知题材用 DEFAULT。支持子串匹配(如'都市黑道'→都市)。"""
+# 题材专属审校维度(喂审校子代理,在通用 rubric 之外按题材多查这些)
+AUDIT_DIMS: dict[str, list[str]] = {
+    "无限流": ["每副本/层是否给出通关条件与已用缝隙", "队伍信任/内鬼线是否推进", "代价是否守恒(借力有还)"],
+    "玄幻": ["战力/资源进展本章是否可见", "金手指是否守恒(不凭空)", "境界压制逻辑是否自洽"],
+    "仙侠": ["道心/情劫/机缘是否至少推进一条", "境界与因果是否自洽", "情与道的张力是否在场"],
+    "都市": ["人物关系或处境是否实质变化(非水文)", "规矩/人情账是否记得住", "身份反差是否用上"],
+    "科幻": ["设定后果是否落到人能感受的代价", "硬设定/常数是否前后自洽", "尺度落差的压迫是否到位"],
+    "悬疑": ["α谜题是否推进一层并抛新疑点", "线索是否公平埋设(非作弊)", "人物动机是否站得住"],
+    "言情": ["关系温度本章是否有变(非单调上扬)", "误会/拉扯是否有效", "细节是否见情"],
+    "_default": ["α悬念是否推进一层", "本章是否兑现节奏契约", "行动是否有后果闭环"],
+}
+
+
+def _match_key(genre: str) -> str:
     if not genre:
-        return dict(DEFAULT)
+        return "_default"
     if genre in RECIPES:
-        return RECIPES[genre]
-    for g, r in RECIPES.items():
+        return genre
+    for g in RECIPES:
         if g in genre or genre in g:
-            return r
-    return dict(DEFAULT)
+            return g
+    return "_default"
+
+
+def get(genre: str) -> dict:
+    """按题材取配方(子串匹配,如'都市黑道'→都市;未知→DEFAULT)+ 附题材审校维度。"""
+    k = _match_key(genre)
+    base = RECIPES[k] if k in RECIPES else DEFAULT
+    return {**base, "audit_dimensions": AUDIT_DIMS.get(k, AUDIT_DIMS["_default"])}
 
 
 def forbidden_words(genre: str) -> list[str]:
