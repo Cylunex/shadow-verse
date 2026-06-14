@@ -9,7 +9,8 @@ import sys
 from pathlib import Path
 
 TESTS = ["sim.test_memory", "sim.test_forge", "sim.test_lenses", "sim.test_nexus",
-         "sim.test_llm", "sim.test_narrate", "sim.test_codex", "sim.test_manage", "sim.smoke"]
+         "sim.test_llm", "sim.test_narrate", "sim.test_codex", "sim.test_manage",
+         "sim.test_render", "sim.smoke"]
 ROOT = Path(__file__).resolve().parent.parent
 
 

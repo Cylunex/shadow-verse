@@ -198,6 +198,12 @@ def cmd_render_prep(a):
     _out(lenses.render_prep(World.load(a.world), a.subject or "", appearance=a.appearance or ""))
 
 
+def cmd_render_entity(a):
+    from .entity import LocalEntity
+    w = World.load(a.world)
+    _out(lenses.render_entity(w, LocalEntity.load(w, a.entity), a.scene or ""))
+
+
 def cmd_render_commit(a):
     w, t = _wt(a.world, a.thread)
     _out(lenses.render_commit(w, t, a.subject or "", appearance=a.appearance or ""))
@@ -373,6 +379,7 @@ def build_parser():
     add("simulate-commit", cmd_simulate_commit, ["world", "thread"])
     add("render-prep", cmd_render_prep, ["world"], [("subject", {"default": ""}), ("appearance", {"default": ""})])
     add("render-commit", cmd_render_commit, ["world", "thread"], [("subject", {"default": ""}), ("appearance", {"default": ""})])
+    add("render-entity", cmd_render_entity, ["world", "entity"], [("scene", {"default": ""})])
 
     add("ascend", cmd_ascend, ["world", "entity"], [("as", {"default": None})])
     add("summon", cmd_summon, ["nexus_id", "world"], [("entry", {"default": "本体进"})])

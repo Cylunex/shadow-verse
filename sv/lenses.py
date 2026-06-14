@@ -319,29 +319,66 @@ def simulate_commit(world: World, thread: Thread, payload: dict) -> dict:
 
 
 # ========== render(可视化 / 多模态)—— 可插拔,未配则休眠 ==========
+def render_available() -> bool:
+    return RENDER == "gitee" and bool(GITEE_API_KEY)
+
+
 def render_prep(world: World, subject: str, *, appearance: str = "") -> dict:
     prompt = (appearance + ", " if appearance else "") + subject
-    return {"lens": "render", "provider": RENDER,
-            "enabled": RENDER != "none" and bool(GITEE_API_KEY),
+    return {"lens": "render", "provider": RENDER, "enabled": render_available(),
             "image_prompt": prompt,
-            "note": "render-commit 据此出图(Gitee z-image-turbo,~18s);未配 GITEE_API_KEY 则休眠。"}
+            "note": "据此出图(Gitee z-image-turbo,~18s);未配 SV_RENDER=gitee + GITEE_API_KEY 则休眠。"}
+
+
+def _gen_image(prompt: str) -> bytes:
+    """调 Gitee z-image 出图,带空白图重试(满分辨率却 <60KB 多为过滤空图,同 Doll)。"""
+    raw = b""
+    body = json.dumps({"model": IMAGE_MODEL, "prompt": prompt, "size": IMAGE_SIZE,
+                       "num_inference_steps": IMAGE_STEPS}).encode("utf-8")
+    for _ in range(3):
+        req = urllib.request.Request(f"{GITEE_BASE_URL}/images/generations", data=body,
+                                     headers={"Authorization": f"Bearer {GITEE_API_KEY}", "Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=120) as r:
+            data = json.loads(r.read().decode("utf-8"))
+        item = (data.get("data") or [{}])[0]
+        raw = base64.b64decode(item["b64_json"]) if item.get("b64_json") else urllib.request.urlopen(item["url"], timeout=60).read()
+        if len(raw) >= 60_000:
+            break
+    return raw
+
+
+def _save_image(dirpath, raw: bytes, stem: str):
+    n = len(list(dirpath.glob("*.png"))) + 1 if dirpath.exists() else 1
+    out = dirpath / f"{stem}-{n:03d}.png"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(raw)
+    return out
+
+
+def render_scene(world: World, thread: Thread, subject: str, *, appearance: str = "") -> dict:
+    """生成一张场景图,存到线的 renders/。"""
+    if not render_available():
+        return {"enabled": False, "note": "多模态渲染未启用:在 sv.conf 设 SV_RENDER=gitee + GITEE_API_KEY。"}
+    prompt = (appearance + ", " if appearance else "") + subject
+    raw = _gen_image(prompt)
+    out = _save_image(thread.renders_dir, raw, "scene")
+    thread.mark_lens("render")
+    return {"enabled": True, "file": out.name, "bytes": len(raw), "prompt": prompt,
+            "rel": f"worlds/{world.id}/threads/{thread.id}/renders/{out.name}"}
+
+
+def render_entity(world: World, entity, scene: str = "") -> dict:
+    """生成一张角色立绘,用实体固定 appearance 锁脸,存到实体 portraits/。entity=LocalEntity。"""
+    if not render_available():
+        return {"enabled": False, "note": "多模态渲染未启用:在 sv.conf 设 SV_RENDER=gitee + GITEE_API_KEY。"}
+    base = entity.appearance or entity.card().get("name", entity.id)
+    prompt = base + (", " + scene if scene else ", character portrait")
+    raw = _gen_image(prompt)
+    out = _save_image(entity.dir / "portraits", raw, "portrait")
+    return {"enabled": True, "file": out.name, "bytes": len(raw), "prompt": prompt,
+            "rel": f"worlds/{world.id}/entities/{entity.id}/portraits/{out.name}"}
 
 
 def render_commit(world: World, thread: Thread, subject: str, *, appearance: str = "") -> dict:
-    if RENDER != "gitee" or not GITEE_API_KEY:
-        return {"enabled": False, "note": "多模态渲染未启用:在 sv.conf 设 SV_RENDER=gitee + GITEE_API_KEY。"}
-    prompt = (appearance + ", " if appearance else "") + subject
-    body = json.dumps({"model": IMAGE_MODEL, "prompt": prompt, "size": IMAGE_SIZE,
-                       "num_inference_steps": IMAGE_STEPS}).encode("utf-8")
-    req = urllib.request.Request(f"{GITEE_BASE_URL}/images/generations", data=body,
-                                 headers={"Authorization": f"Bearer {GITEE_API_KEY}", "Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=120) as r:
-        data = json.loads(r.read().decode("utf-8"))
-    item = (data.get("data") or [{}])[0]
-    raw = base64.b64decode(item["b64_json"]) if item.get("b64_json") else urllib.request.urlopen(item["url"], timeout=60).read()
-    n = len(list(thread.renders_dir.glob("*.png"))) + 1 if thread.renders_dir.exists() else 1
-    out = thread.renders_dir / f"render-{n:03d}.png"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_bytes(raw)
-    thread.mark_lens("render")
-    return {"enabled": True, "file": str(out), "bytes": len(raw), "prompt": prompt}
+    """向后兼容旧命令名 → render_scene。"""
+    return render_scene(world, thread, subject, appearance=appearance)

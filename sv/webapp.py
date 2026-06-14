@@ -73,8 +73,9 @@ def api_thread(wid: str, tid: str) -> dict:
         chapters.append({"no": n, "title": title, "text": body, "hanzi": _hanzi(body)})
     sessions = [{"id": p.stem, "text": p.read_text(encoding="utf-8")}
                 for p in sorted(t.sessions_dir.glob("*.md"))] if t.sessions_dir.exists() else []
+    renders = [f"worlds/{wid}/threads/{tid}/renders/{p.name}" for p in sorted(t.renders_dir.glob("*.png"))] if t.renders_dir.exists() else []
     return {"meta": m, "thread_md": util.read_md(t.dir / "thread.md"), "summary_md": t.summary(),
-            "chapters": chapters, "beats": t.beats(), "sessions": sessions,
+            "chapters": chapters, "beats": t.beats(), "sessions": sessions, "renders": renders,
             "recipe": recipes.get(m.get("genre", "")),
             "entities": [{"id": e, "name": LocalEntity(w, e).card().get("name", e),
                           "role": LocalEntity(w, e).card().get("role", "")} for e in w.list_entities()]}
@@ -82,8 +83,11 @@ def api_thread(wid: str, tid: str) -> dict:
 
 def api_entity(wid: str, eid: str) -> dict:
     w = World.load(wid); e = LocalEntity.load(w, eid)
+    pd = e.dir / "portraits"
+    portraits = [f"worlds/{wid}/entities/{eid}/portraits/{p.name}" for p in sorted(pd.glob("*.png"))] if pd.exists() else []
     return {"card": e.card(), "profile_md": util.read_md(e.dir / "profile.md"),
             "state": memory.read_state(e.dir), "anchors": e.anchors(),
+            "appearance": e.appearance, "portraits": portraits,
             "experiences": memory.all_experiences(e.dir)}
 
 
@@ -135,10 +139,23 @@ def post_world_save_md(b: dict) -> dict:
 
 def post_entity_create(b: dict) -> dict:
     w = World.load(b["world"])
-    e = LocalEntity.create(w, b["id"], b.get("name", b["id"]), role=b.get("role", "secondary"))
+    e = LocalEntity.create(w, b["id"], b.get("name", b["id"]), role=b.get("role", "secondary"),
+                           appearance=b.get("appearance", ""))
     if b.get("profile_md"):
         util.write_md(e.dir / "profile.md", b["profile_md"])
     return {"ok": True, "id": e.id}
+
+
+def post_render_entity(b: dict) -> dict:
+    w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
+    if b.get("appearance") is not None and b.get("appearance") != "":
+        e.set_appearance(b["appearance"])
+    return lenses.render_entity(w, e, b.get("scene", ""))
+
+
+def post_render_scene(b: dict) -> dict:
+    w = World.load(b["world"]); t = Thread.load(w, b["thread"])
+    return lenses.render_scene(w, t, b.get("subject", ""), appearance=b.get("appearance", ""))
 
 
 def post_thread_create(b: dict) -> dict:
@@ -281,6 +298,8 @@ POST_ROUTES = [
     (re.compile(r"^/api/delete/entity$"), post_delete_entity),
     (re.compile(r"^/api/delete/codex$"), post_delete_codex),
     (re.compile(r"^/api/unlink$"), post_unlink),
+    (re.compile(r"^/api/render/entity$"), post_render_entity),
+    (re.compile(r"^/api/render/scene$"), post_render_scene),
 ]
 
 
@@ -302,6 +321,13 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         if path in ("/", "/index.html"):
             return self._send(200, (WEB_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
+        if path.startswith("/img/"):   # 服务 universe 下的生成图(防目录穿越)
+            from urllib.parse import unquote
+            target = (UNIVERSE / unquote(path[len("/img/"):])).resolve()
+            root = UNIVERSE.resolve()
+            if target.suffix.lower() == ".png" and root in target.parents and target.exists():
+                return self._send(200, target.read_bytes(), "image/png")
+            return self._send(404, b"not found", "text/plain")
         q = _qs(self.path)
         for rx, fn in GET_ROUTES:
             mm = rx.match(path)

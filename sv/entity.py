@@ -62,10 +62,18 @@ class LocalEntity:
     def grows(self) -> bool:
         return self.role in GROWS
 
+    @property
+    def appearance(self) -> str:
+        """固定外貌词(英文打底,保持立绘像同一人;同 Doll 套路)。"""
+        return self.card().get("appearance", "")
+
+    def set_appearance(self, text: str) -> None:
+        c = self.card(); c["appearance"] = text; save_json(self.card_path, c)
+
     @classmethod
     def create(
         cls, world: World, eid: str, name: str, *, role: str = "secondary",
-        prov: dict | None = None, body: str | None = None,
+        appearance: str = "", prov: dict | None = None, body: str | None = None,
     ) -> "LocalEntity":
         if not util.is_id(eid):
             raise ValueError(f"实体 id 必须 kebab-case:{eid!r}")
@@ -75,7 +83,7 @@ class LocalEntity:
         if e.exists():
             raise FileExistsError(f"实体已存在:{eid}")
         save_json(e.card_path, {
-            "id": eid, "name": name, "role": role,
+            "id": eid, "name": name, "role": role, "appearance": appearance,
             "provenance": prov or provenance.stamp("manual"), "created": clock.now_iso(),
         })
         util.write_md(e.dir / "profile.md", body or PROFILE_TEMPLATE.format(id=eid, name=name, role=role))

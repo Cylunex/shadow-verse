@@ -79,6 +79,8 @@
   .node text{fill:var(--ink);font-size:13px;text-anchor:middle}
   .edge{stroke:var(--acc);stroke-width:1.5;stroke-dasharray:5 5;opacity:.55}
   .edge-label{fill:var(--faint);font-size:10px;text-anchor:middle}
+  .gallery{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .gallery img{max-width:200px;max-height:300px;border-radius:10px;border:1px solid var(--line);background:var(--panel)}
   .incarn{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
   .incarn .b{background:#0006;border:1px solid var(--acc);color:var(--acc2);border-radius:20px;padding:2px 11px;font-size:12px}
   .crumb{color:var(--faint);font-size:13px;margin-bottom:10px}
@@ -173,6 +175,7 @@ async function actNewEntity(wid){formModal('新建实体 · '+wid,[
   {n:'id',label:'id (kebab-case)'},{n:'name',label:'名称'},
   {n:'concept',label:'角色概念(AI 生成用;留空用名称)',type:'textarea',rows:2,ph:'如:外冷内热的守护者'},
   {n:'role',label:'戏份',type:'select',options:['main','secondary','cameo','npc'],value:'secondary'},
+  {n:'appearance',label:'固定外貌(英文,立绘锁脸用,可空)',ph:'如:26yo man, scar on brow, black coat'},
   {n:'profile_md',label:'灵魂 profile (留空=模板;含「## 核心事实」会被抽成 anchors)',type:'textarea',rows:7,ph:'# 名字\\n\\n## 核心事实\\n- …'},
 ],'建实体',async v=>{v.world=wid;await post('/entity/create',v);closeModal();toast(`✓ 实体 <b>${esc(v.name||v.id)}</b> 已建`);route()},
  {label:'🔮 AI生成灵魂',run:async(v,set)=>{const r=await post('/gen/entity',{world:wid,prompt:v.concept||v.name||v.id,role:v.role});set('profile_md',r.body);toast('✓ 灵魂已生成,可编辑')}})}
@@ -207,6 +210,20 @@ async function actDelEntity(wid,eid,name){if(!confirm(`删除实体「${name}」
   try{await post('/delete/entity',{world:wid,entity:eid});toast(`✓ 已删实体「${esc(name)}」`);location.hash='#/world/'+wid;route()}catch(e){toast('✗ '+e.message,true)}}
 async function actDelCodex(cat,id){if(!confirm(`删除元件 [${cat}] ${id}?`))return;
   try{await post('/delete/codex',{category:cat,id});await refresh();toast(`✓ 已删元件 ${esc(id)}`);route()}catch(e){toast('✗ '+e.message,true)}}
+
+// 多模态:生成角色立绘(用固定 appearance 锁脸)
+async function actRenderEntity(wid,eid,appearance){formModal('🖼 生成立绘 · '+eid,[
+  {n:'appearance',label:'固定外貌(英文打底,锁脸用;留空用名字)',type:'textarea',rows:2,value:appearance||'',ph:'如:26 year old man, scar on brow, black coat'},
+  {n:'scene',label:'本张场景(英文,可空)',ph:'如:standing in the rain at night'},
+],'生成(~18s)',async v=>{const r=await post('/render/entity',{world:wid,entity:eid,appearance:v.appearance,scene:v.scene});
+  closeModal();if(r.enabled){toast(`✓ 立绘已生成(${Math.round(r.bytes/1024)}KB)`);route()}else{toast('⚠ '+r.note,true)}})}
+
+// 多模态:生成场景图
+async function actRenderScene(wid,tid){formModal('🖼 生成场景图 · '+tid,[
+  {n:'subject',label:'画面内容(英文)',type:'textarea',rows:2,ph:'如:a lone figure before a giant gate, neon city'},
+  {n:'appearance',label:'风格/外貌打底(英文,可空)',ph:'如:cinematic, moody lighting'},
+],'生成(~18s)',async v=>{const r=await post('/render/scene',{world:wid,thread:tid,subject:v.subject,appearance:v.appearance});
+  closeModal();if(r.enabled){toast(`✓ 场景图已生成`);route()}else{toast('⚠ '+r.note,true)}})}
 
 async function actLink(){const ids=OV.worlds.map(w=>w.id);if(ids.length<2)return toast('至少要 2 个世界才能连接',true);
   formModal('连接世界(暗宇宙)',[
@@ -418,8 +435,10 @@ async function viewThread(m,wid,tid){try{const d=await api('/thread/'+wid+'/'+ti
       <button class="btn" onclick="actNarrateRun('${wid}','${tid}')">✨ AI产线写章</button>
       <button class="btn ghost" onclick="actPlay('${wid}','${tid}')">🎭 玩一场</button>
       <button class="btn ghost" onclick="actReflect('${wid}','${tid}')">🧠 反思</button>
+      <button class="btn ghost" onclick="actRenderScene('${wid}','${tid}')">🖼 场景图</button>
       <button class="btn ghost" onclick="actExportThread('${wid}','${tid}')">📖 导出全书</button>
       <button class="btn ghost" onclick="actDelThread('${wid}','${tid}','${esc(meta.title)}')">🗑 删除</button></div>
+    ${(d.renders&&d.renders.length)?`<div class="section"><h2>场景图</h2><div class="gallery">${d.renders.map(p=>`<img src="/img/${esc(p)}" loading="lazy">`).join('')}</div></div>`:''}
     <div class="section"><h2>节奏契约 / 配方</h2><div class="md">${esc(meta.pacing||'')}<br><span style="color:var(--faint);font-size:13px">爽点:${esc((d.recipe||{}).climax||'')}　｜　套路:${esc(((d.recipe||{}).tropes||[]).join('、'))}</span></div></div>
     ${d.chapters.length?`<div class="section"><h2>正文</h2><div class="ch-nav">${chTabs}</div><div id="chbody" class="reader md"></div></div>`:'<div class="empty">还没有章节 — 点「✍ 写一章」</div>'}
     ${d.beats.length?`<div class="section"><h2>跨透镜时间线 (beats)</h2><div class="timeline">${d.beats.map(b=>`<div class="ev"><div class="w">${esc(b.where)} · <span class="tag lens">${esc(b.lens)}</span></div>${esc(b.text)}</div>`).join('')}</div></div>`:''}
@@ -434,8 +453,10 @@ async function viewEntity(m,wid,eid){try{const d=await api('/entity/'+wid+'/'+ei
   m.innerHTML=`<div class="crumb"><a href="#/">总览</a> / <a href="#/world/${wid}">${esc(wid)}</a> / ${esc(c.name)}</div>
     <h1>👤 ${esc(c.name)} <small><span class="tag role-${c.role}">${esc(c.role)}</span></small></h1>
     <div class="actions">${(c.role==='main'||c.role==='secondary')?`<button class="btn ghost" onclick="actAscend('${wid}','${eid}','${esc(c.name)}')">⬆ 升格为跨世界实体</button>`:''}
+      <button class="btn ghost" onclick="actRenderEntity('${wid}','${eid}',${JSON.stringify(d.appearance||'')})">🖼 生成立绘</button>
       <button class="btn ghost" onclick="actDelEntity('${wid}','${eid}','${esc(c.name)}')">🗑 删除实体</button></div>
-    <div class="section"><h2>此刻状态</h2><table class="kv"><tr><td>位置</td><td>${esc(st.location||'—')}</td></tr><tr><td>情绪</td><td>${esc(st.mood||'—')}</td></tr><tr><td>目标</td><td>${esc(st.goal||'—')}</td></tr></table></div>
+    ${(d.portraits&&d.portraits.length)?`<div class="section"><h2>立绘</h2><div class="gallery">${d.portraits.map(p=>`<img src="/img/${esc(p)}" loading="lazy">`).join('')}</div></div>`:''}
+    <div class="section"><h2>此刻状态</h2><table class="kv">${d.appearance?`<tr><td>外貌</td><td>${esc(d.appearance)}</td></tr>`:''}<tr><td>位置</td><td>${esc(st.location||'—')}</td></tr><tr><td>情绪</td><td>${esc(st.mood||'—')}</td></tr><tr><td>目标</td><td>${esc(st.goal||'—')}</td></tr></table></div>
     ${d.anchors.length?`<div class="section"><h2>锚点 anchors</h2><div>${d.anchors.map(a=>`<span class="tag role-main">${esc(a)}</span>`).join('')}</div></div>`:''}
     <div class="section"><h2>经历 (${d.experiences.length})</h2><div class="timeline">${d.experiences.map(e=>`<div class="ev l-${e.level}"><div class="w">${esc(e.where)}<span class="lvl ${e.level}">${esc(e.level)}</span></div>${esc(e.text)}</div>`).join('')||'<div class="empty">暂无</div>'}</div></div>
     <div class="section"><h2>灵魂 profile</h2><div class="md reader">${md(d.profile_md)}</div></div>`;
@@ -473,7 +494,7 @@ async function viewCodex(m){try{const d=await api('/codex');const byCat={};for(c
   }catch(e){m.innerHTML=`<div class="empty">${esc(e.message)}</div>`}}
 
 window.showCh=showCh;
-['actNewWorld','actNewEntity','actNewThread','actNewCodex','actSeedCodex','actLink','actAscend','actSummon','actWriteChapter','actPlay','actEditWorldMd','actNarrateRun','actReflect','actExportThread','actDelWorld','actDelThread','actDelEntity','actDelCodex','closeModal'].forEach(f=>window[f]=eval(f));
+['actNewWorld','actNewEntity','actNewThread','actNewCodex','actSeedCodex','actLink','actAscend','actSummon','actWriteChapter','actPlay','actEditWorldMd','actNarrateRun','actReflect','actExportThread','actDelWorld','actDelThread','actDelEntity','actDelCodex','actRenderEntity','actRenderScene','closeModal'].forEach(f=>window[f]=eval(f));
 window.addEventListener('hashchange',route);
 (async()=>{try{await refresh()}catch(e){}route()})();
 </script>
