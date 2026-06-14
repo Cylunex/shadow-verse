@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>暗宇宙 · ShadowVerse</title>
+<style>
+  :root{
+    --bg:#0a0a12; --bg2:#11111d; --panel:#161628; --panel2:#1d1d33;
+    --ink:#e8e8f4; --dim:#9a9ac0; --faint:#6a6a8c;
+    --acc:#8b6cff; --acc2:#5ee0d0; --gold:#ffcd6b; --rose:#ff7b9c;
+    --line:#262642; --bad:#ff6b6b; --good:#5ee0a0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 800px at 70% -10%,#1a1530 0%,var(--bg) 55%);
+       color:var(--ink);font:15px/1.7 system-ui,"Segoe UI","Microsoft YaHei",sans-serif;min-height:100vh}
+  a{color:inherit;text-decoration:none;cursor:pointer}
+  .wrap{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+  aside{background:linear-gradient(180deg,var(--bg2),var(--bg));border-right:1px solid var(--line);padding:22px 16px;position:sticky;top:0;height:100vh;overflow:auto}
+  .brand{font-size:20px;font-weight:700;letter-spacing:1px;background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .brand small{display:block;color:var(--faint);font-size:11px;font-weight:400;letter-spacing:2px;margin-top:3px}
+  .nav{margin-top:22px}
+  .nav h4{color:var(--faint);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin:18px 0 8px}
+  .nav a{display:flex;justify-content:space-between;align-items:center;padding:8px 11px;border-radius:9px;color:var(--dim);margin-bottom:2px;transition:.15s}
+  .nav a:hover{background:var(--panel);color:var(--ink)}
+  .nav a.on{background:var(--panel2);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+  .nav .b{font-size:11px;color:var(--faint);background:#0008;border-radius:20px;padding:1px 8px}
+  .nav .newbtn{margin-top:14px;display:block;text-align:center;background:linear-gradient(90deg,var(--acc),#6a4ad0);color:#fff;padding:9px;border-radius:10px;font-weight:600}
+  .nav .newbtn:hover{filter:brightness(1.12)}
+  main{padding:30px 40px;max-width:1120px}
+  .stat-row{display:flex;gap:12px;flex-wrap:wrap;margin:6px 0 26px}
+  .chip{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 16px;min-width:92px}
+  .chip b{display:block;font-size:22px;color:var(--acc2)}
+  .chip span{font-size:11px;color:var(--faint);letter-spacing:1px}
+  h1{font-size:26px;margin:0 0 4px}
+  h1 small{font-size:13px;color:var(--faint);font-weight:400;margin-left:10px}
+  .lead{color:var(--dim);margin:0 0 18px}
+  .actions{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 20px}
+  .btn{background:var(--acc);color:#fff;border:none;border-radius:9px;padding:8px 15px;font-size:14px;cursor:pointer;transition:.15s}
+  .btn:hover{filter:brightness(1.12)}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--dim)}
+  .btn.ghost:hover{border-color:var(--acc);color:var(--ink)}
+  .btn.sm{padding:4px 10px;font-size:12px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;transition:.15s;cursor:pointer;position:relative}
+  .card:hover{border-color:var(--acc);transform:translateY(-2px)}
+  .card h3{margin:0 0 6px;font-size:17px}
+  .card .meta{color:var(--faint);font-size:12px}
+  .tag{display:inline-block;font-size:11px;padding:2px 9px;border-radius:20px;margin:3px 5px 0 0;background:#0006;border:1px solid var(--line);color:var(--dim)}
+  .tag.role-main{color:var(--gold);border-color:#5a4a1a}
+  .tag.role-secondary{color:var(--acc2);border-color:#1a4a44}
+  .tag.role-cameo{color:var(--faint)}
+  .tag.lens{color:var(--acc);border-color:#3a2a6a}
+  .tag.forge{color:var(--rose);border-color:#5a2336}
+  .section{margin:24px 0}
+  .section h2{font-size:14px;letter-spacing:1px;color:var(--faint);text-transform:uppercase;border-bottom:1px solid var(--line);padding-bottom:7px;display:flex;justify-content:space-between;align-items:center}
+  .md h1,.md h2,.md h3{color:var(--ink);margin:18px 0 6px}
+  .md h1{font-size:20px}.md h2{font-size:16px;color:var(--acc2)}.md h3{font-size:14px}
+  .md blockquote{border-left:3px solid var(--acc);margin:8px 0;padding:2px 14px;color:var(--dim);background:#0004}
+  .md ul{margin:6px 0;padding-left:22px}.md li{margin:2px 0}.md p{margin:8px 0}
+  .reader{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px 30px;line-height:2.05;font-size:16px}
+  .reader p{margin:0 0 16px;text-indent:2em}
+  .ch-nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .ch-nav button{background:var(--panel);border:1px solid var(--line);color:var(--dim);border-radius:9px;padding:7px 13px;cursor:pointer}
+  .ch-nav button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+  .timeline{border-left:2px solid var(--line);margin-left:6px;padding-left:18px}
+  .ev{position:relative;margin:0 0 14px}
+  .ev::before{content:"";position:absolute;left:-25px;top:7px;width:9px;height:9px;border-radius:50%;background:var(--acc)}
+  .ev.l-身份::before{background:var(--gold)}.ev.l-持久::before{background:var(--acc2)}.ev.l-瞬时::before{background:var(--faint)}
+  .ev .w{font-size:11px;color:var(--faint)}
+  .lvl{font-size:10px;padding:1px 7px;border-radius:20px;border:1px solid var(--line);margin-left:6px}
+  .lvl.身份{color:var(--gold)}.lvl.持久{color:var(--acc2)}.lvl.瞬时{color:var(--faint)}
+  table.kv{border-collapse:collapse;font-size:14px}
+  table.kv td{padding:4px 18px 4px 0;color:var(--dim)} table.kv td:first-child{color:var(--faint);width:80px}
+  .map{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px;margin-bottom:8px}
+  .node{cursor:pointer}
+  .node circle{fill:var(--panel2);stroke:var(--acc);stroke-width:2;transition:.15s}
+  .node:hover circle{fill:var(--acc);stroke:var(--acc2)}
+  .node text{fill:var(--ink);font-size:13px;text-anchor:middle}
+  .edge{stroke:var(--acc);stroke-width:1.5;stroke-dasharray:5 5;opacity:.55}
+  .edge-label{fill:var(--faint);font-size:10px;text-anchor:middle}
+  .incarn{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .incarn .b{background:#0006;border:1px solid var(--acc);color:var(--acc2);border-radius:20px;padding:2px 11px;font-size:12px}
+  .crumb{color:var(--faint);font-size:13px;margin-bottom:10px}
+  .crumb a:hover{color:var(--acc2)}
+  .empty{color:var(--faint);padding:40px;text-align:center}
+  /* modal */
+  .overlay{position:fixed;inset:0;background:#000a;backdrop-filter:blur(3px);display:flex;align-items:flex-start;justify-content:center;padding:50px 16px;z-index:50;overflow:auto}
+  .modal{background:var(--bg2);border:1px solid var(--line);border-radius:16px;width:100%;max-width:720px;padding:24px 26px;box-shadow:0 20px 60px #000a}
+  .modal h3{margin:0 0 16px;font-size:19px}
+  .field{margin-bottom:13px}
+  .field label{display:block;font-size:12px;color:var(--faint);margin-bottom:5px;letter-spacing:.5px}
+  .field input,.field select,.field textarea{width:100%;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:9px 11px;font:inherit}
+  .field textarea{resize:vertical;line-height:1.8}
+  .field input:focus,.field textarea:focus,.field select:focus{outline:none;border-color:var(--acc)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+  .packet{background:#0006;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:12.5px;color:var(--dim);max-height:240px;overflow:auto;white-space:pre-wrap;margin-bottom:10px}
+  .packet b{color:var(--acc2)}
+  .ent-row{display:grid;grid-template-columns:90px 1fr 84px;gap:8px;align-items:center;margin-bottom:7px}
+  .ent-row .nm{font-size:13px;color:var(--dim)}
+  .err{color:var(--bad);font-size:13px;margin-top:8px}
+  .toast{position:fixed;right:20px;bottom:20px;background:var(--panel2);border:1px solid var(--acc);color:var(--ink);padding:12px 18px;border-radius:11px;box-shadow:0 8px 30px #000a;z-index:60;max-width:420px;font-size:14px}
+  .toast.bad{border-color:var(--bad)}
+  .toast b{color:var(--acc2)}
+  code{background:#0006;padding:1px 5px;border-radius:5px;font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside>
+    <div class="brand">暗宇宙<small>SHADOWVERSE CONSOLE</small></div>
+    <a class="newbtn" onclick="actNewWorld()">＋ 新建世界</a>
+    <div class="nav" id="nav"></div>
+  </aside>
+  <main id="main"><div class="empty">载入中…</div></main>
+</div>
+<script>
+const esc=(s)=>(s==null?'':(''+s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+async function api(p){const r=await fetch('/api'+p);if(!r.ok)throw new Error((await r.json()).error||r.status);return r.json()}
+async function post(p,b){const r=await fetch('/api'+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+  const j=await r.json();if(!r.ok||j.ok===false)throw new Error(j.error||r.status);return j}
+function toast(msg,bad){const t=document.createElement('div');t.className='toast'+(bad?' bad':'');t.innerHTML=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),4200)}
+function md(t){const lines=(t||'').split('\n');let h='',ul=false;const cu=()=>{if(ul){h+='</ul>';ul=false}};
+  for(let ln of lines){
+    if(/^###\s/.test(ln)){cu();h+='<h3>'+esc(ln.slice(4))+'</h3>'}
+    else if(/^##\s/.test(ln)){cu();h+='<h2>'+esc(ln.slice(3))+'</h2>'}
+    else if(/^#\s/.test(ln)){cu();h+='<h1>'+esc(ln.slice(2))+'</h1>'}
+    else if(/^>\s?/.test(ln)){cu();h+='<blockquote>'+inl(ln.replace(/^>\s?/,''))+'</blockquote>'}
+    else if(/^[-*]\s/.test(ln)){if(!ul){h+='<ul>';ul=true}h+='<li>'+inl(ln.slice(2))+'</li>'}
+    else if(/^<!--/.test(ln.trim())){cu()}
+    else if(ln.trim()===''){cu()}
+    else{cu();h+='<p>'+inl(ln)+'</p>'}}
+  cu();return h}
+function inl(s){return esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/`(.+?)`/g,'<code>$1</code>')}
+
+let OV={worlds:[],nexus:{entities:[],links:[]},codex:{count:0},genres:[]};
+async function refresh(){OV=await api('/overview')}
+
+/* ---------- modal ---------- */
+function closeModal(){const o=document.querySelector('.overlay');if(o)o.remove()}
+function openModal(html){closeModal();const o=document.createElement('div');o.className='overlay';
+  o.onclick=e=>{if(e.target===o)closeModal()};o.innerHTML='<div class="modal">'+html+'</div>';document.body.appendChild(o);return o}
+// 简单表单弹窗:fields=[{n,label,type,options,ph,value,rows}];aux={label,run(vals,set)} 可选(AI 生成按钮)
+function formModal(title,fields,submitLabel,onSubmit,aux){
+  const body=fields.map(f=>{
+    if(f.type==='select')return `<div class="field"><label>${esc(f.label)}</label><select id="f_${f.n}">${f.options.map(o=>`<option ${o===f.value?'selected':''}>${esc(o)}</option>`).join('')}</select></div>`;
+    if(f.type==='textarea')return `<div class="field"><label>${esc(f.label)}</label><textarea id="f_${f.n}" rows="${f.rows||4}" placeholder="${esc(f.ph||'')}">${esc(f.value||'')}</textarea></div>`;
+    return `<div class="field"><label>${esc(f.label)}</label><input id="f_${f.n}" placeholder="${esc(f.ph||'')}" value="${esc(f.value||'')}"></div>`;
+  }).join('');
+  const auxBtn=aux?`<button class="btn ghost" id="m_aux" style="margin-right:auto">${esc(aux.label)}${(OV.llm&&!OV.llm.available)?' (stub)':''}</button>`:'';
+  const o=openModal(`<h3>${esc(title)}</h3>${body}<div class="err" id="m_err"></div>
+    <div class="modal-actions">${auxBtn}<button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" id="m_ok">${esc(submitLabel)}</button></div>`);
+  const vals=()=>{const v={};fields.forEach(f=>v[f.n]=o.querySelector('#f_'+f.n).value.trim());return v};
+  const setF=(n,val)=>{const el=o.querySelector('#f_'+n);if(el)el.value=val};
+  o.querySelector('#m_ok').onclick=async()=>{try{await onSubmit(vals())}catch(e){o.querySelector('#m_err').textContent='✗ '+e.message}};
+  if(aux){const ab=o.querySelector('#m_aux');ab.onclick=async()=>{const t0=ab.textContent;ab.textContent='生成中…';ab.disabled=true;
+    try{await aux.run(vals(),setF)}catch(e){o.querySelector('#m_err').textContent='✗ '+e.message}finally{ab.textContent=t0;ab.disabled=false}}}
+}
+
+/* ---------- actions ---------- */
+async function actNewWorld(){formModal('新建世界',[
+  {n:'id',label:'id (kebab-case,如 infinite-tower)',ph:'唯一英文 id'},
+  {n:'name',label:'名称'},
+  {n:'concept',label:'一句话设定(AI 生成用;留空用名称)',type:'textarea',rows:2,ph:'如:一座无限攀登的规则之塔'},
+  {n:'genre',label:'题材',type:'select',options:['',...OV.genres],value:''},
+  {n:'scale',label:'尺度',type:'select',options:['max','克制'],value:'max'},
+  {n:'world_md',label:'设定正文(留空=模板;或点「AI生成设定」)',type:'textarea',rows:8,ph:'# 世界名\\n…'},
+],'建世界',async v=>{await post('/world/create',v);await refresh();closeModal();toast(`✓ 世界 <b>${esc(v.name||v.id)}</b> 已建`);location.hash='#/world/'+v.id;renderNav('world/'+v.id)},
+ {label:'🔮 AI生成设定',run:async(v,set)=>{const r=await post('/gen/world',{prompt:v.concept||v.name||v.id,genre:v.genre,tags:''});set('world_md',r.body);toast('✓ 设定已生成,可编辑后建世界')}})}
+
+async function actNewEntity(wid){formModal('新建实体 · '+wid,[
+  {n:'id',label:'id (kebab-case)'},{n:'name',label:'名称'},
+  {n:'concept',label:'角色概念(AI 生成用;留空用名称)',type:'textarea',rows:2,ph:'如:外冷内热的守护者'},
+  {n:'role',label:'戏份',type:'select',options:['main','secondary','cameo','npc'],value:'secondary'},
+  {n:'profile_md',label:'灵魂 profile (留空=模板;含「## 核心事实」会被抽成 anchors)',type:'textarea',rows:7,ph:'# 名字\\n\\n## 核心事实\\n- …'},
+],'建实体',async v=>{v.world=wid;await post('/entity/create',v);closeModal();toast(`✓ 实体 <b>${esc(v.name||v.id)}</b> 已建`);route()},
+ {label:'🔮 AI生成灵魂',run:async(v,set)=>{const r=await post('/gen/entity',{world:wid,prompt:v.concept||v.name||v.id,role:v.role});set('profile_md',r.body);toast('✓ 灵魂已生成,可编辑')}})}
+
+async function actNewThread(wid){const w=await api('/world/'+wid);formModal('新建叙事线 · '+wid,[
+  {n:'id',label:'id (kebab-case)'},{n:'title',label:'标题'},
+  {n:'concept',label:'叙事概念(AI 生成用;留空用标题)',type:'textarea',rows:2,ph:'如:主角的第一次攀登'},
+  {n:'genre',label:'题材(留空继承世界)',type:'select',options:['',...OV.genres],value:w.meta.genre||''},
+  {n:'pacing',label:'节奏契约',value:'每章至少推进一条主线钩子'},
+  {n:'thread_md',label:'大纲正文(留空=模板;或点「AI生成大纲」)',type:'textarea',rows:7,ph:'# 标题\\n…'},
+],'建线',async v=>{v.world=wid;await post('/thread/create',v);closeModal();toast(`✓ 叙事线 <b>${esc(v.title||v.id)}</b> 已建`);location.hash='#/thread/'+wid+'/'+v.id},
+ {label:'🔮 AI生成大纲',run:async(v,set)=>{const r=await post('/gen/thread',{world:wid,prompt:v.concept||v.title||v.id});set('thread_md',r.body);toast('✓ 大纲已生成,可编辑')}})}
+
+async function actNewCodex(){const cats=(await api('/codex')).categories;formModal('新建元件',[
+  {n:'category',label:'类别',type:'select',options:cats,value:cats[0]},
+  {n:'id',label:'id (kebab-case)'},
+  {n:'summary',label:'AI摘要(喂生成器的食材说明)',type:'textarea',rows:3},
+  {n:'tags',label:'标签(逗号分隔)'},
+  {n:'body',label:'拆解(可选:为什么有效/结构/可变体)',type:'textarea',rows:3},
+],'入库',async v=>{await post('/codex/create',v);await refresh();closeModal();toast(`✓ 元件 <b>${esc(v.id)}</b> 入库`);route()})}
+
+async function actSeedCodex(){try{const r=await post('/codex/seed',{});await refresh();toast(`✓ 起始元件库:新增 <b>${r.added}</b>,跳过 ${r.skipped},共 ${r.total} 个`);route()}catch(e){toast('✗ '+e.message,true)}}
+
+function download(name,content){const b=new Blob([content],{type:'text/markdown;charset=utf-8'});const u=URL.createObjectURL(b);
+  const a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
+async function actExportThread(wid,tid){try{const r=await api('/export/thread/'+wid+'/'+tid);download(r.filename,r.content);toast(`✓ 已导出《${esc(r.filename)}》(${r.chapters} 章 / ${r.hanzi} 字)`)}catch(e){toast('✗ '+e.message,true)}}
+async function actDelWorld(wid,name){if(!confirm(`删除世界「${name}」及其全部叙事线/实体?并清理枢纽里它的连接与化身。此操作不可撤销。`))return;
+  try{await post('/delete/world',{id:wid});await refresh();toast(`✓ 已删世界「${esc(name)}」`);location.hash='#/'}catch(e){toast('✗ '+e.message,true)}}
+async function actDelThread(wid,tid,title){if(!confirm(`删除叙事线「${title}」及其全部章节/小剧场?不可撤销。`))return;
+  try{await post('/delete/thread',{world:wid,thread:tid});toast(`✓ 已删线「${esc(title)}」`);location.hash='#/world/'+wid}catch(e){toast('✗ '+e.message,true)}}
+async function actDelEntity(wid,eid,name){if(!confirm(`删除实体「${name}」?(已升格的跨世界实体不受影响)不可撤销。`))return;
+  try{await post('/delete/entity',{world:wid,entity:eid});toast(`✓ 已删实体「${esc(name)}」`);location.hash='#/world/'+wid;route()}catch(e){toast('✗ '+e.message,true)}}
+async function actDelCodex(cat,id){if(!confirm(`删除元件 [${cat}] ${id}?`))return;
+  try{await post('/delete/codex',{category:cat,id});await refresh();toast(`✓ 已删元件 ${esc(id)}`);route()}catch(e){toast('✗ '+e.message,true)}}
+
+async function actLink(){const ids=OV.worlds.map(w=>w.id);if(ids.length<2)return toast('至少要 2 个世界才能连接',true);
+  formModal('连接世界(暗宇宙)',[
+  {n:'a',label:'世界 A',type:'select',options:ids,value:ids[0]},
+  {n:'b',label:'世界 B',type:'select',options:ids,value:ids[1]},
+  {n:'relation',label:'连接关系',ph:'如:第七层裂隙通向…'},{n:'note',label:'备注(可选)'},
+],'连接',async v=>{await post('/link',v);await refresh();closeModal();toast(`✓ <b>${esc(v.a)}</b> ⇄ <b>${esc(v.b)}</b>`);route()})}
+
+async function actAscend(wid,eid,name){formModal(`升格为跨世界实体 · ${name}`,[
+  {n:'as',label:'枢纽 id(留空=沿用本地 id)',value:''},
+],'升格',async v=>{await post('/ascend',{world:wid,entity:eid,as:v.as});await refresh();closeModal();toast(`✓ <b>${esc(name)}</b> 升格,可跨世界穿梭`);route()})}
+
+async function actSummon(nid,name){const ids=OV.worlds.map(w=>w.id);formModal(`召唤 ${name} 进入世界`,[
+  {n:'world',label:'目标世界',type:'select',options:ids,value:ids[0]},
+  {n:'entry',label:'进入方式',type:'select',options:['本体进','带记忆进','换皮进'],value:'本体进'},
+],'召唤',async v=>{v.nexus_id=nid;await post('/summon',v);await refresh();closeModal();toast(`✓ <b>${esc(name)}</b> 在 <b>${esc(v.world)}</b> 开了化身`);route()})}
+
+// 写一章:取写作包 → 写正文 → 沉淀(每个活跃实体一行)→ 提交
+async function actWriteChapter(wid,tid){
+  const t=await api('/thread/'+wid+'/'+tid);
+  const ents=t.entities;
+  const entRows=ents.map(e=>`<div class="ent-row"><span class="nm">${esc(e.name)}<br><span class="tag role-${e.role}">${e.role}</span></span>
+     <input id="sd_${e.id}" placeholder="这章 ${esc(e.name)} 经历了什么(留空=不沉淀)">
+     <select id="lv_${e.id}"><option>瞬时</option><option selected>持久</option><option>身份</option></select></div>
+     <div class="ent-row" style="grid-template-columns:90px 1fr 1fr 1fr;margin-bottom:12px"><span></span>
+     <input id="st_loc_${e.id}" placeholder="位置"><input id="st_mood_${e.id}" placeholder="情绪"><input id="st_goal_${e.id}" placeholder="目标"></div>`).join('');
+  const o=openModal(`<h3>✍ 写第 ${t.meta.chapter_count+1} 章 · ${esc(t.meta.title)}</h3>
+    <div class="field"><label>节奏契约</label><div class="packet">${esc(t.meta.pacing)}　｜　爽点:${esc((t.recipe||{}).climax||'')}</div></div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <button class="btn ghost sm" id="getpkt">⬇ 取写作包(喂你的模型)</button>
+      <button class="btn sm" id="gench">🔮 AI写本章${(OV.llm&&!OV.llm.available)?' (stub)':''}</button></div>
+    <div class="packet" id="pktbox" style="display:none"></div>
+    <div class="field"><label>章标题</label><input id="ch_title" placeholder="本章小标题"></div>
+    <div class="field"><label>正文</label><textarea id="ch_body" rows="12" placeholder="把这一章写在这里(或贴你模型写的)…"></textarea></div>
+    <div class="field"><label>经历沉淀(主/次角写回,客串自动忽略)</label>${entRows||'<div class="empty">这条线还没有实体</div>'}</div>
+    <div class="field"><label>本章摘要(可选,每 5 章压缩时填)</label><input id="ch_sum" placeholder="留空=不更新摘要"></div>
+    <div class="err" id="m_err"></div>
+    <div class="modal-actions"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" id="m_ok">落章 + 沉淀</button></div>`);
+  o.querySelector('#getpkt').onclick=async()=>{
+    const intent=o.querySelector('#ch_title').value||'';
+    const p=await api('/prep/narrate?world='+wid+'&thread='+tid+'&intent='+encodeURIComponent(intent));
+    const box=o.querySelector('#pktbox');box.style.display='block';
+    box.innerHTML=`<b>配方 pacing</b>:${esc(p.recipe.pacing)}\n<b>疲劳词(慎用)</b>:${esc((p.recipe.forbidden||[]).join('、')||'—')}\n`+
+      `<b>上章结尾</b>:${esc((p.last_chapter_tail||'(开篇)').slice(-200))}\n\n`+
+      p.active_entities.map(e=>`<b>${esc(e.name)}[${e.role}]</b> 此刻:${esc(JSON.stringify(e.state))}\n  锚点:${esc((e.anchors||[]).join('、'))}\n  该想起:${esc((e.recalled||[]).join(' / ')||'—')}`).join('\n\n');
+  };
+  o.querySelector('#gench').onclick=async()=>{const b=o.querySelector('#gench'),t0=b.textContent;b.textContent='写作中…';b.disabled=true;
+    try{const r=await post('/gen/chapter',{world:wid,thread:tid,intent:o.querySelector('#ch_title').value||''});
+      if(r.title)o.querySelector('#ch_title').value=r.title;
+      o.querySelector('#ch_body').value=r.chapter_text||'';
+      (r.sediments||[]).forEach(s=>{const el=o.querySelector('#sd_'+s.entity);if(el){el.value=s.text;const lv=o.querySelector('#lv_'+s.entity);if(lv)lv.value=s.level||'持久'}});
+      Object.entries(r.state_updates||{}).forEach(([id,su])=>{['location','mood','goal'].forEach(k=>{const m={location:'loc',mood:'mood',goal:'goal'}[k];const el=o.querySelector('#st_'+m+'_'+id);if(el&&su[k])el.value=su[k]})});
+      toast('✓ AI 已写好本章,审一遍可改后落章');
+    }catch(e){o.querySelector('#m_err').textContent='✗ '+e.message}finally{b.textContent=t0;b.disabled=false}};
+  o.querySelector('#m_ok').onclick=async()=>{
+    const body=o.querySelector('#ch_body').value.trim();
+    if(!body)return o.querySelector('#m_err').textContent='✗ 正文不能为空';
+    const sediments=[],state_updates={};
+    ents.forEach(e=>{const tx=o.querySelector('#sd_'+e.id).value.trim();
+      if(tx)sediments.push({entity:e.id,text:tx,level:o.querySelector('#lv_'+e.id).value});
+      const loc=o.querySelector('#st_loc_'+e.id).value.trim(),mo=o.querySelector('#st_mood_'+e.id).value.trim(),go=o.querySelector('#st_goal_'+e.id).value.trim();
+      const su={};if(loc)su.location=loc;if(mo)su.mood=mo;if(go)su.goal=go;if(Object.keys(su).length)state_updates[e.id]=su;});
+    const sum=o.querySelector('#ch_sum').value.trim();
+    try{const r=await post('/narrate/commit',{world:wid,thread:tid,chapter_text:body,title:o.querySelector('#ch_title').value.trim(),sediments,state_updates,...(sum?{summary:sum}:{})});
+      closeModal();const sk=r.skipped.length?`,门控 ${r.skipped.length}`:'';
+      toast(`✓ 第 ${r.chapter} 章已落(${r.hanzi} 字,沉淀 ${r.sedimented.length}${sk})<br><span style="color:var(--faint);font-size:12px">${esc((r.auto_checks||[]).join(' · '))}</span>`);
+      route();
+    }catch(e){o.querySelector('#m_err').textContent='✗ '+e.message}
+  };
+}
+
+async function actPlay(wid,tid){
+  const t=await api('/thread/'+wid+'/'+tid);const ents=t.entities;
+  const rows=ents.map(e=>`<div class="ent-row"><span class="nm">${esc(e.name)}</span>
+     <input id="g_${e.id}" placeholder="这场 ${esc(e.name)} 的成长(留空=无)">
+     <label style="font-size:12px;color:var(--dim);white-space:nowrap"><input type="checkbox" id="tr_${e.id}" style="width:auto"> 触发成长</label></div>`).join('');
+  const o=openModal(`<h3>🎭 玩一场 · ${esc(t.meta.title)}</h3>
+    <div class="field"><label>场景</label><input id="pl_scene" placeholder="如:雨夜屋檐下的对峙"></div>
+    <div class="field"><label>过程记录</label><textarea id="pl_tr" rows="7" placeholder="把这段互动记下来…"></textarea></div>
+    <div class="field"><label>成长(仅勾选「触发成长」且主/次角才写回记忆;否则留作候选)</label>${rows||'<div class="empty">无实体</div>'}</div>
+    <div class="err" id="m_err"></div>
+    <div class="modal-actions"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" id="m_ok">落小剧场</button></div>`);
+  o.querySelector('#m_ok').onclick=async()=>{
+    const growth=[];ents.forEach(e=>{const tx=o.querySelector('#g_'+e.id).value.trim();
+      if(tx)growth.push({entity:e.id,text:tx,trigger:o.querySelector('#tr_'+e.id).checked})});
+    try{const r=await post('/play/commit',{world:wid,thread:tid,scene:o.querySelector('#pl_scene').value.trim(),transcript:o.querySelector('#pl_tr').value.trim(),growth});
+      closeModal();toast(`✓ 小剧场 ${r.session} 已落(写回 ${r.written_back.length},候选 ${r.candidates.length})`);route();
+    }catch(e){o.querySelector('#m_err').textContent='✗ '+e.message}
+  };
+}
+
+async function actEditWorldMd(wid){const w=await api('/world/'+wid);
+  formModal('编辑世界设定 · '+wid,[{n:'world_md',label:'world.md',type:'textarea',rows:18,value:w.world_md}],'保存',
+    async v=>{await post('/world/save-md',{world:wid,world_md:v.world_md});closeModal();toast('✓ 设定已保存');route()})}
+
+// AI 产线写章:写手→审校→修订→落章,展示全过程 trace
+async function actNarrateRun(wid,tid){
+  const o=openModal(`<h3>✨ AI 产线写章${(OV.llm&&!OV.llm.available)?' (stub 占位)':''}</h3>
+    <div class="field"><label>本章意图(可空)</label><input id="nr_intent" placeholder="如:破解第二层规则,关系升温"></div>
+    <div class="field"><label>最多修订轮数</label><select id="nr_rev"><option>0</option><option selected>1</option><option>2</option></select></div>
+    <div class="packet" id="nr_out" style="display:none"></div>
+    <div class="err" id="m_err"></div>
+    <div class="modal-actions"><button class="btn ghost" onclick="closeModal()">关闭</button><button class="btn" id="nr_go">▶ 运行产线</button></div>`);
+  o.querySelector('#nr_go').onclick=async()=>{const b=o.querySelector('#nr_go'),t0=b.textContent;b.textContent='产线运行中…(写→审→修→落)';b.disabled=true;
+    try{const r=await post('/narrate/run',{world:wid,thread:tid,intent:o.querySelector('#nr_intent').value.trim(),max_rev:+o.querySelector('#nr_rev').value});
+      const out=o.querySelector('#nr_out');out.style.display='block';
+      const revs=(r.reviews||[]).map((rv,i)=>`<b>审校#${i+1}</b> 判定:${esc(rv.verdict)}\n`+((rv.findings||[]).map(f=>`  · [${esc(f.dim)}] ${esc(f.issue)}`).join('\n')||'  （无问题）')).join('\n\n');
+      out.innerHTML=`<b>写手草稿</b>:${r.draft_hanzi} 字 ｜ 修订 ${r.revisions} 轮\n\n${revs||'(未审校)'}\n\n<b>已落章</b>:第 ${r.receipt?r.receipt.chapter:'?'} 章(${r.receipt?r.receipt.hanzi:'?'} 字)\n沉淀:${(r.receipt&&r.receipt.sedimented||[]).map(s=>s.entity).join('、')||'—'}\n质检:${esc((r.receipt&&r.receipt.auto_checks||[]).join(' · '))}`;
+      toast(`✓ 产线完成,第 ${r.receipt?r.receipt.chapter:''} 章已落`);
+      b.textContent='✓ 完成(可再运行下一章)';setTimeout(()=>{b.textContent=t0;b.disabled=false},800);
+    }catch(e){o.querySelector('#m_err').textContent='✗ '+e.message;b.textContent=t0;b.disabled=false}};
+}
+
+// 反思:横向校验最近数章 + 漏掉的成长(建议,不自动落)
+async function actReflect(wid,tid){
+  const o=openModal(`<h3>🧠 反思最近章节${(OV.llm&&!OV.llm.available)?' (需配 LLM)':''}</h3>
+    <div class="field"><label>校验最近几章</label><select id="rf_n"><option>3</option><option selected>5</option><option>8</option></select></div>
+    <div class="packet" id="rf_out" style="display:none"></div><div class="err" id="m_err"></div>
+    <div class="modal-actions"><button class="btn ghost" onclick="closeModal()">关闭</button><button class="btn" id="rf_go">▶ 反思</button></div>`);
+  o.querySelector('#rf_go').onclick=async()=>{const b=o.querySelector('#rf_go'),t0=b.textContent;b.textContent='反思中…';b.disabled=true;
+    try{const r=await post('/narrate/reflect',{world:wid,thread:tid,last:+o.querySelector('#rf_n').value});
+      const out=o.querySelector('#rf_out');out.style.display='block';
+      out.innerHTML=`<b>全局自洽问题</b>:\n${(r.findings||[]).map(f=>'  · '+esc(f)).join('\n')||'  （无,或需配 LLM）'}\n\n<b>建议补的成长</b>:\n${(r.suggested_sediments||[]).map(s=>`  · [${esc(s.entity)}] ${esc(s.text)} (${esc(s.level)})`).join('\n')||'  （无）'}${r.note?'\n\n'+esc(r.note):''}`;
+    }catch(e){o.querySelector('#m_err').textContent='✗ '+e.message}finally{b.textContent=t0;b.disabled=false}};
+}
+
+/* ---------- nav + router ---------- */
+function renderNav(active){
+  const n=document.getElementById('nav');
+  let h=`<h4>纵览</h4>
+    <a href="#/" class="${active==='/'?'on':''}">🌌 多元宇宙总览</a>
+    <a href="#/nexus" class="${active==='nexus'?'on':''}">🔗 枢纽 <span class="b">${OV.nexus.entities.length}</span></a>
+    <a href="#/codex" class="${active==='codex'?'on':''}">🧬 元件库 <span class="b">${OV.codex.count}</span></a>
+    <h4>世界 (${OV.worlds.length})</h4>`;
+  for(const w of OV.worlds)
+    h+=`<a href="#/world/${w.id}" class="${active==='world/'+w.id?'on':''}">🌍 ${esc(w.name)} <span class="b">${w.threads}线</span></a>`;
+  n.innerHTML=h;
+}
+function route(){
+  const hash=location.hash.slice(1)||'/';
+  const m=document.getElementById('main');m.innerHTML='<div class="empty">载入中…</div>';
+  const p=hash.split('/').filter(Boolean);
+  let active=p[0]==='world'?'world/'+p[1]:(p[0]||'/');if(hash==='/')active='/';
+  renderNav(active);
+  if(hash==='/')viewOverview(m);
+  else if(p[0]==='world'&&p.length===2)viewWorld(m,p[1]);
+  else if(p[0]==='thread')viewThread(m,p[1],p[2]);
+  else if(p[0]==='entity')viewEntity(m,p[1],p[2]);
+  else if(p[0]==='nexus'&&p[1])viewNexusEntity(m,p[1]);
+  else if(p[0]==='nexus')viewNexus(m);
+  else if(p[0]==='codex')viewCodex(m);
+}
+
+/* ---------- views ---------- */
+function viewOverview(m){
+  const W=OV.worlds,L=OV.nexus.links;
+  const cx=420,cy=185,R=130,svgW=840,svgH=370;const pos={};
+  W.forEach((w,i)=>{const a=-Math.PI/2+i*2*Math.PI/Math.max(1,W.length);pos[w.id]=[cx+R*Math.cos(a),cy+R*Math.sin(a)]});
+  let edges='';for(const e of L){const a=pos[e.a],b=pos[e.b];if(a&&b){const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;
+    edges+=`<line class="edge" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"/><text class="edge-label" x="${mx}" y="${my-5}">${esc(e.relation)}</text>`}}
+  let nodes='';for(const w of W){const [x,y]=pos[w.id];
+    nodes+=`<g class="node" onclick="location.hash='#/world/${w.id}'"><circle cx="${x}" cy="${y}" r="40"/><text x="${x}" y="${y-2}">${esc(w.name)}</text><text x="${x}" y="${y+15}" style="font-size:10px;fill:var(--faint)">${esc(w.genre)}</text></g>`}
+  const map=W.length?`<div class="map"><svg viewBox="0 0 ${svgW} ${svgH}" width="100%">${edges}${nodes}</svg></div>`:'';
+  const tT=W.reduce((a,w)=>a+w.threads,0),tE=W.reduce((a,w)=>a+w.entities,0);
+  const nx=OV.nexus.entities.map(e=>`<div class="card" onclick="location.hash='#/nexus/${e.id}'"><h3>👤 ${esc(e.name)}</h3>
+      <div class="meta">起源 ${esc(e.origin)}</div><div class="incarn">${e.incarnations.map(w=>`<span class="b">🌍 ${esc(w)}</span>`).join('')}</div></div>`).join('');
+  m.innerHTML=`<h1>多元宇宙总览 <small>暗宇宙 · 无限世界 · AIGC</small></h1>
+    <p class="lead">从元件生成世界,角色在世界间穿梭,世界彼此相连。</p>
+    <div class="actions"><button class="btn" onclick="actNewWorld()">＋ 新世界</button>
+      <button class="btn ghost" onclick="actLink()">⇄ 连接世界</button>
+      <button class="btn ghost" onclick="actNewCodex()">＋ 元件</button></div>
+    <div class="stat-row">
+      <div class="chip"><b>${W.length}</b><span>世界</span></div><div class="chip"><b>${tT}</b><span>叙事线</span></div>
+      <div class="chip"><b>${tE}</b><span>实体</span></div><div class="chip"><b>${OV.nexus.entities.length}</b><span>跨世界</span></div>
+      <div class="chip"><b>${OV.nexus.links.length}</b><span>连接</span></div><div class="chip"><b>${OV.codex.count}</b><span>元件</span></div></div>
+    <div class="section"><h2>多元宇宙地图</h2>${map||'<div class="empty">还没有世界。点「＋ 新世界」开始,或跑 <code>python -m sim.seed</code> 播 demo。</div>'}</div>
+    <div class="section"><h2>世界</h2><div class="grid">${W.map(w=>`
+      <div class="card" onclick="location.hash='#/world/${w.id}'"><h3>🌍 ${esc(w.name)}</h3>
+        <div class="meta">${esc(w.genre)} · ${w.threads} 线 · ${w.entities} 实体</div>
+        <div>${(w.links||[]).map(l=>`<span class="tag">⇄ ${esc(l.to)}</span>`).join('')}${w.provenance==='forge'?'<span class="tag forge">AIGC锻造</span>':''}</div></div>`).join('')}</div></div>
+    ${nx?`<div class="section"><h2>跨世界实体(穿梭中)</h2><div class="grid">${nx}</div></div>`:''}`;
+}
+
+async function viewWorld(m,id){try{const d=await api('/world/'+id);const meta=d.meta;
+  m.innerHTML=`<div class="crumb"><a href="#/">总览</a> / ${esc(meta.name)}</div>
+    <h1>🌍 ${esc(meta.name)} <small>${esc(meta.genre)} · 尺度 ${esc(meta.scale)}</small></h1>
+    <div>${(meta.links||[]).map(l=>`<span class="tag">⇄ ${esc(l.to)} (${esc(l.relation)})</span>`).join('')}${meta.provenance&&meta.provenance.source==='forge'?'<span class="tag forge">AIGC锻造</span>':''}</div>
+    <div class="actions"><button class="btn" onclick="actNewThread('${id}')">＋ 叙事线</button>
+      <button class="btn ghost" onclick="actNewEntity('${id}')">＋ 实体</button>
+      <button class="btn ghost" onclick="actEditWorldMd('${id}')">✎ 编辑设定</button>
+      <button class="btn ghost" onclick="actDelWorld('${id}','${esc(meta.name)}')">🗑 删除世界</button></div>
+    <div class="section"><h2>叙事线</h2><div class="grid">${d.threads.length?d.threads.map(t=>`
+      <div class="card" onclick="location.hash='#/thread/${id}/${t.id}'"><h3>📖 ${esc(t.title)}</h3>
+        <div class="meta">${esc(t.genre)} · ${t.chapters} 章</div><div>${t.lenses.map(l=>`<span class="tag lens">${esc(l)}</span>`).join('')}</div></div>`).join(''):'<div class="empty">暂无叙事线 — 点「＋ 叙事线」</div>'}</div></div>
+    <div class="section"><h2>实体</h2><div class="grid">${d.entities.length?d.entities.map(e=>`
+      <div class="card"><h3 onclick="location.hash='#/entity/${id}/${e.id}'">👤 ${esc(e.name)}</h3>
+        <div><span class="tag role-${e.role}">${esc(e.role)}</span>${e.provenance==='forge'?'<span class="tag forge">锻造</span>':''}</div>
+        ${(e.role==='main'||e.role==='secondary')?`<button class="btn sm ghost" style="margin-top:8px" onclick="event.stopPropagation();actAscend('${id}','${e.id}','${esc(e.name)}')">⬆ 升格跨世界</button>`:''}</div>`).join(''):'<div class="empty">暂无实体</div>'}</div></div>
+    <div class="section"><h2>世界设定</h2><div class="md reader">${md(d.world_md)}</div></div>`;
+  }catch(e){m.innerHTML=`<div class="empty">${esc(e.message)}</div>`}}
+
+async function viewThread(m,wid,tid){try{const d=await api('/thread/'+wid+'/'+tid);const meta=d.meta;
+  const chTabs=d.chapters.map((c,i)=>`<button onclick="showCh(${i})" id="cht${i}" class="${i===d.chapters.length-1?'on':''}">第${c.no}章${c.title?' · '+esc(c.title):''}</button>`).join('');
+  window._chs=d.chapters;
+  m.innerHTML=`<div class="crumb"><a href="#/">总览</a> / <a href="#/world/${wid}">${esc(wid)}</a> / ${esc(meta.title)}</div>
+    <h1>📖 ${esc(meta.title)} <small>${esc(meta.genre)} · ${meta.chapter_count} 章</small></h1>
+    <div>${(meta.lenses||[]).map(l=>`<span class="tag lens">${esc(l)}</span>`).join('')}</div>
+    <div class="actions"><button class="btn" onclick="actWriteChapter('${wid}','${tid}')">✍ 写一章</button>
+      <button class="btn" onclick="actNarrateRun('${wid}','${tid}')">✨ AI产线写章</button>
+      <button class="btn ghost" onclick="actPlay('${wid}','${tid}')">🎭 玩一场</button>
+      <button class="btn ghost" onclick="actReflect('${wid}','${tid}')">🧠 反思</button>
+      <button class="btn ghost" onclick="actExportThread('${wid}','${tid}')">📖 导出全书</button>
+      <button class="btn ghost" onclick="actDelThread('${wid}','${tid}','${esc(meta.title)}')">🗑 删除</button></div>
+    <div class="section"><h2>节奏契约 / 配方</h2><div class="md">${esc(meta.pacing||'')}<br><span style="color:var(--faint);font-size:13px">爽点:${esc((d.recipe||{}).climax||'')}　｜　套路:${esc(((d.recipe||{}).tropes||[]).join('、'))}</span></div></div>
+    ${d.chapters.length?`<div class="section"><h2>正文</h2><div class="ch-nav">${chTabs}</div><div id="chbody" class="reader md"></div></div>`:'<div class="empty">还没有章节 — 点「✍ 写一章」</div>'}
+    ${d.beats.length?`<div class="section"><h2>跨透镜时间线 (beats)</h2><div class="timeline">${d.beats.map(b=>`<div class="ev"><div class="w">${esc(b.where)} · <span class="tag lens">${esc(b.lens)}</span></div>${esc(b.text)}</div>`).join('')}</div></div>`:''}
+    ${d.sessions.length?`<div class="section"><h2>小剧场</h2>${d.sessions.map(s=>`<div class="reader md" style="margin-bottom:10px">${md(s.text)}</div>`).join('')}</div>`:''}
+    <div class="section"><h2>摘要</h2><div class="md">${md(d.summary_md)}</div></div>`;
+  if(d.chapters.length)showCh(d.chapters.length-1);
+  }catch(e){m.innerHTML=`<div class="empty">${esc(e.message)}</div>`}}
+function showCh(i){const c=window._chs[i];document.querySelectorAll('.ch-nav button').forEach((b,j)=>b.classList.toggle('on',i===j));
+  document.getElementById('chbody').innerHTML=md(c.text)+`<p style="text-indent:0;color:var(--faint);font-size:12px;margin-top:20px">— ${c.hanzi} 字 —</p>`}
+
+async function viewEntity(m,wid,eid){try{const d=await api('/entity/'+wid+'/'+eid);const c=d.card,st=d.state;
+  m.innerHTML=`<div class="crumb"><a href="#/">总览</a> / <a href="#/world/${wid}">${esc(wid)}</a> / ${esc(c.name)}</div>
+    <h1>👤 ${esc(c.name)} <small><span class="tag role-${c.role}">${esc(c.role)}</span></small></h1>
+    <div class="actions">${(c.role==='main'||c.role==='secondary')?`<button class="btn ghost" onclick="actAscend('${wid}','${eid}','${esc(c.name)}')">⬆ 升格为跨世界实体</button>`:''}
+      <button class="btn ghost" onclick="actDelEntity('${wid}','${eid}','${esc(c.name)}')">🗑 删除实体</button></div>
+    <div class="section"><h2>此刻状态</h2><table class="kv"><tr><td>位置</td><td>${esc(st.location||'—')}</td></tr><tr><td>情绪</td><td>${esc(st.mood||'—')}</td></tr><tr><td>目标</td><td>${esc(st.goal||'—')}</td></tr></table></div>
+    ${d.anchors.length?`<div class="section"><h2>锚点 anchors</h2><div>${d.anchors.map(a=>`<span class="tag role-main">${esc(a)}</span>`).join('')}</div></div>`:''}
+    <div class="section"><h2>经历 (${d.experiences.length})</h2><div class="timeline">${d.experiences.map(e=>`<div class="ev l-${e.level}"><div class="w">${esc(e.where)}<span class="lvl ${e.level}">${esc(e.level)}</span></div>${esc(e.text)}</div>`).join('')||'<div class="empty">暂无</div>'}</div></div>
+    <div class="section"><h2>灵魂 profile</h2><div class="md reader">${md(d.profile_md)}</div></div>`;
+  }catch(e){m.innerHTML=`<div class="empty">${esc(e.message)}</div>`}}
+
+function viewNexus(m){
+  m.innerHTML=`<h1>🔗 枢纽 <small>跨世界实体 + 世界互联 = 暗宇宙</small></h1>
+    <div class="actions"><button class="btn ghost" onclick="actLink()">⇄ 连接世界</button></div>
+    <div class="section"><h2>世界互联</h2><div class="timeline">${OV.nexus.links.map(l=>`<div class="ev">${esc(l.a)} ⇄ ${esc(l.b)} <span class="tag lens">${esc(l.relation)}</span></div>`).join('')||'<div class="empty">暂无连接</div>'}</div></div>
+    <div class="section"><h2>跨世界实体</h2><div class="grid">${OV.nexus.entities.map(e=>`
+      <div class="card"><h3 onclick="location.hash='#/nexus/${e.id}'">👤 ${esc(e.name)}</h3><div class="meta">起源 ${esc(e.origin)}</div>
+        <div class="incarn">${e.incarnations.map(w=>`<span class="b">🌍 ${esc(w)}</span>`).join('')}</div>
+        <button class="btn sm ghost" style="margin-top:8px" onclick="actSummon('${e.id}','${esc(e.name)}')">✦ 召唤进世界</button></div>`).join('')||'<div class="empty">暂无 — 在世界里把角色「升格」</div>'}</div></div>`;
+}
+
+async function viewNexusEntity(m,id){try{const d=await api('/nexus/'+id);const meta=d.meta;
+  m.innerHTML=`<div class="crumb"><a href="#/nexus">枢纽</a> / ${esc(meta.name)}</div>
+    <h1>👤 ${esc(meta.name)} <small>跨世界实体</small></h1>
+    <div class="actions"><button class="btn" onclick="actSummon('${id}','${esc(meta.name)}')">✦ 召唤进世界</button></div>
+    <div class="section"><h2>灵魂锚点(跨世界一致)</h2><div>${d.anchors.map(a=>`<span class="tag role-main">${esc(a)}</span>`).join('')}</div></div>
+    <div class="section"><h2>各世界化身(记忆独立)</h2>${d.incarnations.map(inc=>`
+      <div class="card" style="cursor:default;margin-bottom:12px"><h3>🌍 ${esc(inc.world)}</h3>
+        <table class="kv"><tr><td>位置</td><td>${esc(inc.state.location||'—')}</td></tr><tr><td>情绪</td><td>${esc(inc.state.mood||'—')}</td></tr></table>
+        <div class="timeline" style="margin-top:8px">${inc.experiences.map(e=>`<div class="ev l-${e.level}"><div class="w">${esc(e.where)}<span class="lvl ${e.level}">${esc(e.level)}</span></div>${esc(e.text)}</div>`).join('')||'<div class="w">暂无经历</div>'}</div></div>`).join('')}</div>
+    <div class="section"><h2>灵魂 soul</h2><div class="md reader">${md(d.soul_md)}</div></div>`;
+  }catch(e){m.innerHTML=`<div class="empty">${esc(e.message)}</div>`}}
+
+async function viewCodex(m){try{const d=await api('/codex');const byCat={};for(const e of d.elements){(byCat[e.category]=byCat[e.category]||[]).push(e)}
+  m.innerHTML=`<h1>🧬 元件库 <small>L0 创世素材 · ${d.elements.length} 个</small></h1>
+    <p class="lead">锻造世界/角色/线时按相关度取料的"元素周期表"。</p>
+    <div class="actions"><button class="btn" onclick="actNewCodex()">＋ 新元件</button>
+      <button class="btn ghost" onclick="actSeedCodex()">🌱 填充起始元件库</button></div>
+    ${Object.entries(byCat).map(([cat,els])=>`<div class="section"><h2>${esc(cat)}</h2><div class="grid">${els.map(e=>`
+      <div class="card" style="cursor:default"><h3>${esc(e.id)} <span class="tag" style="cursor:pointer;float:right" onclick="actDelCodex('${esc(cat)}','${esc(e.id)}')">🗑</span></h3><div class="meta">${esc(e.summary)}</div><div>${(e.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div></div>`).join('')}</div></div>`).join('')||'<div class="empty">空 — 点「＋ 新元件」</div>'}`;
+  }catch(e){m.innerHTML=`<div class="empty">${esc(e.message)}</div>`}}
+
+window.showCh=showCh;
+['actNewWorld','actNewEntity','actNewThread','actNewCodex','actSeedCodex','actLink','actAscend','actSummon','actWriteChapter','actPlay','actEditWorldMd','actNarrateRun','actReflect','actExportThread','actDelWorld','actDelThread','actDelEntity','actDelCodex','closeModal'].forEach(f=>window[f]=eval(f));
+window.addEventListener('hashchange',route);
+(async()=>{try{await refresh()}catch(e){}route()})();
+</script>
+</body>
+</html>
