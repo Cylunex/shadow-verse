@@ -12,6 +12,10 @@ from . import clock, provenance, util
 from .config import DEFAULT_SCALE, HANZI_TARGET, append_jsonl, load_json, read_jsonl, save_json
 from .world import World
 
+HOOK_TYPES = ("event", "concept")        # 事件钩子(带回收) / 概念阶梯(按层揭)
+HOOK_LEVELS = ("α", "主", "中", "细")     # α悬念 > 主钩(卷) > 中钩(数章) > 细钩(章内)
+HOOK_STATUS = ("待回收", "进行中", "已回收", "顺延", "放弃")
+
 THREAD_TEMPLATE = """# {title} · 叙事线
 
 > 线 id:`{id}` ｜ 世界:{world} ｜ 题材:{genre} ｜ 尺度:{scale}
@@ -145,3 +149,71 @@ class Thread:
     def write_summary(self, text: str) -> None:
         util.write_md(self.dir / "summary.md", text)
         self.update_meta(summary_through=self.last_chapter_no())
+
+    # ---- 钩子台账(结构化状态机)----
+    @property
+    def hooks_path(self) -> Path:
+        return self.dir / "hooks.json"
+
+    def hooks_data(self) -> dict:
+        return load_json(self.hooks_path, {"alpha": "", "hooks": []}) or {"alpha": "", "hooks": []}
+
+    def _save_hooks(self, data: dict) -> None:
+        save_json(self.hooks_path, data)
+        self._render_hooks_md(data)
+
+    def set_alpha(self, text: str) -> None:
+        d = self.hooks_data(); d["alpha"] = text.strip(); self._save_hooks(d)
+
+    def add_hook(self, desc: str, *, type: str = "event", level: str = "中", importance: str = "mid",
+                 plant_chapter: int | None = None, payoff_target: int | None = None) -> dict:
+        if type not in HOOK_TYPES:
+            raise ValueError(f"钩子类型须 ∈ {HOOK_TYPES}")
+        if level not in HOOK_LEVELS:
+            raise ValueError(f"钩子层级须 ∈ {HOOK_LEVELS}")
+        d = self.hooks_data()
+        h = {"id": f"hook-{len(d['hooks']) + 1:04d}", "type": type, "desc": desc.strip(),
+             "level": level, "importance": importance,
+             "plant_chapter": plant_chapter if plant_chapter is not None else (self.last_chapter_no() or None),
+             "payoff_target": payoff_target, "status": "待回收",
+             "created": clock.now_iso(), "updated": clock.now_iso()}
+        d["hooks"].append(h); self._save_hooks(d)
+        return h
+
+    def update_hook(self, hid: str, **fields) -> dict:
+        d = self.hooks_data()
+        for h in d["hooks"]:
+            if h["id"] == hid:
+                if "status" in fields and fields["status"] not in HOOK_STATUS:
+                    raise ValueError(f"状态须 ∈ {HOOK_STATUS}")
+                for k in ("status", "payoff_target", "desc", "level", "importance"):
+                    if k in fields and fields[k] is not None:
+                        h[k] = fields[k]
+                h["updated"] = clock.now_iso()
+                self._save_hooks(d)
+                return h
+        raise FileNotFoundError(f"无此钩子:{hid}")
+
+    def open_hooks(self) -> list[dict]:
+        return [h for h in self.hooks_data()["hooks"] if h["status"] in ("待回收", "进行中")]
+
+    def overdue_hooks(self, current: int | None = None) -> list[dict]:
+        """计划回收章已过、却仍未回收的钩子(确定性揪漏伏笔)。"""
+        cur = current if current is not None else self.last_chapter_no()
+        out = []
+        for h in self.hooks_data()["hooks"]:
+            t = h.get("payoff_target")
+            if t and t <= cur and h["status"] in ("待回收", "进行中"):
+                out.append(h)
+        return out
+
+    def _render_hooks_md(self, d: dict) -> None:
+        lines = [f"# {self.meta().get('title', self.id)} · 钩子台账", "",
+                 f"## α 悬念(全书唯一)\n{d.get('alpha') or '<!-- 未定 -->'}", "", "## 钩子"]
+        if not d["hooks"]:
+            lines.append("_(暂无)_")
+        for h in d["hooks"]:
+            tgt = f" → 计划回收 ch{h['payoff_target']}" if h.get("payoff_target") else ""
+            plant = f" 埋于 ch{h['plant_chapter']}" if h.get("plant_chapter") else ""
+            lines.append(f"- [{h['status']}] **{h['level']}** ({h['type']}) {h['desc']}{plant}{tgt} `{h['id']}`")
+        util.write_md(self.dir / "hooks.md", "\n".join(lines))

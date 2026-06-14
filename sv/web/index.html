@@ -218,6 +218,22 @@ async function actRenderEntity(wid,eid,appearance){formModal('🖼 生成立绘 
 ],'生成(~18s)',async v=>{const r=await post('/render/entity',{world:wid,entity:eid,appearance:v.appearance,scene:v.scene});
   closeModal();if(r.enabled){toast(`✓ 立绘已生成(${Math.round(r.bytes/1024)}KB)`);route()}else{toast('⚠ '+r.note,true)}})}
 
+// 钩子台账
+async function actSetAlpha(wid,tid,cur){formModal('设 α 悬念(全书唯一统领)',[
+  {n:'text',label:'α 悬念',type:'textarea',rows:2,value:cur||'',ph:'全书最大的那个悬念,其余钩子为它服务'},
+],'保存',async v=>{await post('/hook/alpha',{world:wid,thread:tid,text:v.text});closeModal();toast('✓ α 悬念已设');route()})}
+async function actAddHook(wid,tid){formModal('加钩子',[
+  {n:'desc',label:'钩子 / 伏笔',type:'textarea',rows:2,ph:'埋下的悬念或伏笔'},
+  {n:'type',label:'类型',type:'select',options:['event','concept'],value:'event'},
+  {n:'level',label:'层级',type:'select',options:['α','主','中','细'],value:'中'},
+  {n:'payoff_target',label:'计划回收章(数字,可空)'},
+],'加',async v=>{const b={world:wid,thread:tid,desc:v.desc,type:v.type,level:v.level};if(v.payoff_target)b.payoff_target=+v.payoff_target;await post('/hook/add',b);closeModal();toast('✓ 钩子已埋');route()})}
+async function actSetHook(wid,tid,hid,desc){formModal('改钩子 · '+hid,[
+  {n:'status',label:'状态',type:'select',options:['待回收','进行中','已回收','顺延','放弃']},
+  {n:'payoff_target',label:'计划回收章(数字,可空)'},
+  {n:'desc',label:'描述',value:desc||''},
+],'保存',async v=>{const b={world:wid,thread:tid,hid};if(v.status)b.status=v.status;if(v.payoff_target)b.payoff_target=+v.payoff_target;if(v.desc)b.desc=v.desc;await post('/hook/set',b);closeModal();toast('✓ 钩子已更新');route()})}
+
 // 多模态:生成场景图
 async function actRenderScene(wid,tid){formModal('🖼 生成场景图 · '+tid,[
   {n:'subject',label:'画面内容(英文)',type:'textarea',rows:2,ph:'如:a lone figure before a giant gate, neon city'},
@@ -442,6 +458,10 @@ async function viewThread(m,wid,tid){try{const d=await api('/thread/'+wid+'/'+ti
       <button class="btn ghost" onclick="actDelThread('${wid}','${tid}','${esc(meta.title)}')">🗑 删除</button></div>
     ${(d.renders&&d.renders.length)?`<div class="section"><h2>场景图</h2><div class="gallery">${d.renders.map(p=>`<img src="/img/${esc(p)}" loading="lazy">`).join('')}</div></div>`:''}
     <div class="section"><h2>节奏契约 / 配方</h2><div class="md">${esc(meta.pacing||'')}<br><span style="color:var(--faint);font-size:13px">爽点:${esc((d.recipe||{}).climax||'')}　｜　套路:${esc(((d.recipe||{}).tropes||[]).join('、'))}</span></div></div>
+    <div class="section"><h2>钩子台账 <span><button class="btn sm ghost" onclick="actAddHook('${wid}','${tid}')">＋钩子</button> <button class="btn sm ghost" onclick="actSetAlpha('${wid}','${tid}',${JSON.stringify((d.hooks||{}).alpha||'')})">设 α 悬念</button></span></h2>
+      <div class="md" style="color:var(--gold);margin-bottom:8px">α 悬念:${esc((d.hooks||{}).alpha||'未定')}</div>
+      <div class="timeline">${(((d.hooks||{}).items)||[]).map(h=>{const od=((d.hooks||{}).overdue||[]).includes(h.id);
+        return `<div class="ev"><span class="lvl" style="color:var(--acc2)">${esc(h.level)}</span> <span class="tag" style="${h.status==='已回收'?'color:var(--good)':od?'color:var(--bad)':''}">${esc(h.status)}${od?' ⚠过期未收':''}</span> ${esc(h.desc)} ${h.payoff_target?`<span style="color:var(--faint)">→回收 ch${h.payoff_target}</span>`:''} <a onclick="actSetHook('${wid}','${tid}','${h.id}',${JSON.stringify(h.desc)})" style="color:var(--acc2);font-size:12px">改</a></div>`}).join('')||'<div class="w">暂无钩子 — 点「＋钩子」埋一个</div>'}</div></div>
     ${d.chapters.length?`<div class="section"><h2>正文</h2><div class="ch-nav">${chTabs}</div><div id="chbody" class="reader md"></div></div>`:'<div class="empty">还没有章节 — 点「✍ 写一章」</div>'}
     ${d.beats.length?`<div class="section"><h2>跨透镜时间线 (beats)</h2><div class="timeline">${d.beats.map(b=>`<div class="ev"><div class="w">${esc(b.where)} · <span class="tag lens">${esc(b.lens)}</span></div>${esc(b.text)}</div>`).join('')}</div></div>`:''}
     ${d.sessions.length?`<div class="section"><h2>小剧场</h2>${d.sessions.map(s=>`<div class="reader md" style="margin-bottom:10px">${md(s.text)}</div>`).join('')}</div>`:''}
@@ -549,7 +569,7 @@ async function testLLM(){const box=document.getElementById('cf_test');box.style.
   }catch(e){box.textContent='✗ '+e.message}}
 
 window.showCh=showCh;
-['actNewWorld','actNewEntity','actNewThread','actNewCodex','actSeedCodex','actLink','actAscend','actSummon','actWriteChapter','actPlay','actEditWorldMd','actNarrateRun','actReflect','actExportThread','actDelWorld','actDelThread','actDelEntity','actDelCodex','actRenderEntity','actRenderScene','saveSettings','clearSecret','testLLM','closeModal'].forEach(f=>window[f]=eval(f));
+['actNewWorld','actNewEntity','actNewThread','actNewCodex','actSeedCodex','actLink','actAscend','actSummon','actWriteChapter','actPlay','actEditWorldMd','actNarrateRun','actReflect','actExportThread','actDelWorld','actDelThread','actDelEntity','actDelCodex','actRenderEntity','actRenderScene','actSetAlpha','actAddHook','actSetHook','saveSettings','clearSecret','testLLM','closeModal'].forEach(f=>window[f]=eval(f));
 window.addEventListener('hashchange',route);
 (async()=>{try{await refresh()}catch(e){}route()})();
 </script>

@@ -74,8 +74,10 @@ def api_thread(wid: str, tid: str) -> dict:
     sessions = [{"id": p.stem, "text": p.read_text(encoding="utf-8")}
                 for p in sorted(t.sessions_dir.glob("*.md"))] if t.sessions_dir.exists() else []
     renders = [f"worlds/{wid}/threads/{tid}/renders/{p.name}" for p in sorted(t.renders_dir.glob("*.png"))] if t.renders_dir.exists() else []
+    hd = t.hooks_data(); overdue = {h["id"] for h in t.overdue_hooks()}
     return {"meta": m, "thread_md": util.read_md(t.dir / "thread.md"), "summary_md": t.summary(),
             "chapters": chapters, "beats": t.beats(), "sessions": sessions, "renders": renders,
+            "hooks": {"alpha": hd["alpha"], "items": hd["hooks"], "overdue": list(overdue)},
             "recipe": recipes.get(m.get("genre", "")),
             "entities": [{"id": e, "name": LocalEntity(w, e).card().get("name", e),
                           "role": LocalEntity(w, e).card().get("role", "")} for e in w.list_entities()]}
@@ -220,6 +222,26 @@ def post_unlink(b: dict) -> dict:
     return {"ok": True, **nexus.unlink(b["a"], b["b"])}
 
 
+def _thr(b):
+    w = World.load(b["world"]); return w, Thread.load(w, b["thread"])
+
+
+def post_hook_add(b: dict) -> dict:
+    _, t = _thr(b)
+    return t.add_hook(b["desc"], type=b.get("type", "event"), level=b.get("level", "中"),
+                      importance=b.get("importance", "mid"),
+                      plant_chapter=b.get("plant_chapter"), payoff_target=b.get("payoff_target"))
+
+
+def post_hook_set(b: dict) -> dict:
+    _, t = _thr(b)
+    return t.update_hook(b["hid"], status=b.get("status"), payoff_target=b.get("payoff_target"), desc=b.get("desc"))
+
+
+def post_hook_alpha(b: dict) -> dict:
+    _, t = _thr(b); t.set_alpha(b.get("text", "")); return {"ok": True}
+
+
 def post_narrate_commit(b: dict) -> dict:
     w = World.load(b["world"]); t = Thread.load(w, b["thread"])
     return lenses.narrate_commit(w, t, b)
@@ -322,6 +344,9 @@ POST_ROUTES = [
     (re.compile(r"^/api/render/scene$"), post_render_scene),
     (re.compile(r"^/api/config$"), post_config),
     (re.compile(r"^/api/llm-test$"), post_llm_test),
+    (re.compile(r"^/api/hook/add$"), post_hook_add),
+    (re.compile(r"^/api/hook/set$"), post_hook_set),
+    (re.compile(r"^/api/hook/alpha$"), post_hook_alpha),
 ]
 
 

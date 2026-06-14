@@ -54,6 +54,9 @@ def narrate_prep(world: World, thread: Thread, *, focus=None, brief: str = "") -
         "last_chapter_tail": thread.chapter_text(nxt - 1)[-1200:] if nxt > 1 else "",
         "active_entities": blocks, "craft_checklist": craft.WRITER_CHECKLIST,
         "recipe": recipes.get(meta.get("genre", "")), "intent": brief,
+        "alpha": thread.hooks_data().get("alpha", ""),
+        "open_hooks": [{"id": h["id"], "desc": h["desc"], "level": h["level"], "payoff_target": h.get("payoff_target")}
+                       for h in thread.open_hooks()],
     }
 
 
@@ -72,6 +75,10 @@ def narrate_generate(world: World, thread: Thread, *, focus=None, intent: str = 
         f"题材配方——爽点:{rec.get('climax')};慎用疲劳词:{('、'.join(rec.get('forbidden', [])) or '无')}",
         f"目标字数(纯汉字):约 {pkt['hanzi_target']}",
         f"本章意图:{intent or '顺势推进一条主线钩子'}",
+        f"α 悬念(全书统领):{pkt.get('alpha') or '未定'}",
+        "待推进的开放钩子(本章主推其一的下一层):\n" + ("\n".join(
+            f"- [{h['level']}] {h['desc']}" + (f"(计划 ch{h['payoff_target']} 回收)" if h.get('payoff_target') else "")
+            for h in pkt.get("open_hooks", [])) or "（暂无,可自然埋新钩)"),
         f"上章结尾:\n{pkt['last_chapter_tail'] or '(开篇)'}",
         "出场角色(状态/锚点/该想起):\n" + "\n".join(
             f"- {e['name']}[{e['role']}] 此刻{json.dumps(e['state'], ensure_ascii=False)};锚点:{'、'.join(e['anchors'])};该想起:{'/'.join(e['recalled']) or '—'}"
@@ -162,7 +169,10 @@ def narrate_review(world: World, thread: Thread, chapter_text: str) -> dict:
     m = thread.meta()
     auto = checks.check_text(chapter_text, genre=m.get("genre", ""), target=m.get("hanzi_target", 0))
     findings = [{"dim": "客观", "issue": f} for f in auto["findings"] if "未见明显问题" not in f]
-    verdict = "pass"
+    # 确定性钩子审计:埋了却过期未回收的伏笔
+    for h in thread.overdue_hooks():
+        findings.append({"dim": "钩子", "issue": f"伏笔「{h['desc']}」计划 ch{h['payoff_target']} 回收却仍『{h['status']}』(漏收或顺延)"})
+    verdict = "revise" if any(f["dim"] == "钩子" for f in findings) else "pass"
     if llm.available():
         dims = recipes.get(m.get("genre", "")).get("audit_dimensions", [])
         sys = ("你是暗宇宙的冷面审校,只挑问题、绝不改写正文。通用 rubric:" + "；".join(craft.REVIEWER_RUBRIC)
@@ -198,6 +208,9 @@ def reflect_prep(world: World, thread: Thread, last_n: int = SUMMARY_EVERY) -> d
         "chapters": chapters, "summary": thread.summary(),
         "canon": util.read_md(world.dir / "canon.md"),
         "focus": craft.REFLECTOR_FOCUS, "growth_triggers": craft.GROWTH_TRIGGERS,
+        "alpha": thread.hooks_data().get("alpha", ""),
+        "overdue_hooks": [{"id": h["id"], "desc": h["desc"], "payoff_target": h.get("payoff_target")}
+                          for h in thread.overdue_hooks()],
     }
 
 

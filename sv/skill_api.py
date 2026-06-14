@@ -271,6 +271,37 @@ def cmd_unlink(a):
     print(f"✓ 已断开 {a.world_a} ⇄ {a.world_b}(移除 {r['removed']} 条)")
 
 
+def cmd_hooks(a):
+    w, t = _wt(a.world, a.thread)
+    d = t.hooks_data()
+    _out({"alpha": d["alpha"], "hooks": d["hooks"], "overdue": [h["id"] for h in t.overdue_hooks()]})
+
+
+def cmd_hook_add(a):
+    w, t = _wt(a.world, a.thread)
+    _out(t.add_hook(a.desc, type=a.type, level=a.level, importance=a.importance,
+                    plant_chapter=(a.plant if a.plant >= 0 else None),
+                    payoff_target=(a.payoff if a.payoff >= 0 else None)))
+
+
+def cmd_hook_set(a):
+    w, t = _wt(a.world, a.thread)
+    f = {}
+    if a.status:
+        f["status"] = a.status
+    if a.payoff >= 0:
+        f["payoff_target"] = a.payoff
+    if a.desc:
+        f["desc"] = a.desc
+    _out(t.update_hook(a.hid, **f))
+
+
+def cmd_hook_alpha(a):
+    w, t = _wt(a.world, a.thread)
+    t.set_alpha(a.text)
+    print("✓ α 悬念已设")
+
+
 def cmd_check(a):
     w, t = _wt(a.world, a.thread)
     _out(checks.check_chapter(t, a.chapter))
@@ -401,6 +432,10 @@ def build_parser():
     add("delete-entity", cmd_delete_entity, ["world", "entity"])
     add("delete-codex", cmd_delete_codex, ["category", "id"])
     add("unlink", cmd_unlink, ["world_a", "world_b"])
+    add("hooks", cmd_hooks, ["world", "thread"])
+    add("hook-add", cmd_hook_add, ["world", "thread", "desc"], [("type", {"default": "event"}), ("level", {"default": "中"}), ("importance", {"default": "mid"}), ("plant", {"type": int, "default": -1}), ("payoff", {"type": int, "default": -1})])
+    add("hook-set", cmd_hook_set, ["world", "thread", "hid"], [("status", {"default": ""}), ("payoff", {"type": int, "default": -1}), ("desc", {"default": ""})])
+    add("hook-alpha", cmd_hook_alpha, ["world", "thread", "text"])
     add("check", cmd_check, ["world", "thread", ("chapter", {"type": int})])
     add("status", cmd_status, [("world", {"nargs": "?"}), ("thread", {"nargs": "?"})])
     add("show", cmd_show, ["kind", "key"])
