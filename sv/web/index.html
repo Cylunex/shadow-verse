@@ -199,6 +199,21 @@ async function actNewCodex(){const cats=(await api('/codex')).categories;formMod
 
 async function actSeedCodex(){try{const r=await post('/codex/seed',{});await refresh();toast(`✓ 起始元件库:新增 <b>${r.added}</b>,跳过 ${r.skipped},共 ${r.total} 个`);route()}catch(e){toast('✗ '+e.message,true)}}
 
+// 导入 SillyTavern 角色卡(.json 或内嵌卡的 .png)
+function actImportCard(wid){
+  const inp=document.createElement('input');inp.type='file';inp.accept='.json,.png';
+  inp.onchange=async()=>{const f=inp.files[0];if(!f)return;
+    try{let body={world:wid};
+      if(f.name.toLowerCase().endsWith('.png')){const buf=await f.arrayBuffer();
+        let bin='';const u=new Uint8Array(buf);for(let i=0;i<u.length;i++)bin+=String.fromCharCode(u[i]);
+        body.png_b64=btoa(bin);
+      }else{body.card=await f.text();}
+      const r=await post('/import/card',body);
+      toast(`✓ 导入 <b>${esc(r.name)}</b> → ${r.entity}（世界书 ${r.lorebook_entries} 条）`);location.hash='#/entity/'+wid+'/'+r.entity;
+    }catch(e){toast('✗ 导入失败:'+e.message,true)}};
+  inp.click();
+}
+
 function download(name,content){const b=new Blob([content],{type:'text/markdown;charset=utf-8'});const u=URL.createObjectURL(b);
   const a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
 async function actExportThread(wid,tid){try{const r=await api('/export/thread/'+wid+'/'+tid);download(r.filename,r.content);toast(`✓ 已导出《${esc(r.filename)}》(${r.chapters} 章 / ${r.hanzi} 字)`)}catch(e){toast('✗ '+e.message,true)}}
@@ -432,6 +447,7 @@ async function viewWorld(m,id){try{const d=await api('/world/'+id);const meta=d.
     <div class="actions"><button class="btn" onclick="actNewThread('${id}')">＋ 叙事线</button>
       <button class="btn ghost" onclick="actNewEntity('${id}')">＋ 实体</button>
       <button class="btn ghost" onclick="actEditWorldMd('${id}')">✎ 编辑设定</button>
+      <button class="btn ghost" onclick="actImportCard('${id}')">📥 导入ST角色卡</button>
       <button class="btn ghost" onclick="actDelWorld('${id}','${esc(meta.name)}')">🗑 删除世界</button></div>
     <div class="section"><h2>叙事线</h2><div class="grid">${d.threads.length?d.threads.map(t=>`
       <div class="card" onclick="location.hash='#/thread/${id}/${t.id}'"><h3>📖 ${esc(t.title)}</h3>
@@ -569,7 +585,7 @@ async function testLLM(){const box=document.getElementById('cf_test');box.style.
   }catch(e){box.textContent='✗ '+e.message}}
 
 window.showCh=showCh;
-['actNewWorld','actNewEntity','actNewThread','actNewCodex','actSeedCodex','actLink','actAscend','actSummon','actWriteChapter','actPlay','actEditWorldMd','actNarrateRun','actReflect','actExportThread','actDelWorld','actDelThread','actDelEntity','actDelCodex','actRenderEntity','actRenderScene','actSetAlpha','actAddHook','actSetHook','saveSettings','clearSecret','testLLM','closeModal'].forEach(f=>window[f]=eval(f));
+['actNewWorld','actNewEntity','actNewThread','actNewCodex','actSeedCodex','actLink','actAscend','actSummon','actWriteChapter','actPlay','actEditWorldMd','actNarrateRun','actReflect','actExportThread','actDelWorld','actDelThread','actDelEntity','actDelCodex','actRenderEntity','actRenderScene','actSetAlpha','actAddHook','actSetHook','actImportCard','saveSettings','clearSecret','testLLM','closeModal'].forEach(f=>window[f]=eval(f));
 window.addEventListener('hashchange',route);
 (async()=>{try{await refresh()}catch(e){}route()})();
 </script>

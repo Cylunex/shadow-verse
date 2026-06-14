@@ -11,7 +11,7 @@ import argparse
 import json
 import sys
 
-from . import checks, codex, export, forge, lenses, llm, nexus, recipes
+from . import checks, codex, export, forge, importer, lenses, llm, nexus, recipes
 from .config import NEXUS_DIR, UNIVERSE
 from .entity import LocalEntity
 from .nexus import NexusEntity
@@ -148,6 +148,14 @@ def cmd_thread_commit(a):
 
 
 # ---------- 手建(非 AIGC)----------
+def cmd_import_card(a):
+    from pathlib import Path
+    raw = Path(a.path).read_bytes()
+    card = importer.parse_card(raw if a.path.lower().endswith(".png") else raw.decode("utf-8"))
+    r = importer.import_card(World.load(a.world), card, role=a.role, as_id=getattr(a, "as", None))
+    print(f"✓ 导入角色:{r['name']} → {a.world}/{r['entity']}(世界书 {r['lorebook_entries']} 条)")
+
+
 def cmd_new_world(a):
     w = World.create(a.id, a.name or a.id, genre=a.genre, scale=a.scale)
     print(f"✓ 世界已建:{w.id}  →  {w.dir / 'world.md'}")
@@ -407,6 +415,7 @@ def build_parser():
     add("thread-prep", cmd_thread_prep, ["world", "prompt"], [("tags", {"default": ""})])
     add("thread-commit", cmd_thread_commit, ["world"])
 
+    add("import-card", cmd_import_card, ["world", "path"], [("role", {"default": "secondary"}), ("as", {"default": None})])
     add("new-world", cmd_new_world, ["id"], [("name", {"default": ""}), ("genre", {"default": ""}), ("scale", {"default": "max"})])
     add("new-entity", cmd_new_entity, ["world", "id"], [("name", {"default": ""}), ("role", {"default": "secondary"})])
     add("new-thread", cmd_new_thread, ["world", "id"], [("title", {"default": ""}), ("genre", {"default": ""}), ("pacing", {"default": "每章至少推进一条主线钩子"})])

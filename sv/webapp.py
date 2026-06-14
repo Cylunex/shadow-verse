@@ -13,7 +13,9 @@ import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import codex, config, export, forge, lenses, llm, memory, nexus, recipes, util
+import base64
+
+from . import codex, config, export, forge, importer, lenses, llm, memory, nexus, recipes, util
 from .config import UNIVERSE, read_jsonl
 from .entity import LocalEntity
 from .nexus import NexusEntity
@@ -242,6 +244,15 @@ def post_hook_alpha(b: dict) -> dict:
     _, t = _thr(b); t.set_alpha(b.get("text", "")); return {"ok": True}
 
 
+def post_import_card(b: dict) -> dict:
+    w = World.load(b["world"])
+    if b.get("png_b64"):
+        card = importer.parse_card(base64.b64decode(b["png_b64"]))
+    else:
+        card = importer.parse_card(b["card"])   # str(JSON) 或 dict
+    return {"ok": True, **importer.import_card(w, card, role=b.get("role", "secondary"), as_id=b.get("as") or None)}
+
+
 def post_narrate_commit(b: dict) -> dict:
     w = World.load(b["world"]); t = Thread.load(w, b["thread"])
     return lenses.narrate_commit(w, t, b)
@@ -347,6 +358,7 @@ POST_ROUTES = [
     (re.compile(r"^/api/hook/add$"), post_hook_add),
     (re.compile(r"^/api/hook/set$"), post_hook_set),
     (re.compile(r"^/api/hook/alpha$"), post_hook_alpha),
+    (re.compile(r"^/api/import/card$"), post_import_card),
 ]
 
 

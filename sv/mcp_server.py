@@ -21,6 +21,7 @@ TOOLS = [
     ("codex_add", "L0 元件入库(category∈worlds/mechanics/characters/conflicts/organizations/scenes/themes)",
      {"category": "str", "id": "str", "summary": "str", "tags": "str", "body": "str"}, ["category", "id"], ["summary", "tags", "body"], False),
     ("codex_seed", "幂等灌入起始元件库(~40 个亲手提炼的抽象元件)", {}, [], [], False),
+    ("import_card", "导入 SillyTavern 角色卡(JSON/PNG 文件路径)→ 世界内 entity + 世界书", {"world": "str", "path": "str", "role": "str"}, ["world", "path"], ["role"], False),
     ("world_prep", "L1 锻造世界:取元件+题材配方+约束,返回生成包", {"prompt": "str", "tags": "str", "genre": "str"}, ["prompt"], ["tags", "genre"], False),
     ("recipes", "查看题材配方(pacing/爽点/疲劳词/侧重)", {"genre": "str"}, [], ["genre"], False),
     ("gen_world", "AIGC 生成 world.md 正文(需配 SV_PROVIDER;单机用)", {"prompt": "str", "genre": "str", "tags": "str"}, ["prompt"], ["genre", "tags"], False),
