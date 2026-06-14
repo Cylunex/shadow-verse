@@ -288,12 +288,22 @@ def post_chat_clear(b: dict) -> dict:
 
 
 def post_import_card(b: dict) -> dict:
-    w = World.load(b["world"])
-    if b.get("png_b64"):
-        card = importer.parse_card(base64.b64decode(b["png_b64"]))
-    else:
-        card = importer.parse_card(b["card"])   # str(JSON) 或 dict
-    return {"ok": True, **importer.import_card(w, card, role=b.get("role", "secondary"), as_id=b.get("as") or None)}
+    card = importer.parse_card(base64.b64decode(b["png_b64"])) if b.get("png_b64") else importer.parse_card(b["card"])
+    if b.get("target") == "new":   # 默认推荐:卡自带世界 → 新建独立世界
+        return {"ok": True, **importer.import_card_new_world(
+            card, world_id=b.get("world_id") or None, world_name=b.get("world_name") or None, role=b.get("role", "main"))}
+    w = World.load(b["world"])     # 并入现有世界
+    r = importer.import_card(w, card, role=b.get("role", "secondary"), as_id=b.get("as") or None)
+    return {"ok": True, "world": w.id, **r}
+
+
+def post_import_undo(b: dict) -> dict:
+    return {"ok": True, **importer.undo_import(World.load(b["world"]), b["entity"])}
+
+
+def post_world_merge(b: dict) -> dict:
+    from . import merge
+    return {"ok": True, **merge.merge_world(b["src"], b["dst"], delete_src=bool(b.get("delete_src", True)))}
 
 
 def post_narrate_commit(b: dict) -> dict:
@@ -404,6 +414,8 @@ POST_ROUTES = [
     (re.compile(r"^/api/hook/set$"), post_hook_set),
     (re.compile(r"^/api/hook/alpha$"), post_hook_alpha),
     (re.compile(r"^/api/import/card$"), post_import_card),
+    (re.compile(r"^/api/import/undo$"), post_import_undo),
+    (re.compile(r"^/api/world/merge$"), post_world_merge),
     (re.compile(r"^/api/chat$"), post_chat),
     (re.compile(r"^/api/chat/clear$"), post_chat_clear),
 ]

@@ -7,12 +7,15 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import struct
 
 from . import provenance, util
 from .config import save_json
 from .entity import LocalEntity
 from .world import World
+
+LB_MARK = "IMPORT-LOREBOOK"   # world.md 里世界书块的标记(供撤销精确剥离)
 
 
 def _png_text_chunks(b: bytes) -> dict[str, str]:
@@ -102,12 +105,12 @@ def import_card(world: World, card: dict, *, role: str = "secondary", as_id: str
     if card.get("first_mes"):
         c["greeting"] = card["first_mes"].strip()   # 开场白,对话时用
     save_json(e.card_path, c)
-    n = import_lorebook(world, card.get("character_book")) if card.get("character_book") else 0
+    n = import_lorebook(world, card.get("character_book"), eid) if card.get("character_book") else 0
     return {"entity": eid, "name": name, "lorebook_entries": n}
 
 
-def import_lorebook(world: World, book) -> int:
-    """世界书 entries → 追加到 world.md 的「导入世界书」段(关键词条目)。返回条目数。"""
+def import_lorebook(world: World, book, eid: str) -> int:
+    """世界书 entries → 追加到 world.md(带标记块,供撤销精确剥离)。返回条目数。"""
     if not book or not isinstance(book, dict):
         return 0
     entries = book.get("entries") or []
@@ -115,7 +118,7 @@ def import_lorebook(world: World, book) -> int:
         entries = list(entries.values())
     if not entries:
         return 0
-    lines = ["", "## 导入世界书(SillyTavern lorebook)"]
+    lines = [f"<!-- {LB_MARK}:{eid} -->", f"## 导入世界书(来自角色卡 {eid})"]
     for en in entries:
         keys = en.get("keys") or en.get("key") or []
         kw = "、".join(keys) if isinstance(keys, list) else str(keys)
@@ -123,6 +126,49 @@ def import_lorebook(world: World, book) -> int:
         content = (en.get("content") or "").strip()
         comment = (en.get("comment") or "").strip()
         lines.append(f"\n### {comment or kw or '条目'}（{const}）\n触发词:{kw or '—'}\n\n{content}")
+    lines.append(f"<!-- /{LB_MARK}:{eid} -->")
     wp = world.dir / "world.md"
-    util.write_md(wp, util.read_md(wp).rstrip() + "\n" + "\n".join(lines) + "\n")
+    util.write_md(wp, util.read_md(wp).rstrip() + "\n\n" + "\n".join(lines) + "\n")
     return len(entries)
+
+
+def _strip_lorebook(world: World, eid: str) -> None:
+    wp = world.dir / "world.md"
+    text = util.read_md(wp)
+    pat = re.compile(re.escape(f"<!-- {LB_MARK}:{eid} -->") + r".*?" + re.escape(f"<!-- /{LB_MARK}:{eid} -->"), re.S)
+    util.write_md(wp, pat.sub("", text).rstrip() + "\n")
+
+
+def undo_import(world: World, eid: str) -> dict:
+    """撤销一次卡导入:删实体 + 剥掉它并入的世界书块。"""
+    e = LocalEntity.load(world, eid)
+    if e.card().get("provenance", {}).get("source") != "import":
+        raise ValueError(f"{eid} 不是导入的实体(可用「删除实体」)")
+    _strip_lorebook(world, eid)
+    e.delete()
+    return {"undone": eid, "world": world.id}
+
+
+# ---------- 卡 → 新建独立世界(卡自带世界时推荐)----------
+def _derive_world(card: dict) -> tuple[str, str, str]:
+    base = util.slug(card["name"])
+    wid = base if (base and base != "x" and util.is_id(base)) else "card-world"
+    genre = (card.get("tags") or [""])[0] if card.get("tags") else ""
+    return wid, f"{card['name']}·世界", genre
+
+
+def import_card_new_world(card: dict, *, world_id: str | None = None, world_name: str | None = None,
+                          role: str = "main") -> dict:
+    """卡 → 新建独立世界(scenario 作背景 + 世界书作设定),角色落进去。"""
+    d_id, d_name, genre = _derive_world(card)
+    wid = world_id if (world_id and util.is_id(world_id)) else d_id
+    base, i = wid, 1
+    while World(wid).exists():
+        wid = f"{base}-{i}"; i += 1
+    name = world_name or d_name
+    body = (f"# {name}\n\n> 世界 id:`{wid}` ｜ 题材:{genre or '未定'} ｜ 导入自 SillyTavern 角色卡\n\n"
+            f"## 基调 / 背景\n{(card.get('scenario') or '').strip() or '（卡未给场景,可补充）'}\n\n"
+            f"## 核心规则\n<!-- 见下方导入世界书 -->\n")
+    w = World.create(wid, name, genre=genre, prov=provenance.stamp("import"), body=body)
+    r = import_card(w, card, role=role)
+    return {"world": wid, "world_name": name, "new_world": True, **r}

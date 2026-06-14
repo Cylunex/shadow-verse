@@ -55,6 +55,36 @@ r2 = importer.import_card(w, c1, role="secondary")
 ok(r2["entity"] != r["entity"], "两个中文名导入 id 不撞")
 ok(LocalEntity(w, r2["entity"]).exists() and LocalEntity(w, r["entity"]).exists(), "两个导入实体并存")
 
+# 撤销导入:删实体 + 剥世界书块
+before_wm = util.read_md(w.dir / "world.md")
+ok("导入世界书" in before_wm, "撤销前 world.md 有世界书块")
+importer.undo_import(w, r["entity"])
+ok(not LocalEntity(w, r["entity"]).exists(), "撤销:实体已删")
+ok("来自角色卡 " + r["entity"] not in util.read_md(w.dir / "world.md"), "撤销:该卡世界书块已剥")
+try:
+    importer.undo_import(w, "ye-wudao") if False else None
+    # 非导入实体不能撤销
+    from sv.entity import LocalEntity as LE
+    LE.create(w, "manual-x", "手建", role="npc")
+    importer.undo_import(w, "manual-x"); ok(False, "非导入实体应拒绝撤销")
+except ValueError:
+    ok(True, "非导入实体拒绝撤销导入")
+
+# 卡 → 新建独立世界
+nw = importer.import_card_new_world(c2, role="main")
+from sv.world import World as W2  # noqa: E402
+ok(W2(nw["world"]).exists() and nw["new_world"], "卡建独立世界")
+ok(LocalEntity(W2.load(nw["world"]), nw["entity"]).exists(), "角色落进新世界")
+ok("雨夜画室" in util.read_md(W2.load(nw["world"]).dir / "world.md"), "scenario 进新世界背景")
+
+# 世界融合:把新世界融进 w
+from sv import merge  # noqa: E402
+mw = World.create("dst-world", "目标", genre="都市")
+mr = merge.merge_world(nw["world"], "dst-world")
+ok(not W2(nw["world"]).exists() and mr["deleted_src"], "融合后源世界已删")
+ok(len(mr["moved_entities"]) >= 1, "实体已搬进目标世界")
+ok("融入自" in util.read_md(World.load("dst-world").dir / "world.md"), "源设定并入目标(标记块)")
+
 # PNG 内嵌卡(构造一个带 tEXt 'chara' 的最小 PNG)
 def _png_with_card(card_dict):
     sig = b"\x89PNG\r\n\x1a\n"

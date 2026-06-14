@@ -206,20 +206,43 @@ async function actNewCodex(){const cats=(await api('/codex')).categories;formMod
 
 async function actSeedCodex(){try{const r=await post('/codex/seed',{});await refresh();toast(`✓ 起始元件库:新增 <b>${r.added}</b>,跳过 ${r.skipped},共 ${r.total} 个`);route()}catch(e){toast('✗ '+e.message,true)}}
 
-// 导入 SillyTavern 角色卡(.json 或内嵌卡的 .png)
-function actImportCard(wid){
+// 导入 SillyTavern 角色卡(.json 或内嵌卡的 .png)—— 默认新建独立世界(卡自带世界),也可并入现有
+function actImportCard(){
   const inp=document.createElement('input');inp.type='file';inp.accept='.json,.png';
   inp.onchange=async()=>{const f=inp.files[0];if(!f)return;
-    try{let body={world:wid};
-      if(f.name.toLowerCase().endsWith('.png')){const buf=await f.arrayBuffer();
-        let bin='';const u=new Uint8Array(buf);for(let i=0;i<u.length;i++)bin+=String.fromCharCode(u[i]);
-        body.png_b64=btoa(bin);
-      }else{body.card=await f.text();}
-      const r=await post('/import/card',body);
-      toast(`✓ 导入 <b>${esc(r.name)}</b> → ${r.entity}（世界书 ${r.lorebook_entries} 条）`);location.hash='#/entity/'+wid+'/'+r.entity;
-    }catch(e){toast('✗ 导入失败:'+e.message,true)}};
+    let payload={},nameGuess='';
+    try{
+      if(f.name.toLowerCase().endsWith('.png')){const buf=await f.arrayBuffer();let bin='';const u=new Uint8Array(buf);
+        for(let i=0;i<u.length;i++)bin+=String.fromCharCode(u[i]);payload.png_b64=btoa(bin);}
+      else{const txt=await f.text();payload.card=txt;try{const j=JSON.parse(txt);const d=j.data||j;nameGuess=d.name||'';}catch(e){}}
+    }catch(e){return toast('✗ 读文件失败:'+e.message,true)}
+    const worlds=OV.worlds.map(w=>w.id);
+    formModal('导入角色卡'+(nameGuess?' · '+nameGuess:''),[
+      {n:'target',label:'导入方式(卡一般自带世界,推荐新建独立世界)',type:'select',options:['新建独立世界','并入现有世界'],value:'新建独立世界'},
+      {n:'world_name',label:'新世界名(留空自动)',value:nameGuess?nameGuess+'·世界':''},
+      {n:'world',label:'并入哪个世界(选「并入现有世界」时)',type:'select',options:worlds.length?worlds:['(暂无世界)'],value:worlds[0]||''},
+      {n:'role',label:'角色戏份',type:'select',options:['main','secondary','cameo','npc'],value:'main'},
+    ],'导入',async v=>{
+      const body={...payload,role:v.role};
+      if(v.target==='新建独立世界'){body.target='new';if(v.world_name)body.world_name=v.world_name;}
+      else{body.target='existing';body.world=v.world;}
+      const r=await post('/import/card',body);await refresh();closeModal();
+      toast(`✓ 导入 <b>${esc(r.name)}</b>${r.new_world?(' → 新世界 <b>'+esc(r.world)+'</b>'):(' → '+esc(r.world))}（世界书 ${r.lorebook_entries} 条）`);
+      location.hash='#/entity/'+r.world+'/'+r.entity;
+    });
+  };
   inp.click();
 }
+async function actUndoImport(wid,eid,name){if(!confirm(`撤销导入「${name}」?会删掉这个角色,并剥掉它并进世界设定的世界书。`))return;
+  try{await post('/import/undo',{world:wid,entity:eid});await refresh();toast(`✓ 已撤销导入「${esc(name)}」`);location.hash='#/world/'+wid}catch(e){toast('✗ '+e.message,true)}}
+async function actMergeWorld(wid,name){const others=OV.worlds.filter(w=>w.id!==wid).map(w=>w.id);
+  if(!others.length)return toast('没有其他世界可融合',true);
+  formModal(`融合「${name}」进其他世界`,[
+    {n:'dst',label:'融进哪个世界(目标)',type:'select',options:others,value:others[0]},
+    {n:'keep',label:'源世界处理',type:'select',options:['融完删除源世界','保留源世界'],value:'融完删除源世界'},
+  ],'融合',async v=>{const r=await post('/world/merge',{src:wid,dst:v.dst,delete_src:v.keep==='融完删除源世界'});
+    await refresh();closeModal();toast(`✓ 「${esc(name)}」融进 <b>${esc(v.dst)}</b>(实体 ${r.moved_entities.length}、线 ${r.moved_threads.length})`);
+    location.hash='#/world/'+v.dst})}
 
 function download(name,content){const b=new Blob([content],{type:'text/markdown;charset=utf-8'});const u=URL.createObjectURL(b);
   const a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
@@ -473,6 +496,7 @@ function viewOverview(m){
   m.innerHTML=`<h1>多元宇宙总览 <small>暗宇宙 · 无限世界 · AIGC</small></h1>
     <p class="lead">从元件生成世界,角色在世界间穿梭,世界彼此相连。</p>
     <div class="actions"><button class="btn" onclick="actNewWorld()">＋ 新世界</button>
+      <button class="btn" onclick="actImportCard()">📥 导入角色卡</button>
       <button class="btn ghost" onclick="actLink()">⇄ 连接世界</button>
       <button class="btn ghost" onclick="actNewCodex()">＋ 元件</button></div>
     <div class="stat-row">
@@ -495,7 +519,7 @@ async function viewWorld(m,id){try{const d=await api('/world/'+id);const meta=d.
       <button class="btn ghost" onclick="actNewEntity('${id}')">＋ 实体</button>
       <button class="btn ghost" onclick="location.hash='#/timeline/${id}'">📜 故事时间线</button>
       <button class="btn ghost" onclick="actEditWorldMd('${id}')">✎ 编辑设定</button>
-      <button class="btn ghost" onclick="actImportCard('${id}')">📥 导入ST角色卡</button>
+      <button class="btn ghost" onclick="actMergeWorld('${id}','${esc(meta.name)}')">🔗 融合进其他世界</button>
       <button class="btn ghost" onclick="actDelWorld('${id}','${esc(meta.name)}')">🗑 删除世界</button></div>
     <div class="section"><h2>叙事线</h2><div class="grid">${d.threads.length?d.threads.map(t=>`
       <div class="card" onclick="location.hash='#/thread/${id}/${t.id}'"><h3>📖 ${esc(t.title)}</h3>
@@ -541,6 +565,7 @@ async function viewEntity(m,wid,eid){try{const d=await api('/entity/'+wid+'/'+ei
     <div class="actions"><button class="btn" onclick="location.hash='#/chat/${wid}/${eid}'">💬 对话</button>
       ${(c.role==='main'||c.role==='secondary')?`<button class="btn ghost" onclick="actAscend('${wid}','${eid}','${esc(c.name)}')">⬆ 升格为跨世界实体</button>`:''}
       <button class="btn ghost" onclick="actRenderEntity('${wid}','${eid}',${JSON.stringify(d.appearance||'')})">🖼 生成立绘</button>
+      ${(c.provenance&&c.provenance.source==='import')?`<button class="btn ghost" onclick="actUndoImport('${wid}','${eid}','${esc(c.name)}')">↩ 撤销导入</button>`:''}
       <button class="btn ghost" onclick="actDelEntity('${wid}','${eid}','${esc(c.name)}')">🗑 删除实体</button></div>
     ${(d.portraits&&d.portraits.length)?`<div class="section"><h2>立绘</h2><div class="gallery">${d.portraits.map(p=>`<img src="/img/${esc(p)}" loading="lazy">`).join('')}</div></div>`:''}
     <div class="section"><h2>此刻状态</h2><table class="kv">${d.appearance?`<tr><td>外貌</td><td>${esc(d.appearance)}</td></tr>`:''}<tr><td>位置</td><td>${esc(st.location||'—')}</td></tr><tr><td>情绪</td><td>${esc(st.mood||'—')}</td></tr><tr><td>目标</td><td>${esc(st.goal||'—')}</td></tr></table></div>
@@ -634,7 +659,7 @@ async function testLLM(){const box=document.getElementById('cf_test');box.style.
   }catch(e){box.textContent='✗ '+e.message}}
 
 window.showCh=showCh;
-['actNewWorld','actNewEntity','actNewThread','actNewCodex','actSeedCodex','actLink','actAscend','actSummon','actWriteChapter','actPlay','actEditWorldMd','actNarrateRun','actReflect','actExportThread','actDelWorld','actDelThread','actDelEntity','actDelCodex','actRenderEntity','actRenderScene','actSetAlpha','actAddHook','actSetHook','actImportCard','chatClear','saveSettings','clearSecret','testLLM','closeModal'].forEach(f=>window[f]=eval(f));
+['actNewWorld','actNewEntity','actNewThread','actNewCodex','actSeedCodex','actLink','actAscend','actSummon','actWriteChapter','actPlay','actEditWorldMd','actNarrateRun','actReflect','actExportThread','actDelWorld','actDelThread','actDelEntity','actDelCodex','actRenderEntity','actRenderScene','actSetAlpha','actAddHook','actSetHook','actImportCard','actUndoImport','actMergeWorld','chatClear','saveSettings','clearSecret','testLLM','closeModal'].forEach(f=>window[f]=eval(f));
 window.addEventListener('hashchange',route);
 (async()=>{try{await refresh()}catch(e){}route()})();
 </script>

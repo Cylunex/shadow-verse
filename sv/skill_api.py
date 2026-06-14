@@ -148,12 +148,32 @@ def cmd_thread_commit(a):
 
 
 # ---------- 手建(非 AIGC)----------
-def cmd_import_card(a):
+def _read_card(path):
     from pathlib import Path
-    raw = Path(a.path).read_bytes()
-    card = importer.parse_card(raw if a.path.lower().endswith(".png") else raw.decode("utf-8"))
-    r = importer.import_card(World.load(a.world), card, role=a.role, as_id=getattr(a, "as", None))
+    raw = Path(path).read_bytes()
+    return importer.parse_card(raw if path.lower().endswith(".png") else raw.decode("utf-8"))
+
+
+def cmd_import_card(a):
+    r = importer.import_card(World.load(a.world), _read_card(a.path), role=a.role, as_id=getattr(a, "as", None))
     print(f"✓ 导入角色:{r['name']} → {a.world}/{r['entity']}(世界书 {r['lorebook_entries']} 条)")
+
+
+def cmd_import_card_world(a):
+    r = importer.import_card_new_world(_read_card(a.path), world_id=a.world_id or None,
+                                       world_name=a.world_name or None, role=a.role)
+    print(f"✓ 卡建独立世界:{r['world_name']}({r['world']}),角色 {r['entity']}(世界书 {r['lorebook_entries']} 条)")
+
+
+def cmd_undo_import(a):
+    importer.undo_import(World.load(a.world), a.entity)
+    print(f"✓ 已撤销导入:{a.world}/{a.entity}(删实体 + 剥世界书)")
+
+
+def cmd_merge_world(a):
+    from . import merge
+    r = merge.merge_world(a.src, a.dst, delete_src=not a.keep_src)
+    print(f"✓ 融合:{a.src} → {a.dst}(实体 {len(r['moved_entities'])},线 {len(r['moved_threads'])},{'删源' if r['deleted_src'] else '留源'})")
 
 
 def cmd_new_world(a):
@@ -416,6 +436,9 @@ def build_parser():
     add("thread-commit", cmd_thread_commit, ["world"])
 
     add("import-card", cmd_import_card, ["world", "path"], [("role", {"default": "secondary"}), ("as", {"default": None})])
+    add("import-card-world", cmd_import_card_world, ["path"], [("world-id", {"default": "", "dest": "world_id"}), ("world-name", {"default": "", "dest": "world_name"}), ("role", {"default": "main"})])
+    add("undo-import", cmd_undo_import, ["world", "entity"])
+    add("merge-world", cmd_merge_world, ["src", "dst"], [("keep-src", {"action": "store_true", "dest": "keep_src"})])
     add("new-world", cmd_new_world, ["id"], [("name", {"default": ""}), ("genre", {"default": ""}), ("scale", {"default": "max"})])
     add("new-entity", cmd_new_entity, ["world", "id"], [("name", {"default": ""}), ("role", {"default": "secondary"})])
     add("new-thread", cmd_new_thread, ["world", "id"], [("title", {"default": ""}), ("genre", {"default": ""}), ("pacing", {"default": "每章至少推进一条主线钩子"})])
