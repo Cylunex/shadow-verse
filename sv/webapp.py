@@ -121,7 +121,8 @@ def api_chat(wid: str, eid: str) -> dict:
     w = World.load(wid); e = LocalEntity.load(w, eid)
     return {"world": wid, "entity": eid, "name": e.card().get("name", eid),
             "greeting": chatmod.greeting(e), "history": chatmod.history(e),
-            "avatar": e.avatar_rel(), "llm_available": llm.available()}
+            "avatar": e.avatar_rel(), "player": chatmod.player(), "vars": chatmod.vars(e),
+            "llm_available": llm.available()}
 
 
 def api_timeline(wid: str) -> dict:
@@ -303,6 +304,20 @@ def post_entity_avatar(b: dict) -> dict:
     return {"ok": True, "avatar": rel}
 
 
+def post_player(b: dict) -> dict:
+    return {"ok": True, "player": chatmod.set_player(b.get("name", "你"), b.get("persona", ""))}
+
+
+def post_chat_var(b: dict) -> dict:
+    w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
+    return {"ok": True, "vars": chatmod.set_var(e, b["name"], b.get("value", 0))}
+
+
+def post_chat_var_del(b: dict) -> dict:
+    w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
+    return {"ok": True, "vars": chatmod.del_var(e, b["name"])}
+
+
 def post_import_card(b: dict) -> dict:
     png = base64.b64decode(b["png_b64"]) if b.get("png_b64") else None   # PNG 卡图 → 头像
     card = importer.parse_card(png) if png else importer.parse_card(b["card"])
@@ -439,6 +454,9 @@ POST_ROUTES = [
     (re.compile(r"^/api/chat/regenerate$"), post_chat_regenerate),
     (re.compile(r"^/api/chat/undo$"), post_chat_undo),
     (re.compile(r"^/api/entity/avatar$"), post_entity_avatar),
+    (re.compile(r"^/api/player$"), post_player),
+    (re.compile(r"^/api/chat/var$"), post_chat_var),
+    (re.compile(r"^/api/chat/var/del$"), post_chat_var_del),
 ]
 
 

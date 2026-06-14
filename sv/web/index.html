@@ -94,6 +94,14 @@
   .brow.user{flex-direction:row-reverse}
   .cavatar{width:34px;height:34px;border-radius:50%;object-fit:cover;border:1px solid var(--line);flex:0 0 auto}
   .entity-av{width:120px;height:120px;border-radius:14px;object-fit:cover;border:1px solid var(--line);float:right;margin-left:14px}
+  .rp{display:grid;grid-template-columns:1fr 230px;gap:16px;align-items:start}
+  @media(max-width:820px){.rp{grid-template-columns:1fr}}
+  .rp-side .card{margin-bottom:12px;cursor:default;padding:13px 15px}
+  .rp-side h2{border:none;padding:0;margin:0 0 7px;font-size:13px}
+  .varrow{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:14px;border-bottom:1px solid var(--line)}
+  .varrow .vn{color:var(--dim)} .varrow .vv{color:var(--acc2);font-weight:600}
+  .varrow a{font-size:12px;color:var(--faint);margin-left:7px;cursor:pointer}
+  .sideav{width:100%;border-radius:12px;border:1px solid var(--line)}
   .incarn{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
   .incarn .b{background:#0006;border:1px solid var(--acc);color:var(--acc2);border-radius:20px;padding:2px 11px;font-size:12px}
   .crumb{color:var(--faint);font-size:13px;margin-bottom:10px}
@@ -472,6 +480,19 @@ async function chatRegen(){if(!window._chat)return;const c=window._chat,box=docu
   const tgt=last?last.querySelector('.bubble'):_addBubble('char','…');tgt.textContent='…';
   try{const r=await post('/chat/regenerate',{world:c.wid,entity:c.eid});tgt.textContent=r.reply||r.note||'(无)';}
   catch(e){tgt.textContent='✗ '+e.message}}
+function renderVars(v){const box=document.getElementById('varpanel');if(!box)return;const ks=Object.keys(v||{});
+  box.innerHTML=ks.length?ks.map(k=>`<div class="varrow"><span class="vn">${esc(k)}</span><span><span class="vv">${esc(''+v[k])}</span><a onclick="varSet('${esc(k)}')">改</a><a onclick="varDel('${esc(k)}')">✕</a></span></div>`).join('')
+    :'<div style="color:var(--faint);font-size:13px">无。对话中角色可能自动产生,或点＋手动加(如 好感度/HP/进度)</div>';}
+async function actEditPlayer(){let pl={name:'你',persona:''};try{pl=(await api('/chat/'+window._chat.wid+'/'+window._chat.eid)).player}catch(e){}
+  formModal('你扮演谁(用户身份)',[
+    {n:'name',label:'你的名字(角色会这样称呼你)',value:pl.name||'你'},
+    {n:'persona',label:'你的身份/简介(可空,让角色认得你、别把你写成别人)',type:'textarea',rows:2,value:pl.persona||''},
+  ],'保存',async v=>{await post('/player',{name:v.name,persona:v.persona});closeModal();toast('✓ 已设你的身份');route()})}
+async function varAdd(){const c=window._chat;formModal('加变量',[{n:'name',label:'变量名',ph:'如 好感度 / HP / 金钱 / 进度'},{n:'value',label:'初始值',value:'0'}],'加',
+  async v=>{if(!v.name)return;const r=await post('/chat/var',{world:c.wid,entity:c.eid,name:v.name,value:v.value});closeModal();renderVars(r.vars)})}
+async function varSet(name){const c=window._chat;const val=prompt('设「'+name+'」(数值可写 +5 / -3 增减,或直接写新值):');if(val==null)return;
+  const r=await post('/chat/var',{world:c.wid,entity:c.eid,name,value:val});renderVars(r.vars)}
+async function varDel(name){const c=window._chat;if(!confirm('删变量「'+name+'」?'))return;const r=await post('/chat/var/del',{world:c.wid,entity:c.eid,name});renderVars(r.vars)}
 async function viewChat(m,wid,eid){
   let d;try{d=await api('/chat/'+wid+'/'+eid)}catch(e){m.innerHTML=`<div class="empty">${esc(e.message)}</div>`;return}
   window._chat={wid,eid,avatar:d.avatar};
@@ -480,12 +501,21 @@ async function viewChat(m,wid,eid){
   m.innerHTML=`<div class="crumb"><a href="#/">总览</a> / <a href="#/world/${wid}">${esc(wid)}</a> / <a href="#/entity/${wid}/${eid}">${esc(d.name)}</a> / 对话</div>
     <div class="chat-head">${av?`<img class="bigav" src="${av}">`:''}<h1 style="margin:0">💬 ${esc(d.name)}</h1></div>
     ${d.llm_available?'':'<p class="lead" style="color:var(--gold)">还没配 LLM —— 去左边 <a href="#/settings" style="color:var(--acc2)">⚙ 设置</a> 填一个 provider + key,回来就能真聊。</p>'}
-    <div class="actions"><button class="btn ghost" onclick="chatRegen()">🔄 换一个回复</button><button class="btn ghost" onclick="chatUndo()">↩ 撤回上一轮</button><button class="btn ghost" onclick="chatClear()">🗑 重置</button></div>
-    <div class="chat" id="chatbox">${bubbles.map(b=>bubbleHtml(b.role,b.text)).join('')}</div>
-    <div class="chat-input"><input id="chatmsg" placeholder="对 ${esc(d.name)} 说…(回车发送)"><button class="btn" id="chatsend">发送</button></div>`;
+    <div class="rp"><div class="rp-main">
+      <div class="actions"><button class="btn ghost" onclick="chatRegen()">🔄 换一个回复</button><button class="btn ghost" onclick="chatUndo()">↩ 撤回上一轮</button><button class="btn ghost" onclick="chatClear()">🗑 重置</button></div>
+      <div class="chat" id="chatbox">${bubbles.map(b=>bubbleHtml(b.role,b.text)).join('')}</div>
+      <div class="chat-input"><input id="chatmsg" placeholder="以 ${esc(d.player.name)} 的身份说…(回车发送)"><button class="btn" id="chatsend">发送</button></div>
+    </div><aside class="rp-side">
+      <div class="card"><h2>你扮演 <a onclick="actEditPlayer()" style="color:var(--acc2);cursor:pointer">编辑</a></h2>
+        <div style="color:var(--gold)">${esc(d.player.name)}</div>${d.player.persona?`<div style="color:var(--faint);font-size:13px;margin-top:3px">${esc(d.player.persona)}</div>`:'<div style="color:var(--faint);font-size:12px;margin-top:3px">未设身份 → 角色易认错你,建议点编辑</div>'}</div>
+      <div class="card"><h2>变量 <a onclick="varAdd()" style="color:var(--acc2);cursor:pointer">＋</a></h2><div id="varpanel"></div></div>
+      ${av?`<img class="sideav" src="${av}">`:''}
+    </aside></div>`;
+  renderVars(d.vars);
   const send=async()=>{const inp=document.getElementById('chatmsg');const msg=inp.value.trim();if(!msg)return;
     inp.value='';inp.disabled=true;_addBubble('user',msg);const w=_addBubble('char','…');
-    try{const r=await post('/chat',{world:wid,entity:eid,message:msg});w.textContent=r.reply;}
+    try{const r=await post('/chat',{world:wid,entity:eid,message:msg});w.textContent=r.reply;renderVars(r.vars);
+      if(r.var_changed&&r.var_changed.length)toast('变量更新:'+r.var_changed.join('、'));}
     catch(e){w.textContent='✗ '+e.message}
     inp.disabled=false;inp.focus();};
   document.getElementById('chatsend').onclick=send;
@@ -688,7 +718,7 @@ async function testLLM(){const box=document.getElementById('cf_test');box.style.
   }catch(e){box.textContent='✗ '+e.message}}
 
 window.showCh=showCh;
-['actNewWorld','actNewEntity','actNewThread','actNewCodex','actSeedCodex','actLink','actAscend','actSummon','actWriteChapter','actPlay','actEditWorldMd','actNarrateRun','actReflect','actExportThread','actDelWorld','actDelThread','actDelEntity','actDelCodex','actRenderEntity','actRenderScene','actSetAlpha','actAddHook','actSetHook','actImportCard','actUndoImport','actMergeWorld','chatClear','chatUndo','chatRegen','actSetAvatar','saveSettings','clearSecret','testLLM','closeModal'].forEach(f=>window[f]=eval(f));
+['actNewWorld','actNewEntity','actNewThread','actNewCodex','actSeedCodex','actLink','actAscend','actSummon','actWriteChapter','actPlay','actEditWorldMd','actNarrateRun','actReflect','actExportThread','actDelWorld','actDelThread','actDelEntity','actDelCodex','actRenderEntity','actRenderScene','actSetAlpha','actAddHook','actSetHook','actImportCard','actUndoImport','actMergeWorld','chatClear','chatUndo','chatRegen','actSetAvatar','actEditPlayer','varAdd','varSet','varDel','renderVars','saveSettings','clearSecret','testLLM','closeModal'].forEach(f=>window[f]=eval(f));
 window.addEventListener('hashchange',route);
 (async()=>{try{await refresh()}catch(e){}route()})();
 </script>

@@ -37,9 +37,9 @@ card = e2.card(); card["greeting"] = "谁?"; save_json(e2.card_path, card)
 ok(chat.greeting(e2) == "谁?", "card.greeting 作开场白")
 
 # 人设组装含档案 + anchors(不打网络)
-sysp = chat._persona(w, e)
+sysp = chat._system(w, e, chat.player(), {})
 ok("苏晴" in sysp and "外冷内热" in sysp and "不伤无辜" in sysp, "人设含名字/档案/底线 anchors")
-ok("第一人称" in sysp and "不报" not in sysp[:0] and "AI" in sysp, "人设要求第一人称扮演、不跳戏")
+ok("第一人称" in sysp and "AI" in sysp, "人设要求第一人称扮演、不跳戏")
 
 # 配 openai+假key → available 翻 True(真聊只差真 key;不在测试里打网络)
 config.save_setting({"SV_PROVIDER": "openai", "OPENAI_API_KEY": "sk-fake"})
@@ -82,6 +82,39 @@ try:
     ok(u["remaining"] == 2 and len(chat.history(e)) == 2, "撤回删掉最后一轮")
 finally:
     C.llm.available, C.llm.generate = _av, _gen
+
+# 玩家身份(治身份漂移)
+ok(chat.player()["name"] == "你", "默认玩家身份")
+chat.set_player("阿哲", "苏晴的发小")
+ok(chat.player() == {"name": "阿哲", "persona": "苏晴的发小"}, "设玩家身份持久化")
+sysp = chat._system(w, e, chat.player(), {})
+ok("阿哲" in sysp and "绝不替阿哲说话" in sysp, "系统提示含玩家名 + 不替玩家说话铁律")
+
+# 变量系统
+ok(chat.vars(e) == {}, "初始无变量")
+chat.set_var(e, "好感度", 10)
+ok(chat.vars(e)["好感度"] == 10, "设数值变量")
+chat.set_var(e, "好感度", "+5")
+ok(chat.vars(e)["好感度"] == 15, "+N 增量")
+chat.set_var(e, "好感度", "-3")
+ok(chat.vars(e)["好感度"] == 12, "-N 减量")
+chat.set_var(e, "心情", "温柔")
+ok(chat.vars(e)["心情"] == "温柔", "字符串变量")
+chat.del_var(e, "心情")
+ok("心情" not in chat.vars(e), "删变量")
+
+# 模型在回复尾部下变量块 → 解析+结算,正文剥干净
+_av2, _gen2 = C.llm.available, C.llm.generate
+C.llm.available = lambda: True
+C.llm.generate = lambda system, user, **kw: '啧,又来了。\n===变量===\n{"好感度":"+5","金钱":"100"}'
+try:
+    chat.clear(e)
+    r = chat.turn(w, e, "我来看你了")
+    ok(r["reply"] == "啧,又来了。" and "===" not in r["reply"], "变量块从正文剥离")
+    ok(r["vars"]["好感度"] == 17 and r["vars"]["金钱"] == 100, "模型变量块结算(增量+新值)")
+    ok(set(r["var_changed"]) == {"好感度", "金钱"}, "var_changed 报告改了哪些")
+finally:
+    C.llm.available, C.llm.generate = _av2, _gen2
 
 if os.path.exists(os.environ["SV_LOCAL_CONF"]):
     os.remove(os.environ["SV_LOCAL_CONF"])
