@@ -63,12 +63,13 @@ MCP(零依赖 stdio):`python -m sv.mcp_server`(22 个 typed 工具,语义同 CLI
 ## 目录
 
 ```
-sv/         引擎(codex·forge·world·entity·thread·nexus·lenses·memory·
-            provenance·recipes·checks·craft·skill_api·mcp_server·config·clock·util)
-sv/webapp.py + web/index.html   网页视图层(零依赖 stdlib server,只读仪表盘)
-universe/   数据真相(codex/ + worlds/<w>/{entities,threads}/ + nexus/)
-sim/        run_tests(总跑) · test_memory/forge/lenses/nexus · smoke · seed(demo 播种)
-ARCHITECTURE.md · sv.conf · deploy/
+sv/         引擎(25 模块):codex/codex_starter·forge·recipes·world·entity·thread·
+            nexus·merge·lenses·chat·memory·provenance·checks·craft·importer·export·
+            llm·config·clock·util·skill_api·mcp_server(40工具)·webapp
+sv/web/index.html   网页控制台(零依赖 stdlib server 的深色 SPA)
+universe/   数据真相(codex/ + worlds/<w>/{entities,threads}/ + nexus/ + player.json)
+sim/        run_tests(总跑) · 15 套测试 · smoke · seed(demo 播种)
+ARCHITECTURE.md · sv.conf / sv.local.conf · deploy/
 ```
 
 ## 两种用法
@@ -103,5 +104,7 @@ ARCHITECTURE.md · sv.conf · deploy/
 
 ## 状态
 
-**Phase 0 五层地基已贯通**(测试 5 套全绿 + demo 种子 + 交互式网页控制台):元件取料 · AIGC 锻造世界/实体/线(带谱系+题材配方) · 读/玩透镜(核心循环铁律+沉淀门控+落章自动质检) · 跨世界实体穿梭 + 世界互联 · 页面里直接建/写/玩/连接。
-模拟(自演化)与多模态渲染**接口已建、默认关/休眠**。后续慢慢填充:批量造世界、子代理产线(写→审→反思)、开自演化、向量记忆、线分支——见 ARCHITECTURE「演进阶梯」。
+**五层贯通 + 完整可用**(测试 **15 套全绿**):元件取料 · AIGC 锻造世界/实体/线(谱系+题材配方) · narrate 产线(写→审→改→落 + 钩子台账自动揪伏笔) · 扮演页(对话+用户身份+变量+立绘) · 跨世界穿梭+互联+融合 · 多模态出图 · 导入 ST 角色卡 · 故事时间线 · 导出/管理 · 网页配 LLM。
+
+**后面再做**(已记 ARCHITECTURE「Backlog」):立绘表情切换、文生图入对话、世界书预设(SillyTavern 简化版);批量造世界、simulate 自演化(用户暂缓);向量记忆、线分支(规模/设计驱动)。
+模拟(自演化)与多模态渲染**接口已建、默认关/休眠**。
