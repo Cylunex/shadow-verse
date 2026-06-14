@@ -52,19 +52,57 @@ def _persona(world: World, e: LocalEntity) -> str:
     return "\n\n".join(parts)
 
 
+def _generate(world: World, e: LocalEntity, message: str, hist: list[dict]) -> str:
+    sys = _persona(world, e)
+    mem = memory.retrieve(e.dir, message)
+    if mem:
+        sys += "\n\n该想起的事:" + " / ".join(m["text"] for m in mem)
+    convo = "\n".join((("你" if t["role"] == "char" else "对方") + ":" + t["text"]) for t in hist)
+    user = (convo + "\n" if convo else "") + "对方:" + message + "\n你:"
+    return llm.generate(sys, user).strip()
+
+
+def _rewrite(e: LocalEntity, turns: list[dict]) -> None:
+    """整段覆盖写 chat.jsonl(撤回/重roll 用)。"""
+    p = _path(e)
+    if p.exists():
+        p.unlink()
+    for t in turns:
+        append_jsonl(p, t)
+
+
 def turn(world: World, e: LocalEntity, message: str) -> dict:
     """聊一轮:组装人设+记忆+对话史 → LLM 出角色回复,落 chat.jsonl。"""
     if not llm.available():
         return {"available": False,
                 "reply": "（还没配 LLM,没法真正对话。去左边 ⚙ 设置 填一个 provider + key,回来就能聊了。）"}
-    sys = _persona(world, e)
-    mem = memory.retrieve(e.dir, message)
-    if mem:
-        sys += "\n\n该想起的事:" + " / ".join(m["text"] for m in mem)
-    h = history(e, HISTORY_WINDOW)
-    convo = "\n".join((("你" if t["role"] == "char" else "对方") + ":" + t["text"]) for t in h)
-    user = (convo + "\n" if convo else "") + "对方:" + message + "\n你:"
-    reply = llm.generate(sys, user).strip()
+    reply = _generate(world, e, message, history(e, HISTORY_WINDOW))
     append_jsonl(_path(e), {"role": "user", "text": message, "ts": clock.now_iso()})
     append_jsonl(_path(e), {"role": "char", "text": reply, "ts": clock.now_iso()})
     return {"available": True, "reply": reply}
+
+
+def regenerate(world: World, e: LocalEntity) -> dict:
+    """重 roll:丢掉最后一条角色回复,用同一句话重新生成(酒馆 swipe 简化版)。"""
+    if not llm.available():
+        return {"available": False, "reply": "（未配 LLM）"}
+    h = history(e)
+    if h and h[-1]["role"] == "char":
+        h = h[:-1]                       # 丢掉最后一条角色回复
+    if not h or h[-1]["role"] != "user":
+        return {"available": True, "reply": "", "note": "没有可重生成的对话"}
+    last_user = h[-1]["text"]
+    reply = _generate(world, e, last_user, h[:-1])   # 用这句之前的史做上下文
+    _rewrite(e, h + [{"role": "char", "text": reply, "ts": clock.now_iso()}])
+    return {"available": True, "reply": reply}
+
+
+def undo_last(e: LocalEntity) -> dict:
+    """撤回最后一轮(角色回复 + 上一条用户消息)。"""
+    h = history(e)
+    if h and h[-1]["role"] == "char":
+        h = h[:-1]
+    if h and h[-1]["role"] == "user":
+        h = h[:-1]
+    _rewrite(e, h)
+    return {"ok": True, "remaining": len(h)}

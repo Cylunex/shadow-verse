@@ -149,20 +149,24 @@ def cmd_thread_commit(a):
 
 # ---------- 手建(非 AIGC)----------
 def _read_card(path):
+    """返回 (card, png_bytes_or_None)。PNG 卡的原图用作头像。"""
     from pathlib import Path
     raw = Path(path).read_bytes()
-    return importer.parse_card(raw if path.lower().endswith(".png") else raw.decode("utf-8"))
+    is_png = path.lower().endswith(".png")
+    return importer.parse_card(raw if is_png else raw.decode("utf-8")), (raw if is_png else None)
 
 
 def cmd_import_card(a):
-    r = importer.import_card(World.load(a.world), _read_card(a.path), role=a.role, as_id=getattr(a, "as", None))
-    print(f"✓ 导入角色:{r['name']} → {a.world}/{r['entity']}(世界书 {r['lorebook_entries']} 条)")
+    card, png = _read_card(a.path)
+    r = importer.import_card(World.load(a.world), card, role=a.role, as_id=getattr(a, "as", None), avatar_png=png)
+    print(f"✓ 导入角色:{r['name']} → {a.world}/{r['entity']}(世界书 {r['lorebook_entries']} 条{'，含头像' if r.get('avatar') else ''})")
 
 
 def cmd_import_card_world(a):
-    r = importer.import_card_new_world(_read_card(a.path), world_id=a.world_id or None,
-                                       world_name=a.world_name or None, role=a.role)
-    print(f"✓ 卡建独立世界:{r['world_name']}({r['world']}),角色 {r['entity']}(世界书 {r['lorebook_entries']} 条)")
+    card, png = _read_card(a.path)
+    r = importer.import_card_new_world(card, world_id=a.world_id or None,
+                                       world_name=a.world_name or None, role=a.role, avatar_png=png)
+    print(f"✓ 卡建独立世界:{r['world_name']}({r['world']}),角色 {r['entity']}(世界书 {r['lorebook_entries']} 条{'，含头像' if r.get('avatar') else ''})")
 
 
 def cmd_undo_import(a):

@@ -88,6 +88,12 @@
   .chat-input input:focus{outline:none;border-color:var(--acc)}
   .gallery{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
   .gallery img{max-width:200px;max-height:300px;border-radius:10px;border:1px solid var(--line);background:var(--panel)}
+  .chat-head{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  .bigav{width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--acc)}
+  .brow{display:flex;gap:8px;margin:8px 0;align-items:flex-end}
+  .brow.user{flex-direction:row-reverse}
+  .cavatar{width:34px;height:34px;border-radius:50%;object-fit:cover;border:1px solid var(--line);flex:0 0 auto}
+  .entity-av{width:120px;height:120px;border-radius:14px;object-fit:cover;border:1px solid var(--line);float:right;margin-left:14px}
   .incarn{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
   .incarn .b{background:#0006;border:1px solid var(--acc);color:var(--acc2);border-radius:20px;padding:2px 11px;font-size:12px}
   .crumb{color:var(--faint);font-size:13px;margin-bottom:10px}
@@ -231,6 +237,15 @@ function actImportCard(){
       location.hash='#/entity/'+r.world+'/'+r.entity;
     });
   };
+  inp.click();
+}
+function actSetAvatar(wid,eid){
+  const inp=document.createElement('input');inp.type='file';inp.accept='image/png,image/jpeg,image/webp';
+  inp.onchange=async()=>{const f=inp.files[0];if(!f)return;
+    try{const buf=await f.arrayBuffer();let bin='';const u=new Uint8Array(buf);for(let i=0;i<u.length;i++)bin+=String.fromCharCode(u[i]);
+      const ext=(f.name.split('.').pop()||'png').toLowerCase();
+      await post('/entity/avatar',{world:wid,entity:eid,img_b64:btoa(bin),ext});toast('✓ 头像已设');route();
+    }catch(e){toast('✗ '+e.message,true)}};
   inp.click();
 }
 async function actUndoImport(wid,eid,name){if(!confirm(`撤销导入「${name}」?会删掉这个角色,并剥掉它并进世界设定的世界书。`))return;
@@ -442,19 +457,31 @@ function route(){
   else if(p[0]==='chat'&&p[2])viewChat(m,p[1],p[2]);
 }
 
-function _addBubble(role,text){const box=document.getElementById('chatbox');const d=document.createElement('div');
-  d.className='bubble '+role;d.textContent=text;box.appendChild(d);window.scrollTo(0,document.body.scrollHeight);return d;}
+function _av(){return (window._chat&&window._chat.avatar)?('/img/'+window._chat.avatar):''}
+function bubbleHtml(role,text){const av=_av();
+  if(role==='char')return `<div class="brow char">${av?`<img class="cavatar" src="${av}">`:''}<div class="bubble char">${esc(text)}</div></div>`;
+  return `<div class="brow user"><div class="bubble user">${esc(text)}</div></div>`;}
+function _addBubble(role,text){const box=document.getElementById('chatbox');const w=document.createElement('div');
+  w.innerHTML=bubbleHtml(role,text);const row=w.firstElementChild;box.appendChild(row);
+  window.scrollTo(0,document.body.scrollHeight);return row.querySelector('.bubble');}
 async function chatClear(){if(!window._chat)return;if(!confirm('清空与该角色的对话?'))return;
   await post('/chat/clear',{world:window._chat.wid,entity:window._chat.eid});route();}
+async function chatUndo(){if(!window._chat)return;await post('/chat/undo',{world:window._chat.wid,entity:window._chat.eid});route();}
+async function chatRegen(){if(!window._chat)return;const c=window._chat,box=document.getElementById('chatbox');
+  const rows=box.querySelectorAll('.brow.char');const last=rows[rows.length-1];
+  const tgt=last?last.querySelector('.bubble'):_addBubble('char','…');tgt.textContent='…';
+  try{const r=await post('/chat/regenerate',{world:c.wid,entity:c.eid});tgt.textContent=r.reply||r.note||'(无)';}
+  catch(e){tgt.textContent='✗ '+e.message}}
 async function viewChat(m,wid,eid){
   let d;try{d=await api('/chat/'+wid+'/'+eid)}catch(e){m.innerHTML=`<div class="empty">${esc(e.message)}</div>`;return}
-  window._chat={wid,eid};
+  window._chat={wid,eid,avatar:d.avatar};
   const bubbles=d.history.length?d.history:[{role:'char',text:d.greeting}];
+  const av=d.avatar?('/img/'+d.avatar):'';
   m.innerHTML=`<div class="crumb"><a href="#/">总览</a> / <a href="#/world/${wid}">${esc(wid)}</a> / <a href="#/entity/${wid}/${eid}">${esc(d.name)}</a> / 对话</div>
-    <h1>💬 ${esc(d.name)}</h1>
+    <div class="chat-head">${av?`<img class="bigav" src="${av}">`:''}<h1 style="margin:0">💬 ${esc(d.name)}</h1></div>
     ${d.llm_available?'':'<p class="lead" style="color:var(--gold)">还没配 LLM —— 去左边 <a href="#/settings" style="color:var(--acc2)">⚙ 设置</a> 填一个 provider + key,回来就能真聊。</p>'}
-    <div class="actions"><button class="btn ghost" onclick="chatClear()">🗑 重置对话</button></div>
-    <div class="chat" id="chatbox">${bubbles.map(b=>`<div class="bubble ${b.role==='user'?'user':'char'}">${esc(b.text)}</div>`).join('')}</div>
+    <div class="actions"><button class="btn ghost" onclick="chatRegen()">🔄 换一个回复</button><button class="btn ghost" onclick="chatUndo()">↩ 撤回上一轮</button><button class="btn ghost" onclick="chatClear()">🗑 重置</button></div>
+    <div class="chat" id="chatbox">${bubbles.map(b=>bubbleHtml(b.role,b.text)).join('')}</div>
     <div class="chat-input"><input id="chatmsg" placeholder="对 ${esc(d.name)} 说…(回车发送)"><button class="btn" id="chatsend">发送</button></div>`;
   const send=async()=>{const inp=document.getElementById('chatmsg');const msg=inp.value.trim();if(!msg)return;
     inp.value='';inp.disabled=true;_addBubble('user',msg);const w=_addBubble('char','…');
@@ -561,9 +588,11 @@ function showCh(i){const c=window._chs[i];document.querySelectorAll('.ch-nav but
 
 async function viewEntity(m,wid,eid){try{const d=await api('/entity/'+wid+'/'+eid);const c=d.card,st=d.state;
   m.innerHTML=`<div class="crumb"><a href="#/">总览</a> / <a href="#/world/${wid}">${esc(wid)}</a> / ${esc(c.name)}</div>
+    ${d.avatar?`<img class="entity-av" src="/img/${esc(d.avatar)}">`:''}
     <h1>👤 ${esc(c.name)} <small><span class="tag role-${c.role}">${esc(c.role)}</span></small></h1>
     <div class="actions"><button class="btn" onclick="location.hash='#/chat/${wid}/${eid}'">💬 对话</button>
       ${(c.role==='main'||c.role==='secondary')?`<button class="btn ghost" onclick="actAscend('${wid}','${eid}','${esc(c.name)}')">⬆ 升格为跨世界实体</button>`:''}
+      <button class="btn ghost" onclick="actSetAvatar('${wid}','${eid}')">🖼 上传头像</button>
       <button class="btn ghost" onclick="actRenderEntity('${wid}','${eid}',${JSON.stringify(d.appearance||'')})">🖼 生成立绘</button>
       ${(c.provenance&&c.provenance.source==='import')?`<button class="btn ghost" onclick="actUndoImport('${wid}','${eid}','${esc(c.name)}')">↩ 撤销导入</button>`:''}
       <button class="btn ghost" onclick="actDelEntity('${wid}','${eid}','${esc(c.name)}')">🗑 删除实体</button></div>
@@ -659,7 +688,7 @@ async function testLLM(){const box=document.getElementById('cf_test');box.style.
   }catch(e){box.textContent='✗ '+e.message}}
 
 window.showCh=showCh;
-['actNewWorld','actNewEntity','actNewThread','actNewCodex','actSeedCodex','actLink','actAscend','actSummon','actWriteChapter','actPlay','actEditWorldMd','actNarrateRun','actReflect','actExportThread','actDelWorld','actDelThread','actDelEntity','actDelCodex','actRenderEntity','actRenderScene','actSetAlpha','actAddHook','actSetHook','actImportCard','actUndoImport','actMergeWorld','chatClear','saveSettings','clearSecret','testLLM','closeModal'].forEach(f=>window[f]=eval(f));
+['actNewWorld','actNewEntity','actNewThread','actNewCodex','actSeedCodex','actLink','actAscend','actSummon','actWriteChapter','actPlay','actEditWorldMd','actNarrateRun','actReflect','actExportThread','actDelWorld','actDelThread','actDelEntity','actDelCodex','actRenderEntity','actRenderScene','actSetAlpha','actAddHook','actSetHook','actImportCard','actUndoImport','actMergeWorld','chatClear','chatUndo','chatRegen','actSetAvatar','saveSettings','clearSecret','testLLM','closeModal'].forEach(f=>window[f]=eval(f));
 window.addEventListener('hashchange',route);
 (async()=>{try{await refresh()}catch(e){}route()})();
 </script>

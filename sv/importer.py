@@ -93,8 +93,9 @@ def _unique_id(world: World, base: str) -> str:
     return f"imported-{i:03d}"
 
 
-def import_card(world: World, card: dict, *, role: str = "secondary", as_id: str | None = None) -> dict:
-    """卡 → 世界内 entity。返回 {entity, name, lorebook_entries}。"""
+def import_card(world: World, card: dict, *, role: str = "secondary", as_id: str | None = None,
+                avatar_png: bytes | None = None) -> dict:
+    """卡 → 世界内 entity。avatar_png=卡的 PNG 原图(设为头像)。返回 {entity, name, lorebook_entries, avatar}。"""
     name = card["name"]
     eid = as_id if (as_id and util.is_id(as_id)) else _unique_id(world, util.slug(name))
     prov = provenance.stamp("import", prompt=f"ST card:{name}")
@@ -105,8 +106,9 @@ def import_card(world: World, card: dict, *, role: str = "secondary", as_id: str
     if card.get("first_mes"):
         c["greeting"] = card["first_mes"].strip()   # 开场白,对话时用
     save_json(e.card_path, c)
+    avatar = e.set_avatar(avatar_png, "png") if avatar_png else None   # PNG 卡图 → 头像/立绘
     n = import_lorebook(world, card.get("character_book"), eid) if card.get("character_book") else 0
-    return {"entity": eid, "name": name, "lorebook_entries": n}
+    return {"entity": eid, "name": name, "lorebook_entries": n, "avatar": avatar}
 
 
 def import_lorebook(world: World, book, eid: str) -> int:
@@ -158,7 +160,7 @@ def _derive_world(card: dict) -> tuple[str, str, str]:
 
 
 def import_card_new_world(card: dict, *, world_id: str | None = None, world_name: str | None = None,
-                          role: str = "main") -> dict:
+                          role: str = "main", avatar_png: bytes | None = None) -> dict:
     """卡 → 新建独立世界(scenario 作背景 + 世界书作设定),角色落进去。"""
     d_id, d_name, genre = _derive_world(card)
     wid = world_id if (world_id and util.is_id(world_id)) else d_id
@@ -170,5 +172,5 @@ def import_card_new_world(card: dict, *, world_id: str | None = None, world_name
             f"## 基调 / 背景\n{(card.get('scenario') or '').strip() or '（卡未给场景,可补充）'}\n\n"
             f"## 核心规则\n<!-- 见下方导入世界书 -->\n")
     w = World.create(wid, name, genre=genre, prov=provenance.stamp("import"), body=body)
-    r = import_card(w, card, role=role)
+    r = import_card(w, card, role=role, avatar_png=avatar_png)
     return {"world": wid, "world_name": name, "new_world": True, **r}

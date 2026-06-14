@@ -54,6 +54,35 @@ ok(len(chat.history(e)) == 2 and chat.history(e, 1)[0]["text"] == "啧。", "对
 chat.clear(e)
 ok(chat.history(e) == [], "清空对话")
 
+# 头像
+e.set_avatar(b"\x89PNG\r\n\x1a\nfake-but-bytes", "png")
+ok(e.avatar_rel() == "worlds/w/entities/su/avatar.png", "头像相对路径")
+e.set_avatar(b"jpegbytes", "jpg")
+ok(e.avatar_rel().endswith("avatar.jpg") and not (e.dir / "avatar.png").exists(), "换头像覆盖旧的")
+
+# 重 roll / 撤回(确定性假 LLM)
+import sv.chat as C  # noqa: E402
+_av, _gen = C.llm.available, C.llm.generate
+seq = {"n": 0}
+C.llm.available = lambda: True
+def _fake(system, user, **kw):
+    seq["n"] += 1; return f"回复{seq['n']}"
+C.llm.generate = _fake
+try:
+    chat.turn(w, e, "在吗")
+    h = chat.history(e)
+    ok(len(h) == 2 and h[1]["text"] == "回复1", "turn 落 user+char")
+    rg = chat.regenerate(w, e)
+    h2 = chat.history(e)
+    ok(rg["reply"] == "回复2" and len(h2) == 2 and h2[1]["text"] == "回复2" and h2[0]["text"] == "在吗",
+       "重 roll 换回复、保留用户消息、不新增轮")
+    chat.turn(w, e, "第二句")
+    ok(len(chat.history(e)) == 4, "第二轮落盘")
+    u = chat.undo_last(e)
+    ok(u["remaining"] == 2 and len(chat.history(e)) == 2, "撤回删掉最后一轮")
+finally:
+    C.llm.available, C.llm.generate = _av, _gen
+
 if os.path.exists(os.environ["SV_LOCAL_CONF"]):
     os.remove(os.environ["SV_LOCAL_CONF"])
 

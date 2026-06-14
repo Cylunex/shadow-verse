@@ -100,6 +100,13 @@ png = _png_with_card(v2)
 cp = importer.parse_card(png)
 ok(cp["name"] == "苏晴", "PNG 内嵌卡解出角色")
 
+# PNG 卡图 → 头像
+w3 = World.create("av-world", "AV", genre="都市")
+ra = importer.import_card(w3, cp, role="main", avatar_png=png)
+av = LocalEntity.load(w3, ra["entity"])
+ok(ra.get("avatar") and av.avatar_rel() == ra["avatar"], "PNG 卡导入设了头像")
+ok((av.dir / "avatar.png").exists(), "头像文件落盘")
+
 # 坏数据优雅报错
 try:
     importer.parse_card(b"\x89PNG\r\n\x1a\nnotreallypng")

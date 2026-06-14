@@ -62,6 +62,28 @@ class LocalEntity:
     def grows(self) -> bool:
         return self.role in GROWS
 
+    AVATAR_EXTS = ("png", "jpg", "jpeg", "webp")
+
+    def avatar_rel(self) -> str | None:
+        """头像/立绘的 universe 相对路径(供 /img 服务);无则 None。"""
+        for ext in self.AVATAR_EXTS:
+            if (self.dir / f"avatar.{ext}").exists():
+                return f"worlds/{self.world.id}/entities/{self.id}/avatar.{ext}"
+        return None
+
+    def set_avatar(self, raw: bytes, ext: str = "png") -> str:
+        """设头像(导入 PNG 卡 / 手动上传 / 立绘设为头像)。覆盖旧的。"""
+        ext = ext.lower().lstrip(".")
+        if ext not in self.AVATAR_EXTS:
+            ext = "png"
+        for e in self.AVATAR_EXTS:
+            p = self.dir / f"avatar.{e}"
+            if p.exists():
+                p.unlink()
+        self.dir.mkdir(parents=True, exist_ok=True)
+        (self.dir / f"avatar.{ext}").write_bytes(raw)
+        return f"worlds/{self.world.id}/entities/{self.id}/avatar.{ext}"
+
     @property
     def appearance(self) -> str:
         """固定外貌词(英文打底,保持立绘像同一人;同 Doll 套路)。"""

@@ -92,7 +92,7 @@ def api_entity(wid: str, eid: str) -> dict:
     portraits = [f"worlds/{wid}/entities/{eid}/portraits/{p.name}" for p in sorted(pd.glob("*.png"))] if pd.exists() else []
     return {"card": e.card(), "profile_md": util.read_md(e.dir / "profile.md"),
             "state": memory.read_state(e.dir), "anchors": e.anchors(),
-            "appearance": e.appearance, "portraits": portraits,
+            "appearance": e.appearance, "avatar": e.avatar_rel(), "portraits": portraits,
             "experiences": memory.all_experiences(e.dir)}
 
 
@@ -121,7 +121,7 @@ def api_chat(wid: str, eid: str) -> dict:
     w = World.load(wid); e = LocalEntity.load(w, eid)
     return {"world": wid, "entity": eid, "name": e.card().get("name", eid),
             "greeting": chatmod.greeting(e), "history": chatmod.history(e),
-            "llm_available": llm.available()}
+            "avatar": e.avatar_rel(), "llm_available": llm.available()}
 
 
 def api_timeline(wid: str) -> dict:
@@ -287,13 +287,31 @@ def post_chat_clear(b: dict) -> dict:
     return {"ok": True}
 
 
+def post_chat_regenerate(b: dict) -> dict:
+    w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
+    return chatmod.regenerate(w, e)
+
+
+def post_chat_undo(b: dict) -> dict:
+    w = World.load(b["world"])
+    return chatmod.undo_last(LocalEntity.load(w, b["entity"]))
+
+
+def post_entity_avatar(b: dict) -> dict:
+    w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
+    rel = e.set_avatar(base64.b64decode(b["img_b64"]), b.get("ext", "png"))
+    return {"ok": True, "avatar": rel}
+
+
 def post_import_card(b: dict) -> dict:
-    card = importer.parse_card(base64.b64decode(b["png_b64"])) if b.get("png_b64") else importer.parse_card(b["card"])
+    png = base64.b64decode(b["png_b64"]) if b.get("png_b64") else None   # PNG 卡图 → 头像
+    card = importer.parse_card(png) if png else importer.parse_card(b["card"])
     if b.get("target") == "new":   # 默认推荐:卡自带世界 → 新建独立世界
         return {"ok": True, **importer.import_card_new_world(
-            card, world_id=b.get("world_id") or None, world_name=b.get("world_name") or None, role=b.get("role", "main"))}
+            card, world_id=b.get("world_id") or None, world_name=b.get("world_name") or None,
+            role=b.get("role", "main"), avatar_png=png)}
     w = World.load(b["world"])     # 并入现有世界
-    r = importer.import_card(w, card, role=b.get("role", "secondary"), as_id=b.get("as") or None)
+    r = importer.import_card(w, card, role=b.get("role", "secondary"), as_id=b.get("as") or None, avatar_png=png)
     return {"ok": True, "world": w.id, **r}
 
 
@@ -418,6 +436,9 @@ POST_ROUTES = [
     (re.compile(r"^/api/world/merge$"), post_world_merge),
     (re.compile(r"^/api/chat$"), post_chat),
     (re.compile(r"^/api/chat/clear$"), post_chat_clear),
+    (re.compile(r"^/api/chat/regenerate$"), post_chat_regenerate),
+    (re.compile(r"^/api/chat/undo$"), post_chat_undo),
+    (re.compile(r"^/api/entity/avatar$"), post_entity_avatar),
 ]
 
 
@@ -439,12 +460,13 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         if path in ("/", "/index.html"):
             return self._send(200, (WEB_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
-        if path.startswith("/img/"):   # 服务 universe 下的生成图(防目录穿越)
+        if path.startswith("/img/"):   # 服务 universe 下的图(防目录穿越)
             from urllib.parse import unquote
             target = (UNIVERSE / unquote(path[len("/img/"):])).resolve()
             root = UNIVERSE.resolve()
-            if target.suffix.lower() == ".png" and root in target.parents and target.exists():
-                return self._send(200, target.read_bytes(), "image/png")
+            ctype = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}.get(target.suffix.lower())
+            if ctype and root in target.parents and target.exists():
+                return self._send(200, target.read_bytes(), ctype)
             return self._send(404, b"not found", "text/plain")
         q = _qs(self.path)
         for rx, fn in GET_ROUTES:
