@@ -11,10 +11,9 @@ from __future__ import annotations
 
 import base64
 import json
-import re
 import urllib.request
 
-from . import checks, config, craft, llm, recipes, util
+from . import checks, config, craft, expressions, journal, jsonloose, llm, recipes, skills, util, worldbook
 from .config import SUMMARY_EVERY   # 静态默认(函数签名用)
 from .entity import LocalEntity
 from .thread import Thread
@@ -44,6 +43,10 @@ def narrate_prep(world: World, thread: Thread, *, focus=None, brief: str = "") -
             "recent": [x["text"] for x in rb["recent"]],
             "recalled": [x["text"] for x in e.retrieve(q)],
         })
+    last_tail = thread.chapter_text(nxt - 1)[-1200:] if nxt > 1 else ""
+    # 世界书触发:据本章意图+上章结尾+出场角色名,激活相关设定条目
+    wb_ctx = "\n".join([brief or "", last_tail, "、".join(b["name"] for b in blocks),
+                        " ".join(h.get("desc", "") for h in thread.open_hooks())])
     return {
         "lens": "narrate",
         "thread": {"world": world.id, "id": thread.id, "title": meta.get("title"), "genre": meta.get("genre"), "scale": meta.get("scale")},
@@ -51,8 +54,16 @@ def narrate_prep(world: World, thread: Thread, *, focus=None, brief: str = "") -
         "thread_doc": util.read_md(thread.dir / "thread.md"),
         "world_canon": util.read_md(world.dir / "canon.md"),
         "last_summary": thread.summary(),
-        "last_chapter_tail": thread.chapter_text(nxt - 1)[-1200:] if nxt > 1 else "",
+        "last_chapter_tail": last_tail,
+        "worldbook": worldbook.scan(world, wb_ctx),   # 触发的相关世界设定
+        "related_chapters": thread.related_chapters(),   # 四维相关章节反查(长篇该回看哪几章)
+        "skills": skills.available_menu(),   # 可按需取的写作 skill 短目录(反套话/嗓音/事件摘要…)
         "active_entities": blocks, "craft_checklist": craft.WRITER_CHECKLIST,
+        "craft_library": {   # 工艺工具箱(host agent 据此有谱地选技法)
+            "hook_techniques": craft.HOOK_TECHNIQUES, "chapter_openers": craft.CHAPTER_OPENERS,
+            "expansion": craft.EXPANSION_TECHNIQUES, "dialogue": craft.DIALOGUE_CRAFT,
+            "suspense_curve": craft.SUSPENSE_CURVE, "hook_arcs": craft.HOOK_ARCS,
+        },
         "recipe": recipes.get(meta.get("genre", "")), "intent": brief,
         "alpha": thread.hooks_data().get("alpha", ""),
         "open_hooks": [{"id": h["id"], "desc": h["desc"], "level": h["level"], "payoff_target": h.get("payoff_target")}
@@ -79,6 +90,9 @@ def narrate_generate(world: World, thread: Thread, *, focus=None, intent: str = 
         "待推进的开放钩子(本章主推其一的下一层):\n" + ("\n".join(
             f"- [{h['level']}] {h['desc']}" + (f"(计划 ch{h['payoff_target']} 回收)" if h.get('payoff_target') else "")
             for h in pkt.get("open_hooks", [])) or "（暂无,可自然埋新钩)"),
+        f"钩子技法库(给本章收尾择一,别同质轰炸):{craft.hook_menu()}。{craft.SUSPENSE_CURVE}",
+        (f"相关世界设定(按本章上下文触发):\n{pkt['worldbook']['injection']}"
+         if pkt.get("worldbook", {}).get("injection") else ""),
         f"上章结尾:\n{pkt['last_chapter_tail'] or '(开篇)'}",
         "出场角色(状态/锚点/该想起):\n" + "\n".join(
             f"- {e['name']}[{e['role']}] 此刻{json.dumps(e['state'], ensure_ascii=False)};锚点:{'、'.join(e['anchors'])};该想起:{'/'.join(e['recalled']) or '—'}"
@@ -89,7 +103,7 @@ def narrate_generate(world: World, thread: Thread, *, focus=None, intent: str = 
         '"state_updates":{"id":{"location":"","mood":"","goal":""}}}。'
         "sediments 只给主/次角(客串不写);没有就给空数组。",
     ]
-    raw = llm.generate(sys, "\n\n".join(user))
+    raw = llm.generate(sys, "\n\n".join(u for u in user if u))
     return _split_chapter(raw)
 
 
@@ -97,13 +111,9 @@ def _split_chapter(raw: str) -> dict:
     title, sediments, state_updates = "", [], {}
     prose, _, tail = raw.partition(_SEP)
     if tail.strip():
-        try:
-            m = re.search(r"\{.*\}", tail, re.S)
-            j = json.loads(m.group(0)) if m else {}
-            sediments = j.get("sediments", []) or []
-            state_updates = j.get("state_updates", {}) or {}
-        except Exception:
-            pass
+        j = jsonloose.loads(tail, {})
+        sediments = j.get("sediments", []) or []
+        state_updates = j.get("state_updates", {}) or {}
     lines = prose.strip().splitlines()
     if lines and lines[0].lstrip().startswith("#"):
         title = lines[0].lstrip("# ").strip()
@@ -143,11 +153,7 @@ def narrate_commit(world: World, thread: Thread, payload: dict) -> dict:
 
 # ========== narrate 产线:审校 / 修订 / 反思 / 编排 ==========
 def _parse_json(text: str) -> dict:
-    try:
-        m = re.search(r"\{.*\}", text, re.S)
-        return json.loads(m.group(0)) if m else {}
-    except Exception:
-        return {}
+    return jsonloose.loads(text, {})
 
 
 def review_prep(world: World, thread: Thread, chapter_text: str) -> dict:
@@ -159,7 +165,9 @@ def review_prep(world: World, thread: Thread, chapter_text: str) -> dict:
         "chapter_text": chapter_text,
         "canon": util.read_md(world.dir / "canon.md"),
         "pacing_contract": m.get("pacing"), "recipe": recipes.get(m.get("genre", "")),
-        "rubric": craft.REVIEWER_RUBRIC,
+        "profile": recipes.get_profile(m.get("genre", "")),
+        "rubric": craft.REVIEWER_RUBRIC, "discipline": craft.REVIEWER_DISCIPLINE,
+        "consistency": craft.CONSISTENCY_CHECKS,
         "auto_checks": checks.check_text(chapter_text, genre=m.get("genre", ""), target=m.get("hanzi_target", 0)),
     }
 
@@ -175,7 +183,8 @@ def narrate_review(world: World, thread: Thread, chapter_text: str) -> dict:
     verdict = "revise" if any(f["dim"] == "钩子" for f in findings) else "pass"
     if llm.available():
         dims = recipes.get(m.get("genre", "")).get("audit_dimensions", [])
-        sys = ("你是暗宇宙的冷面审校,只挑问题、绝不改写正文。通用 rubric:" + "；".join(craft.REVIEWER_RUBRIC)
+        sys = ("你是暗宇宙的冷面审校,只挑问题、绝不改写正文。" + craft.REVIEWER_DISCIPLINE
+               + " 通用 rubric:" + "；".join(craft.REVIEWER_RUBRIC)
                + ("；本题材另查:" + "；".join(dims) if dims else ""))
         user = "\n\n".join([
             f"题材:{m.get('genre')};节奏契约:{m.get('pacing')}",
@@ -193,7 +202,8 @@ def narrate_review(world: World, thread: Thread, chapter_text: str) -> dict:
 def narrate_revise(world: World, thread: Thread, chapter_text: str, findings: list) -> str:
     """据审校意见改稿(需 LLM)。保持情节与篇幅,只修问题。返回修订后正文。"""
     issues = "；".join(f.get("issue", "") for f in findings if f.get("issue"))
-    sys = "你是暗宇宙写手,据审校意见改稿。保持原情节走向与篇幅,只修指出的问题,去AI味。"
+    sys = ("你是暗宇宙写手,据审校意见改稿。保持原情节走向与篇幅,只修指出的问题,去AI味。"
+           "扩写处守防注水四问:" + "；".join(craft.ANTI_WATER))
     user = f"原正文:\n{chapter_text}\n\n审校意见:{issues}\n\n输出修订后的完整正文(只正文,不要任何解释)。"
     return llm.generate(sys, user).strip()
 
@@ -209,26 +219,35 @@ def reflect_prep(world: World, thread: Thread, last_n: int = SUMMARY_EVERY) -> d
         "canon": util.read_md(world.dir / "canon.md"),
         "focus": craft.REFLECTOR_FOCUS, "growth_triggers": craft.GROWTH_TRIGGERS,
         "alpha": thread.hooks_data().get("alpha", ""),
+        "book_baseline": checks.check_book(thread),   # 全书纵向基线(确定性,喂横向裁定)
+        "diagnosis": checks.reflect_diagnose(thread),   # 规则化诊断(Finding+target writer/recipe)
         "overdue_hooks": [{"id": h["id"], "desc": h["desc"], "payoff_target": h.get("payoff_target")}
                           for h in thread.overdue_hooks()],
     }
 
 
 def narrate_reflect(world: World, thread: Thread, last_n: int = SUMMARY_EVERY) -> dict:
-    """反思:横向校验最近数章全局自洽 + 提出写手漏掉的成长沉淀建议(需 LLM)。"""
+    """反思:全书纵向基线(确定性,无需 LLM)+ 横向校验全局自洽 + 找漏掉的成长(需 LLM)。"""
+    base = checks.check_book(thread)
+    diag = checks.reflect_diagnose(thread)
+    diag_findings = [f"[{d['target']}] {d['rule']}:{d['evidence']} → {d['suggestion']}" for d in diag["findings"]]
     if not llm.available():
-        return {"findings": [], "suggested_sediments": [], "note": "反思需配 SV_PROVIDER(或用 reflect-prep 交宿主模型)。"}
+        return {"findings": diag_findings, "suggested_sediments": [], "book_baseline": base, "diagnosis": diag,
+                "note": "横向自洽/成长建议需配 SV_PROVIDER(或用 reflect-prep 交宿主模型);规则化诊断已给。"}
     last = thread.last_chapter_no()
     chs = "\n\n".join(f"【第{n}章】\n{thread.chapter_text(n)[:1500]}" for n in range(max(1, last - last_n + 1), last + 1))
+    base_hint = ("\n已知客观诊断(请据此重点核查):" + "；".join(diag_findings)) if diag_findings else ""
     sys = "你是暗宇宙的反思者,横向校验全局自洽(时间锚/战力刻度/α进度/配速),并找出写手漏掉的、达到成长时刻判据的成长。" + "；".join(craft.REFLECTOR_FOCUS)
     user = "\n\n".join([
         f"成长时刻判据:{craft.GROWTH_TRIGGERS}",
         f"canon:\n{util.read_md(world.dir / 'canon.md')[:1200]}",
-        f"最近章节:\n{chs}",
+        f"最近章节:\n{chs}{base_hint}",
         '输出 JSON:{"findings":["全局自洽问题…"],"suggested_sediments":[{"entity":"角色id","text":"该补的成长","level":"身份"}]}。',
     ])
     j = _parse_json(llm.generate(sys, user, max_tokens=1500, temperature=0.4))
-    return {"findings": j.get("findings", []) or [], "suggested_sediments": j.get("suggested_sediments", []) or []}
+    findings = diag_findings + [f for f in (j.get("findings", []) or [])]
+    return {"findings": findings, "suggested_sediments": j.get("suggested_sediments", []) or [],
+            "book_baseline": base, "diagnosis": diag}
 
 
 def narrate_run(world: World, thread: Thread, *, intent: str = "", focus=None,
@@ -237,24 +256,31 @@ def narrate_run(world: World, thread: Thread, *, intent: str = "", focus=None,
 
     单机(配 LLM):全自动。stub:产出占位草稿 + 确定性审校 + 落盘(无修订)。
     """
+    jr = journal.open_run(thread)   # 产线审计日志(可审计/可重放)
+    jr.append("start", intent=intent, focus=focus)
     draft = narrate_generate(world, thread, focus=focus, intent=intent)
     text = draft["chapter_text"]
-    trace = {"title": draft["title"], "draft_hanzi": util.hanzi_count(text),
+    trace = {"run_id": jr.path.stem, "title": draft["title"], "draft_hanzi": util.hanzi_count(text),
              "reviews": [], "revisions": 0, "sediments": draft["sediments"]}
+    jr.append("draft", title=draft["title"], hanzi=trace["draft_hanzi"])
     if review:
         for i in range(max_revisions + 1):
             rev = narrate_review(world, thread, text)
             trace["reviews"].append(rev)
+            jr.append("review", verdict=rev["verdict"], findings=len(rev.get("findings", [])))
             if rev["verdict"] == "pass" or not llm.available() or i == max_revisions:
                 break
             text = narrate_revise(world, thread, text, rev["findings"])
             trace["revisions"] += 1
+            jr.append("revise", round=trace["revisions"], hanzi=util.hanzi_count(text))
     if commit:
         trace["receipt"] = narrate_commit(world, thread, {
             "chapter_text": text, "title": draft["title"],
             "sediments": draft["sediments"], "state_updates": draft["state_updates"]})
+        jr.append("commit", chapter=trace["receipt"].get("chapter"), hanzi=trace["receipt"].get("hanzi"))
     else:
         trace["chapter_text"] = text
+    jr.append("finish", committed=commit, revisions=trace["revisions"])
     return trace
 
 
@@ -269,6 +295,8 @@ def play_prep(world: World, thread: Thread, scene: str, entity_ids) -> dict:
     return {"lens": "play", "thread": {"world": world.id, "id": thread.id},
             "scene": scene, "scale": thread.meta().get("scale"),
             "active_entities": blocks, "growth_triggers": craft.GROWTH_TRIGGERS,
+            "protocol": craft.PLAY_PROTOCOL, "self_check": craft.OUTPUT_SELF_CHECK,
+            "var_protocol": craft.VAR_UPDATE_PROTOCOL,
             "note": "平行可能性,默认不动小说 canon;仅触发成长时刻才回写实体记忆。"}
 
 
@@ -342,11 +370,17 @@ def render_prep(world: World, subject: str, *, appearance: str = "") -> dict:
             "note": "据此出图(Gitee z-image-turbo,~18s);未配 SV_RENDER=gitee + GITEE_API_KEY 则休眠。"}
 
 
-def _gen_image(prompt: str) -> bytes:
-    """调 Gitee z-image 出图,带空白图重试(满分辨率却 <60KB 多为过滤空图,同 Doll)。"""
+def _gen_image(prompt: str, *, seed: int | None = None) -> bytes:
+    """调 Gitee z-image 出图,带空白图重试(满分辨率却 <60KB 多为过滤空图,同 Doll)。
+
+    seed 固定 → 同一人换表情时锁脸(立绘表情切换的关键)。
+    """
     raw = b""
-    body = json.dumps({"model": config.IMAGE_MODEL, "prompt": prompt, "size": config.IMAGE_SIZE,
-                       "num_inference_steps": config.IMAGE_STEPS}).encode("utf-8")
+    payload = {"model": config.IMAGE_MODEL, "prompt": prompt, "size": config.IMAGE_SIZE,
+               "num_inference_steps": config.IMAGE_STEPS}
+    if seed is not None:
+        payload["seed"] = seed
+    body = json.dumps(payload).encode("utf-8")
     for _ in range(3):
         req = urllib.request.Request(f"{config.GITEE_BASE_URL}/images/generations", data=body,
                                      headers={"Authorization": f"Bearer {config.GITEE_API_KEY}", "Content-Type": "application/json"})
@@ -394,3 +428,49 @@ def render_entity(world: World, entity, scene: str = "") -> dict:
 def render_commit(world: World, thread: Thread, subject: str, *, appearance: str = "") -> dict:
     """向后兼容旧命令名 → render_scene。"""
     return render_scene(world, thread, subject, appearance=appearance)
+
+
+# ========== 立绘表情切换(锁脸预生成一组情绪立绘)==========
+def render_expressions(world: World, entity, emotions=None, *, seed: int | None = None) -> dict:
+    """为实体预生成一组锁脸表情立绘 → entities/<id>/portraits/<emotion>.png(文件名=情绪标签)。
+
+    同一 appearance + 同一 seed 锁脸,只换情绪子句。seed 存进 card.appearance_seed,后续补图复用。
+    """
+    if not render_available():
+        return {"enabled": False, "note": "多模态渲染未启用:在 sv.conf 设 SV_RENDER=gitee + GITEE_API_KEY。"}
+    card = entity.card()
+    seed = seed if seed is not None else card.get("appearance_seed")
+    if seed is None:
+        seed = (abs(hash(entity.id)) % 2_000_000_000) + 1   # 确定性 seed(避免 Math.random,可复现)
+    entity.set_card_field("appearance_seed", seed)
+    base = entity.appearance or card.get("name", entity.id)
+    emos = emotions or expressions.EMOTIONS_CORE
+    pdir = entity.dir / "portraits"
+    out = {}
+    for emo in emos:
+        prompt = (f"{base}, {expressions.emotion_clause(emo)}, same character, consistent face, "
+                  "upper body portrait, plain background")
+        raw = _gen_image(prompt, seed=seed)
+        (pdir).mkdir(parents=True, exist_ok=True)
+        (pdir / f"{emo}.png").write_bytes(raw)
+        out[emo] = f"worlds/{world.id}/entities/{entity.id}/portraits/{emo}.png"
+    return {"enabled": True, "seed": seed, "emotions": list(out), "sprites": out}
+
+
+def expression_sprites(world: World, entity) -> dict:
+    """列出该实体已生成的表情立绘(emotion→相对路径),供前端切换/分类限定 label。"""
+    pdir = entity.dir / "portraits"
+    out = {}
+    if pdir.exists():
+        for p in sorted(pdir.glob("*.png")):
+            if p.stem in expressions.EMOTION_PROMPT:
+                out[p.stem] = f"worlds/{world.id}/entities/{entity.id}/portraits/{p.stem}.png"
+    return out
+
+
+def classify_reply_emotion(world: World, entity, text: str) -> dict:
+    """对一段回复分类情绪,只在该实体已生成的表情里选;返回 {emotion, sprite}。"""
+    sprites = expression_sprites(world, entity)
+    labels = list(sprites) or expressions.EMOTIONS_CORE
+    emo = expressions.classify_emotion(text, labels)
+    return {"emotion": emo, "sprite": sprites.get(emo), "zh": expressions.EMOTION_ZH.get(emo, emo)}

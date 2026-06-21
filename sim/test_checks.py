@@ -42,5 +42,12 @@ ok(recipes.get("都市黑道")["audit_dimensions"] == recipes.get("都市")["aud
 ok(recipes.get("未知xyz")["audit_dimensions"] == recipes.AUDIT_DIMS["_default"], "未知题材→默认维度")
 ok("pacing" in recipes.get("玄幻"), "配方原字段仍在(附加不破坏)")
 
+# 题材字段化配方(webnovel-writer 吸收)
+prof = recipes.get_profile("无限流")
+ok(prof["stall_max"] == 1 and prof["coolpoint_per_chapter"] == 1, "无限流量化配方(停滞红线/爽点密度)")
+ok(recipes.get_profile("都市黑道")["romance_gap_max"] == recipes.get_profile("都市")["romance_gap_max"], "字段化配方子串匹配")
+ok(recipes.get_profile("未知xyz") == recipes.PROFILE_DEFAULT, "未知题材→默认 profile")
+ok("危机钩" in recipes.HOOK_TAXONOMY and "fit" in recipes.HOOK_TAXONOMY["危机钩"], "钩型分类表")
+
 print(f"\n{len(P)} 通过 / {len(F)} 失败")
 sys.exit(1 if F else 0)

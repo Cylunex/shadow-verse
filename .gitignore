@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 .DS_Store
+*.log
 
 # 运行时/生成的创作数据(demo 可用 `python -m sim.seed` 重建)——保持代码仓干净
 universe/

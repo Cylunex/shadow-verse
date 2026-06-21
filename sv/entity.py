@@ -92,6 +92,9 @@ class LocalEntity:
     def set_appearance(self, text: str) -> None:
         c = self.card(); c["appearance"] = text; save_json(self.card_path, c)
 
+    def set_card_field(self, key: str, value) -> dict:
+        c = self.card(); c[key] = value; save_json(self.card_path, c); return c
+
     @classmethod
     def create(
         cls, world: World, eid: str, name: str, *, role: str = "secondary",

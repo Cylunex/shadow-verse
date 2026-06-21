@@ -11,7 +11,7 @@ import argparse
 import json
 import sys
 
-from . import checks, codex, export, forge, importer, lenses, llm, nexus, recipes
+from . import checks, codex, export, forge, importer, lenses, llm, nexus, recipes, worldbook
 from .config import NEXUS_DIR, UNIVERSE
 from .entity import LocalEntity
 from .nexus import NexusEntity
@@ -131,6 +131,18 @@ def cmd_entity_prep(a):
     _out(forge.entity_prep(World.load(a.world), a.prompt, tags=_csv(a.tags)))
 
 
+def cmd_card_prep(a):
+    _out(forge.card_prep(a.concept, genre=a.genre or "", tags=_csv(a.tags)))
+
+
+def cmd_worldbook_prep(a):
+    _out(forge.worldbook_prep(a.concept, genre=a.genre or ""))
+
+
+def cmd_gen_card(a):
+    _out(forge.gen_card(a.concept, genre=a.genre or "", tags=_csv(a.tags)))
+
+
 def cmd_entity_commit(a):
     p = _in(); w = World.load(a.world)
     _out(forge.entity_commit(w, p["id"], p.get("name", p["id"]), p.get("body", ""),
@@ -167,6 +179,26 @@ def cmd_import_card_world(a):
     r = importer.import_card_new_world(card, world_id=a.world_id or None,
                                        world_name=a.world_name or None, role=a.role, avatar_png=png)
     print(f"✓ 卡建独立世界:{r['world_name']}({r['world']}),角色 {r['entity']}(世界书 {r['lorebook_entries']} 条{'，含头像' if r.get('avatar') else ''})")
+
+
+def cmd_import_preset(a):
+    from pathlib import Path
+    raw = Path(a.path).read_text(encoding="utf-8")
+    name = a.name or Path(a.path).stem
+    r = importer.import_preset(raw, name=name, pid=a.id or None)
+    print(f"✓ 导入预设:{r['name']}({r['preset']})— 模块 {r['module_count']}(自定义 {r['custom_count']})、采样参数 {len(r['sampling'])} 项")
+
+
+def cmd_import_regex(a):
+    from pathlib import Path
+    raw = Path(a.path).read_text(encoding="utf-8")
+    name = a.name or Path(a.path).stem
+    r = importer.import_regex(raw, name=name)
+    print(f"✓ 导入正则:{r['regex']}({r['count']} 条:{'、'.join(r['names'][:3])})")
+
+
+def cmd_presets(a):
+    _out({"presets": importer.list_presets(), "regex": importer.list_regex()})
 
 
 def cmd_undo_import(a):
@@ -234,6 +266,91 @@ def cmd_render_entity(a):
     from .entity import LocalEntity
     w = World.load(a.world)
     _out(lenses.render_entity(w, LocalEntity.load(w, a.entity), a.scene or ""))
+
+
+def cmd_expr_gen(a):
+    from .entity import LocalEntity
+    w = World.load(a.world)
+    emos = [x.strip() for x in a.emotions.split(",") if x.strip()] if a.emotions else None
+    _out(lenses.render_expressions(w, LocalEntity.load(w, a.entity), emos))
+
+
+def cmd_expr_classify(a):
+    from . import expressions
+    _out({"emotion": expressions.classify_emotion(a.text, expressions.EMOTIONS_CORE)})
+
+
+def cmd_group_new(a):
+    from . import group
+    mem = [x.strip() for x in a.members.split(",") if x.strip()]
+    g = group.Group.create(a.id, a.name or a.id, a.world, mem)
+    print(f"✓ 建群:{g.meta()['name']}({a.id})— 成员 {len(mem)}:{'、'.join(mem)}")
+
+
+def cmd_group_chat(a):
+    from . import group
+    _out(group.turn(group.Group.load(a.id), a.message))
+
+
+def cmd_groups(a):
+    from . import group
+    _out({"groups": [{"id": gid, **{k: group.Group.load(gid).meta().get(k) for k in ("name", "world", "members")}}
+                     for gid in group.Group.list_all()]})
+
+
+def cmd_branch_new(a):
+    from . import branch
+    w, t = _wt(a.world, a.thread)
+    b = branch.Branch.create(t, a.from_chapter, name=a.name or "", divergence=a.divergence or "")
+    print(f"✓ 分支:{b.meta()['name']}({b.bid})— 从第 {b.meta()['from_chapter']} 章分叉")
+
+
+def cmd_branches(a):
+    from . import branch
+    w, t = _wt(a.world, a.thread)
+    _out({"branches": branch.list_branches(t)})
+
+
+def cmd_skills(a):
+    from . import skills
+    if a.read:
+        print(skills.read_skill(a.read) or f"(无此 skill:{a.read})")
+    else:
+        _out({"skills": skills.list_skills()})
+
+
+def cmd_skill_add(a):
+    from . import skills
+    r = skills.add_skill(a.name, a.description or "", a.body or "", scope=a.scope or "global")
+    print(f"✓ skill:{r['name']}({r['scope']})")
+
+
+def cmd_skills_seed(a):
+    from . import skills
+    print(f"✓ 灌入起始写作 skill {skills.seed()} 个(已存在的跳过)")
+
+
+def cmd_modes(a):
+    from . import modes
+    if a.mode:
+        _out(modes.mode_pack(a.mode, genre=a.genre or ""))
+    else:
+        _out({"modes": modes.list_modes(a.group or "")})
+
+
+def cmd_convert(a):
+    from . import convert
+    w = World.load(a.world)
+    if a.entity:
+        from .entity import LocalEntity
+        pack = convert.chat_to(w, LocalEntity.load(w, a.entity), a.to or "novel")
+    elif a.chapter:
+        _, t = _wt(a.world, a.thread)
+        pack = convert.chapter_to(w, t, a.chapter, a.to or "cyoa")
+    else:
+        _, t = _wt(a.world, a.thread)
+        pack = convert.beats_to(w, t, a.to or "screenplay")
+    _out(convert.run(pack) if a.run else pack)
 
 
 def cmd_render_commit(a):
@@ -339,6 +456,23 @@ def cmd_check(a):
     _out(checks.check_chapter(t, a.chapter))
 
 
+def cmd_check_book(a):
+    w, t = _wt(a.world, a.thread)
+    _out(checks.check_book(t, last_n=a.last or None))
+
+
+def cmd_worldbook(a):
+    w = World.load(a.world)
+    if a.context:
+        _out(worldbook.scan(w, a.context))
+    else:
+        data = worldbook.load(w)
+        _out({**worldbook.summary(w),
+              "entries": [{"name": e.get("name"), "keys": e.get("keys"),
+                           "constant": e.get("constant"), "source": e.get("source")}
+                          for e in data.get("entries", [])]})
+
+
 def cmd_status(a):
     if not a.world:
         ws = World.list_all()
@@ -435,6 +569,9 @@ def build_parser():
     add("narrate-reflect", cmd_narrate_reflect, ["world", "thread"], [("last", {"type": int, "default": 5})])
     add("world-commit", cmd_world_commit)
     add("entity-prep", cmd_entity_prep, ["world", "prompt"], [("tags", {"default": ""})])
+    add("card-prep", cmd_card_prep, ["concept"], [("genre", {"default": ""}), ("tags", {"default": ""})])
+    add("worldbook-prep", cmd_worldbook_prep, ["concept"], [("genre", {"default": ""})])
+    add("gen-card", cmd_gen_card, ["concept"], [("genre", {"default": ""}), ("tags", {"default": ""})])
     add("entity-commit", cmd_entity_commit, ["world"])
     add("thread-prep", cmd_thread_prep, ["world", "prompt"], [("tags", {"default": ""})])
     add("thread-commit", cmd_thread_commit, ["world"])
@@ -442,6 +579,9 @@ def build_parser():
     add("import-card", cmd_import_card, ["world", "path"], [("role", {"default": "secondary"}), ("as", {"default": None})])
     add("import-card-world", cmd_import_card_world, ["path"], [("world-id", {"default": "", "dest": "world_id"}), ("world-name", {"default": "", "dest": "world_name"}), ("role", {"default": "main"})])
     add("undo-import", cmd_undo_import, ["world", "entity"])
+    add("import-preset", cmd_import_preset, ["path"], [("name", {"default": ""}), ("id", {"default": ""})])
+    add("import-regex", cmd_import_regex, ["path"], [("name", {"default": ""})])
+    add("presets", cmd_presets)
     add("merge-world", cmd_merge_world, ["src", "dst"], [("keep-src", {"action": "store_true", "dest": "keep_src"})])
     add("new-world", cmd_new_world, ["id"], [("name", {"default": ""}), ("genre", {"default": ""}), ("scale", {"default": "max"})])
     add("new-entity", cmd_new_entity, ["world", "id"], [("name", {"default": ""}), ("role", {"default": "secondary"})])
@@ -456,6 +596,20 @@ def build_parser():
     add("render-prep", cmd_render_prep, ["world"], [("subject", {"default": ""}), ("appearance", {"default": ""})])
     add("render-commit", cmd_render_commit, ["world", "thread"], [("subject", {"default": ""}), ("appearance", {"default": ""})])
     add("render-entity", cmd_render_entity, ["world", "entity"], [("scene", {"default": ""})])
+    add("expr-gen", cmd_expr_gen, ["world", "entity"], [("emotions", {"default": ""})])
+    add("expr-classify", cmd_expr_classify, ["text"])
+    add("group-new", cmd_group_new, ["id", "world", "members"], [("name", {"default": ""})])
+    add("group-chat", cmd_group_chat, ["id", "message"])
+    add("groups", cmd_groups)
+    add("branch-new", cmd_branch_new, ["world", "thread", ("from_chapter", {"type": int})],
+        [("name", {"default": ""}), ("divergence", {"default": ""})])
+    add("branches", cmd_branches, ["world", "thread"])
+    add("skills", cmd_skills, [], [("read", {"default": ""})])
+    add("skill-add", cmd_skill_add, ["name"], [("description", {"default": ""}), ("body", {"default": ""}), ("scope", {"default": "global"})])
+    add("skills-seed", cmd_skills_seed)
+    add("modes", cmd_modes, [], [("mode", {"default": ""}), ("group", {"default": ""}), ("genre", {"default": ""})])
+    add("convert", cmd_convert, ["world"], [("entity", {"default": ""}), ("thread", {"default": ""}),
+        ("chapter", {"type": int, "default": 0}), ("to", {"default": ""}), ("run", {"action": "store_true"})])
 
     add("ascend", cmd_ascend, ["world", "entity"], [("as", {"default": None})])
     add("summon", cmd_summon, ["nexus_id", "world"], [("entry", {"default": "本体进"})])
@@ -473,6 +627,8 @@ def build_parser():
     add("hook-set", cmd_hook_set, ["world", "thread", "hid"], [("status", {"default": ""}), ("payoff", {"type": int, "default": -1}), ("desc", {"default": ""})])
     add("hook-alpha", cmd_hook_alpha, ["world", "thread", "text"])
     add("check", cmd_check, ["world", "thread", ("chapter", {"type": int})])
+    add("check-book", cmd_check_book, ["world", "thread"], [("last", {"type": int, "default": 0})])
+    add("worldbook", cmd_worldbook, ["world"], [("context", {"default": ""})])
     add("status", cmd_status, [("world", {"nargs": "?"}), ("thread", {"nargs": "?"})])
     add("show", cmd_show, ["kind", "key"])
     add("config", cmd_config, [("key", {"nargs": "?"}), ("value", {"nargs": "?"})])

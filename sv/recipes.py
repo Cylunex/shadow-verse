@@ -105,3 +105,34 @@ def forbidden_words(genre: str) -> list[str]:
 
 def genres() -> list[str]:
     return list(RECIPES.keys())
+
+
+# ========== 题材配方字段化(吸收 webnovel-writer genre-profiles)==========
+# 把「pacing/爽点」从文字升级成可被 checker/reflect 读的量化参数:节奏红线 + 钩子/爽点基线。
+# 字段:hook_strength(钩子强度基线)/coolpoint_per_chapter(每章爽点密度下限)/
+#       stall_max(主线最大连续停滞章)/romance_gap_max(感情线最大断档章)/transition_max(过渡章最大连续)。
+PROFILES: dict[str, dict] = {
+    "无限流": {"hook_strength": "高", "coolpoint_per_chapter": 1, "stall_max": 1, "romance_gap_max": 8, "transition_max": 1},
+    "玄幻": {"hook_strength": "高", "coolpoint_per_chapter": 1, "stall_max": 2, "romance_gap_max": 10, "transition_max": 2},
+    "仙侠": {"hook_strength": "中", "coolpoint_per_chapter": 1, "stall_max": 2, "romance_gap_max": 8, "transition_max": 2},
+    "都市": {"hook_strength": "中", "coolpoint_per_chapter": 1, "stall_max": 2, "romance_gap_max": 5, "transition_max": 2},
+    "科幻": {"hook_strength": "中", "coolpoint_per_chapter": 0, "stall_max": 3, "romance_gap_max": 12, "transition_max": 3},
+    "悬疑": {"hook_strength": "高", "coolpoint_per_chapter": 0, "stall_max": 1, "romance_gap_max": 12, "transition_max": 2},
+    "言情": {"hook_strength": "中", "coolpoint_per_chapter": 1, "stall_max": 2, "romance_gap_max": 2, "transition_max": 2},
+}
+PROFILE_DEFAULT = {"hook_strength": "中", "coolpoint_per_chapter": 0, "stall_max": 2, "romance_gap_max": 8, "transition_max": 2}
+
+# 追读力钩型分类(每型:触发场景 + 题材适配 + 常见误用)
+HOOK_TAXONOMY: dict[str, dict] = {
+    "危机钩": {"when": "角色陷入立刻行动否则崩盘的处境", "fit": "无限流/玄幻/悬疑", "misuse": "低风险假危机(读者知道死不了)"},
+    "悬念钩": {"when": "抛一个未解之谜/真相缺口", "fit": "悬疑/科幻/仙侠", "misuse": "故弄玄虚却永不兑现"},
+    "渴望钩": {"when": "角色立下目标/承诺,兑现遥远", "fit": "玄幻/言情/都市", "misuse": "目标空泛,读者不在乎"},
+    "情绪钩": {"when": "强烈情感时刻(心动/愤怒/不舍)未落定", "fit": "言情/都市", "misuse": "强行煽情、情绪与情节脱节"},
+    "选择钩": {"when": "两难抉择定格在选择前", "fit": "全题材", "misuse": "选项无实质差异/有明显正解"},
+}
+
+
+def get_profile(genre: str) -> dict:
+    """题材量化配方(节奏红线 + 钩子/爽点基线)。子串匹配,未知→默认。"""
+    k = _match_key(genre)
+    return PROFILES.get(k, PROFILE_DEFAULT) if k in PROFILES else PROFILE_DEFAULT

@@ -16,7 +16,7 @@ from pathlib import Path
 import base64
 
 from . import chat as chatmod
-from . import codex, config, export, forge, importer, lenses, llm, memory, nexus, recipes, util
+from . import codex, config, export, forge, importer, lenses, llm, memory, nexus, recipes, util, varstate
 from .config import UNIVERSE, read_jsonl
 from .entity import LocalEntity
 from .nexus import NexusEntity
@@ -122,6 +122,8 @@ def api_chat(wid: str, eid: str) -> dict:
     return {"world": wid, "entity": eid, "name": e.card().get("name", eid),
             "greeting": chatmod.greeting(e), "history": chatmod.history(e),
             "avatar": e.avatar_rel(), "player": chatmod.player(), "vars": chatmod.vars(e),
+            "var_view": varstate.visible(chatmod.var_state(e)),   # HUD 用(已滤 hidden + 带 vis)
+            "var_meta": chatmod.var_state(e).get("meta", {}),
             "llm_available": llm.available()}
 
 
@@ -293,6 +295,58 @@ def post_chat_regenerate(b: dict) -> dict:
     return chatmod.regenerate(w, e)
 
 
+def api_modes() -> dict:
+    from . import modes
+    return {"modes": modes.list_modes(), "by_group": {
+        g: modes.list_modes(g) for g in ("core", "pillar", "world")}}
+
+
+def api_groups() -> dict:
+    from . import group
+    return {"groups": [{"id": gid, "name": group.Group.load(gid).meta().get("name", gid),
+                        "world": group.Group.load(gid).meta().get("world"),
+                        "members": group.Group.load(gid).meta().get("members", [])}
+                       for gid in group.Group.list_all()]}
+
+
+def api_group(gid: str) -> dict:
+    from . import group, varstate
+    g = group.Group.load(gid)
+    return {"id": gid, "meta": g.meta(), "history": g.history(), "greet": group.greet(g),
+            "vars": varstate.load(g)["data"], "llm_available": llm.available()}
+
+
+def post_group_new(b: dict) -> dict:
+    from . import group
+    mem = b.get("members") or []
+    g = group.Group.create(b["id"], b.get("name") or b["id"], b["world"], mem,
+                           talkativeness=b.get("talkativeness") or {})
+    return {"ok": True, "id": g.gid}
+
+
+def post_group_chat(b: dict) -> dict:
+    from . import group
+    return group.turn(group.Group.load(b["id"]), b.get("message", ""))
+
+
+def post_group_clear(b: dict) -> dict:
+    from . import group
+    group.Group.load(b["id"]).clear()
+    return {"ok": True}
+
+
+def post_chat_swipe(b: dict) -> dict:
+    """左右切候选(delta=±1);右滑到末尾自动生成新候选。"""
+    w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
+    return chatmod.swipe_next(w, e, int(b.get("delta", 1)))
+
+
+def post_chat_floor_regen(b: dict) -> dict:
+    """从第 idx 楼重生成(截断其后)。"""
+    w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
+    return chatmod.floor_regenerate(w, e, int(b.get("idx", -1)))
+
+
 def post_chat_undo(b: dict) -> dict:
     w = World.load(b["world"])
     return chatmod.undo_last(LocalEntity.load(w, b["entity"]))
@@ -302,6 +356,13 @@ def post_entity_avatar(b: dict) -> dict:
     w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
     rel = e.set_avatar(base64.b64decode(b["img_b64"]), b.get("ext", "png"))
     return {"ok": True, "avatar": rel}
+
+
+def post_entity_expressions(b: dict) -> dict:
+    """锁脸预生成一组情绪立绘(需配 render 后端)。"""
+    w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
+    emos = b.get("emotions") or None
+    return lenses.render_expressions(w, e, emos)
 
 
 def post_player(b: dict) -> dict:
@@ -316,6 +377,12 @@ def post_chat_var(b: dict) -> dict:
 def post_chat_var_del(b: dict) -> dict:
     w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
     return {"ok": True, "vars": chatmod.del_var(e, b["name"])}
+
+
+def post_chat_init_vars(b: dict) -> dict:
+    """AI 建变量卡(从人设识别该追踪哪些状态)。"""
+    w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
+    return chatmod.init_vars(w, e)
 
 
 def post_import_card(b: dict) -> dict:
@@ -411,6 +478,9 @@ GET_ROUTES = [
     (re.compile(r"^/api/config$"), lambda m, q: api_config()),
     (re.compile(r"^/api/timeline/([\w-]+)$"), lambda m, q: api_timeline(m.group(1))),
     (re.compile(r"^/api/chat/([\w-]+)/([\w-]+)$"), lambda m, q: api_chat(m.group(1), m.group(2))),
+    (re.compile(r"^/api/modes$"), lambda m, q: api_modes()),
+    (re.compile(r"^/api/groups$"), lambda m, q: api_groups()),
+    (re.compile(r"^/api/group/([\w-]+)$"), lambda m, q: api_group(m.group(1))),
     (re.compile(r"^/api/prep/narrate$"), lambda m, q: api_narrate_prep(q)),
     (re.compile(r"^/api/prep/play$"), lambda m, q: api_play_prep(q)),
     (re.compile(r"^/api/prep/world$"), lambda m, q: api_world_prep(q)),
@@ -452,11 +522,18 @@ POST_ROUTES = [
     (re.compile(r"^/api/chat$"), post_chat),
     (re.compile(r"^/api/chat/clear$"), post_chat_clear),
     (re.compile(r"^/api/chat/regenerate$"), post_chat_regenerate),
+    (re.compile(r"^/api/chat/swipe$"), post_chat_swipe),
+    (re.compile(r"^/api/chat/floor-regen$"), post_chat_floor_regen),
+    (re.compile(r"^/api/group/new$"), post_group_new),
+    (re.compile(r"^/api/group/chat$"), post_group_chat),
+    (re.compile(r"^/api/group/clear$"), post_group_clear),
     (re.compile(r"^/api/chat/undo$"), post_chat_undo),
     (re.compile(r"^/api/entity/avatar$"), post_entity_avatar),
+    (re.compile(r"^/api/entity/expressions$"), post_entity_expressions),
     (re.compile(r"^/api/player$"), post_player),
     (re.compile(r"^/api/chat/var$"), post_chat_var),
     (re.compile(r"^/api/chat/var/del$"), post_chat_var_del),
+    (re.compile(r"^/api/chat/init-vars$"), post_chat_init_vars),
 ]
 
 

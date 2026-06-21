@@ -27,6 +27,71 @@ THREAD_GUIDE = [
 ]
 
 
+# ========== 创作包:一句话 → 完整角色卡 + 世界书(吸收 Narratium 创作 Agent 内容规范)==========
+# 角色卡 8 必填字段(按完成度门控顺序填:先骨架后细节)
+CARD_FIELDS = [
+    ("name", "角色名"),
+    ("description", "身份/外形/背景(200-500字)"),
+    ("personality", "性格内核 + Identity Core 刚性底线"),
+    ("scenario", "出场场景/初始处境"),
+    ("first_mes", "开场白(第一人称,带画面)"),
+    ("mes_example", "对话样本(声音指纹,<START>{{char}}: …)"),
+    ("tags", "题材/标签数组"),
+    ("appearance", "英文锁脸外貌词(发色/瞳色/服装/特征,供出图)"),
+]
+
+# 四类世界书的内容规范(constant/order/position + 字数 + 结构);宿主据此生成结构化条目
+WORLDBOOK_CLASSES = {
+    "STATUS": {"role": "实时状态面板", "constant": True, "order": 1, "position": 0,
+               "spec": "固定关键词常驻;<status> 包裹的游戏界面排版,含时间/地点/角色状态/数值进度条。简洁、信息密度高。"},
+    "USER_SETTING": {"role": "玩家角色档", "constant": True, "order": 2, "position": 0,
+                     "spec": "玩家扮演谁:身份/能力/初始处境/与主角关系。四级 markdown,800-1500 字。"},
+    "WORLD_VIEW": {"role": "世界基础框架", "constant": True, "order": 3, "position": 0,
+                   "spec": "世界规则/势力/地理/历史的多级分类框架。是 SUPPLEMENT 取名词的来源。"},
+    "SUPPLEMENT": {"role": "设定补充条目", "constant": False, "order": 10, "position": 2,
+                   "spec": "从 WORLD_VIEW 提非空名词作 keys 上下文触发;每条 500-1000 字,≥5 条。"},
+}
+
+
+def card_prep(concept: str, *, genre: str = "", tags=None) -> dict:
+    """一句话概念 → 角色卡生成包:8 必填字段(按顺序填)+ 题材配方 + 取料。供宿主/LLM 生成,人审后落。"""
+    picks = _picks(concept, "characters", tags)
+    return {
+        "kind": "card", "concept": concept, "genre": genre,
+        "required_fields": [f for f, _ in CARD_FIELDS],
+        "field_specs": {f: spec for f, spec in CARD_FIELDS},
+        "recipe": recipes.get(genre), "codex": [p.get("id") for p in picks],
+        "guide": ["按字段顺序逐项填(先 name/description 骨架,后 mes_example/appearance 细节);",
+                  "Identity Core 给 3-5 条刚性底线;appearance 用英文锁脸词供出图;",
+                  "对话样本要体现独特嗓音(句长/口头禅/回避什么)。"],
+    }
+
+
+def worldbook_prep(concept: str, *, genre: str = "") -> dict:
+    """一句话概念 → 世界书生成包:四类条目内容规范(STATUS/USER_SETTING/WORLD_VIEW/SUPPLEMENT)。"""
+    return {
+        "kind": "worldbook", "concept": concept, "genre": genre,
+        "classes": WORLDBOOK_CLASSES, "recipe": recipes.get(genre),
+        "order": ["STATUS", "USER_SETTING", "WORLD_VIEW", "SUPPLEMENT"],
+        "guide": ["严格按 STATUS→USER_SETTING→WORLD_VIEW→SUPPLEMENT 顺序生成;",
+                  "前三类 constant 常驻、SUPPLEMENT 关键词触发;",
+                  "SUPPLEMENT 的 keys 必须来自 WORLD_VIEW 里出现的名词,≥5 条。"],
+    }
+
+
+def gen_card(concept: str, *, genre: str = "", tags=None) -> dict:
+    """AIGC 据概念生成一张角色卡(需 LLM)。返回卡字典草稿供人审后导入/落盘。"""
+    pkt = card_prep(concept, genre=genre, tags=tags)
+    sys = "你是暗宇宙的角色设计师,据概念产出一张自洽角色卡,只输出一个 JSON。"
+    fields = "；".join(f"{f}({spec})" for f, spec in CARD_FIELDS)
+    user = (f"概念:{concept}\n题材:{genre or '未定'}\n"
+            f"按这些字段产出 JSON(tags 为数组,其余字符串):{fields}\n"
+            "只输出 JSON,不要解释。")
+    from . import jsonloose
+    j = jsonloose.loads(llm.generate(sys, user, max_tokens=1500), {})
+    return {f: j.get(f, "") for f, _ in CARD_FIELDS} | {"_concept": concept, "_genre": genre}
+
+
 def _picks(query: str, category: str = "", tags=None) -> list[dict]:
     return codex.pick(query, category=category, tags=tags or [], k=8)
 

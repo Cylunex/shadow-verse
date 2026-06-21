@@ -47,6 +47,33 @@ def similarity(a: str, b: str) -> float:
     return len(ba & bb) / len(ba | bb)
 
 
+# ---------- 外部文件安全(导入不可信 ST 卡/世界书/预设时用;借 MimirLink SECURITY_FIXES)----------
+_UNSAFE = re.compile(r"[\\/]|\.\.")
+_SECRET_KEY = re.compile(r"(pass(word)?|api[_-]?key|token|secret|authorization|x-api-key)", re.I)
+
+
+def safe_name(name: str, *, maxlen: int = 200) -> str:
+    """清洗外部来源的文件名/id:剥路径分隔符与 `..`,限长(防路径遍历 + DoS)。"""
+    s = _UNSAFE.sub("", str(name or "")).strip().strip(".")
+    return s[:maxlen] or "x"
+
+
+def guard_size(data, *, limit: int, what: str = "数据") -> None:
+    """外部 JSON 体积上限(防 JSON.parse 炸弹 DoS)。data 为 str/bytes 时校验字节数。"""
+    n = len(data.encode("utf-8")) if isinstance(data, str) else (len(data) if isinstance(data, (bytes, bytearray)) else 0)
+    if n > limit:
+        raise ValueError(f"{what}过大:{n} 字节 > 上限 {limit}(疑似恶意/损坏文件)")
+
+
+def redact(obj):
+    """递归脱敏:把含 password/apiKey/token/secret 的键的值替成 ***(写日志/回执前用)。"""
+    if isinstance(obj, dict):
+        return {k: ("***" if _SECRET_KEY.search(str(k)) else redact(v)) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [redact(x) for x in obj]
+    return obj
+
+
 def next_chapter_no(chapters_dir: Path) -> int:
     """扫描 chapters/ 取下一章号(三位补零文件名)。"""
     if not chapters_dir.exists():

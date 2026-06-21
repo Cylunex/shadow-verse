@@ -37,6 +37,17 @@ description: 暗宇宙·无限世界·AIGC 多元宇宙引擎。当用户要"造
 - `summon <nexus_id> <world> --entry 本体进|换皮进`:让跨世界角色进入另一个世界,开独立化身(记忆各世界独立、灵魂一致)。
 - `nexus`:多元宇宙鸟瞰。
 
+## 更多能力(按需调用)
+- **一句话造卡/世界书**:`card_prep "<概念>" [--genre]`(角色卡 8 字段规范)/ `worldbook_prep`(STATUS/USER_SETTING/WORLD_VIEW/SUPPLEMENT 四类内容规范)→ 你据包生成 → 落盘。
+- **导入 ST 生态**:`import_card`/`import_card_world`(角色卡+世界书,V1/V2/V3,自动取 sd_prompt→锁脸 appearance / depth_prompt)· `import_preset`(采样集+提示词模块)· `import_regex`(消息渲染脚本)。
+- **世界书触发**:`worldbook <world> [--context]` 看按上下文激活了哪些设定(关键词/selective/递归 + sticky/cooldown/delay 时效 + position@D)。
+- **群聊**:`group_new <id> <world> <成员id逗号分隔>` → `group_chat <id> "<玩家发言>"`(自动选发言人 + 意图路由,多角色轮流)。
+- **线分支**:`branch_new <world> <thread> <从第几章> [--divergence "偏离一句话"]` 开平行可能性(共享母线前 N 章 + 蝴蝶效应)。
+- **模式/数据互通**:`modes [--mode]` 取某模式(酒馆RP/小说/CYOA/剧本/漫画/跑团/梦境…)的提示模板包;`convert <world> [--entity|--thread+--chapter] --to <模式>` 把一种产出转成另一种(chat→小说 / 小说→CYOA分支 / beats→跑团日志)。
+- **写作 skill 库**:`skills` 列、`skills --read <name>` 取正文(反套话/角色嗓音/事件摘要…按需拉,省 token)。
+- **质量**:`check_book`(全书纵向 stylestat)· `narrate_reflect` 带规则化诊断(Finding+target writer/recipe)。
+- **立绘表情**:`expr_gen <world> <entity>` 锁脸预生成一组情绪立绘(配出图后端);回复按情绪换脸。
+
 ## 守则
 - 不暴露工程词(状态重建/谱系/化身/透镜)给用户。
 - 尺度后端中立、默认最大;守写在实体 Identity 的红线(如"不伤无辜")。

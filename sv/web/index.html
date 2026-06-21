@@ -101,6 +101,9 @@
   .varrow{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:14px;border-bottom:1px solid var(--line)}
   .varrow .vn{color:var(--dim)} .varrow .vv{color:var(--acc2);font-weight:600}
   .varrow a{font-size:12px;color:var(--faint);margin-left:7px;cursor:pointer}
+  .vbar{display:inline-block;width:60px;height:7px;border-radius:4px;background:var(--line);overflow:hidden;vertical-align:middle;margin-right:6px}
+  .vbar-f{display:block;height:100%;border-radius:4px}
+  iframe.hud{margin-top:6px;max-height:1200px}
   .sideav{width:100%;border-radius:12px;border:1px solid var(--line)}
   .incarn{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
   .incarn .b{background:#0006;border:1px solid var(--acc);color:var(--acc2);border-radius:20px;padding:2px 11px;font-size:12px}
@@ -440,6 +443,8 @@ function renderNav(active){
   let h=`<h4>纵览</h4>
     <a href="#/" class="${active==='/'?'on':''}">🌌 多元宇宙总览</a>
     <a href="#/nexus" class="${active==='nexus'?'on':''}">🔗 枢纽 <span class="b">${OV.nexus.entities.length}</span></a>
+    <a href="#/groups" class="${active==='groups'?'on':''}">👥 群聊</a>
+    <a href="#/modes" class="${active==='modes'?'on':''}">🎚 模式</a>
     <a href="#/codex" class="${active==='codex'?'on':''}">🧬 元件库 <span class="b">${OV.codex.count}</span></a>
     <a href="#/settings" class="${active==='settings'?'on':''}">⚙ 设置 <span class="b" style="${OV.llm&&OV.llm.available?'color:var(--good)':''}">${OV.llm&&OV.llm.available?'LLM✓':'LLM✗'}</span></a>
     <h4>世界 (${OV.worlds.length})</h4>`;
@@ -463,26 +468,127 @@ function route(){
   else if(p[0]==='settings')viewSettings(m);
   else if(p[0]==='timeline'&&p[1])viewTimeline(m,p[1]);
   else if(p[0]==='chat'&&p[2])viewChat(m,p[1],p[2]);
+  else if(p[0]==='groups')viewGroups(m);
+  else if(p[0]==='group'&&p[1])viewGroup(m,p[1]);
+  else if(p[0]==='modes')viewModes(m);
 }
 
+async function viewModes(m){
+  const d=await api('/modes');
+  const ico={'tavern-rp':'🎭','novel':'📖','companion':'💞','cyoa':'🌿','screenplay':'🎬','comic':'🖼','music':'🎵','tabletop':'🎲','educational':'🎓','dream':'🌙','world-explore':'🗺'};
+  const grp={core:'三大核心',pillar:'并行支柱',world:'世界级'};
+  const card=x=>`<div class="card"><h2>${ico[x.id]||'·'} ${esc(x.name)}</h2>
+    <div style="color:var(--faint);font-size:13px">透镜 ${esc(x.lens)} · 视图 ${esc(x.view)}</div></div>`;
+  let html=`<div class="crumb"><a href="#/">总览</a> / 模式</div>
+    <div class="chat-head"><h1 style="margin:0">🎚 体验模式</h1><span style="color:var(--faint);font-size:13px">统一底层 + 多模式并行;模式=透镜+模板+视图,加模式不改核心</span></div>`;
+  for(const g of ['core','pillar','world']){const list=(d.by_group[g]||[]);if(!list.length)continue;
+    html+=`<h2 style="margin:18px 0 8px;color:var(--acc2)">${grp[g]}</h2><div class="grid">${list.map(card).join('')}</div>`;}
+  html+=`<p class="lead" style="margin-top:18px;color:var(--faint)">数据互通:RP聊天 → 小说章节 → CYOA分支 → 漫画分镜 → 跑团日志,以事件线(beats)为枢纽一键转换(CLI <code>convert</code> / MCP)。</p>`;
+  m.innerHTML=html;
+}
+
+async function viewGroups(m){
+  const d=await api('/groups');
+  m.innerHTML=`<div class="crumb"><a href="#/">总览</a> / 群聊</div>
+    <div class="chat-head"><h1 style="margin:0">👥 群聊(多角色同场)</h1><button class="btn" onclick="groupNew()">＋ 建群</button></div>
+    ${(d.groups||[]).length?'':'<p class="lead">还没有群。点「建群」选一个世界里的几个角色同场对话。</p>'}
+    <div class="grid">${(d.groups||[]).map(g=>`<div class="card"><h2><a href="#/group/${g.id}" style="color:var(--acc2)">${esc(g.name)}</a></h2>
+      <div style="color:var(--faint);font-size:13px">世界 ${esc(g.world||'')} · ${(g.members||[]).length} 人:${(g.members||[]).map(esc).join('、')}</div></div>`).join('')}</div>`;
+}
+async function groupNew(){
+  const ws=(await api('/overview')).worlds||[];
+  formModal('建群聊',[
+    {n:'world',label:'世界 id',type:'select',options:ws.map(w=>w.id)},
+    {n:'id',label:'群 id(kebab-case)',ph:'如 crew'},
+    {n:'name',label:'群名'},
+    {n:'members',label:'成员实体 id(逗号分隔,须同一世界)',ph:'如 ye-wudao,lin-wan'},
+  ],'建群',async v=>{v.members=(v.members||'').split(',').map(s=>s.trim()).filter(Boolean);
+    try{await post('/group/new',v);closeModal();location.hash='#/group/'+v.id;}catch(e){toast('✗ '+e.message,true)}})}
+async function viewGroup(m,gid){
+  let d;try{d=await api('/group/'+gid)}catch(e){m.innerHTML=`<div class="empty">${esc(e.message)}</div>`;return}
+  window._group={gid};
+  const rows=d.history.length?d.history:d.greet.map(g=>({role:'char',speaker:g.speaker,text:g.reply}));
+  m.innerHTML=`<div class="crumb"><a href="#/">总览</a> / <a href="#/groups">群聊</a> / ${esc(d.meta.name)}</div>
+    <div class="chat-head"><h1 style="margin:0">👥 ${esc(d.meta.name)}</h1><span style="color:var(--faint);font-size:13px">${(d.meta.members||[]).map(esc).join(' · ')}</span></div>
+    ${d.llm_available?'':'<p class="lead" style="color:var(--gold)">未配 LLM —— 去 ⚙ 设置 配 provider+key。</p>'}
+    <div class="rp"><div class="rp-main">
+      <div class="actions"><button class="btn ghost" onclick="groupClear()">🗑 重置</button></div>
+      <div class="chat" id="gbox">${rows.map(gbubble).join('')}</div>
+      <div class="chat-input"><input id="gmsg" placeholder="对大家说…(回车发送)"><button class="btn" id="gsend">发送</button></div>
+    </div></div>`;
+  const send=async()=>{const inp=document.getElementById('gmsg');const msg=inp.value.trim();if(!msg)return;
+    inp.value='';inp.disabled=true;const box=document.getElementById('gbox');
+    box.insertAdjacentHTML('beforeend',gbubble({role:'user',text:msg}));window.scrollTo(0,document.body.scrollHeight);
+    try{const r=await post('/group/chat',{id:gid,message:msg});
+      (r.replies||[]).forEach(x=>box.insertAdjacentHTML('beforeend',gbubble({role:'char',speaker:x.speaker,text:x.reply})));
+      if(r.note)toast(r.note);window.scrollTo(0,document.body.scrollHeight);}
+    catch(e){toast('✗ '+e.message,true)}
+    inp.disabled=false;inp.focus();};
+  document.getElementById('gsend').onclick=send;
+  document.getElementById('gmsg').addEventListener('keydown',e=>{if(e.key==='Enter')send();});
+}
+function gbubble(t){if(t.role==='user')return `<div class="brow user"><div class="bubble user">${esc(t.text)}</div></div>`;
+  return `<div class="brow char"><div class="bubble char"><b style="color:var(--acc2)">${esc(t.speaker||'?')}</b><br>${esc(t.text)}</div></div>`;}
+async function groupClear(){if(!window._group)return;if(!confirm('清空本群对话?'))return;
+  await post('/group/clear',{id:window._group.gid});route();}
+
 function _av(){return (window._chat&&window._chat.avatar)?('/img/'+window._chat.avatar):''}
+// HUD:把 char 输出里的 ```html``` 块塞进 sandbox iframe(allow-scripts,绝不 allow-same-origin)
+function _hudIframe(html){
+  const theme=getComputedStyle(document.documentElement);
+  const vars=['--ink','--faint','--acc','--acc2','--gold','--panel','--panel2','--line'].map(v=>`${v}:${theme.getPropertyValue(v)||''}`).join(';');
+  // 借 JS-Slash-Runner 工程经验补 3 坑:① 100vh 在自适应 iframe 里会塌成内容高 → 重写成真实视口高
+  const body=String(html).replace(/(\d+(?:\.\d+)?)vh\b/g,'calc(var(--sv-vh) * $1)');
+  const wrapped=`<!DOCTYPE html><html><head><meta charset="utf-8"><style>:root{${vars};--sv-vh:${window.innerHeight/100}px;color-scheme:dark}*{box-sizing:border-box}html,body{margin:0;overflow:hidden;background:transparent;color:var(--ink,#d8dee5);font-family:system-ui,'Segoe UI',sans-serif;font-size:14px}</style></head><body>${body}<script>(function(){var s=false;function post(){s=false;parent.postMessage({_svh:document.documentElement.scrollHeight},'*')}function h(){if(s)return;s=true;(window.requestAnimationFrame||setTimeout)(post)}/* ③ rAF 合批防刷爆 */if(window.ResizeObserver)new ResizeObserver(h).observe(document.body);/* ② 图片加载完再回报一次,兜高度跳变 */[].forEach.call(document.images,function(im){if(!im.complete)im.addEventListener('load',h)});window.addEventListener('load',h);window.onerror=function(m){parent.postMessage({_sverr:String(m)},'*');return false};setTimeout(h,60);h()})()<\/script></body></html>`;
+  return `<iframe class="hud" sandbox="allow-scripts" srcdoc="${wrapped.replace(/"/g,'&quot;')}" style="width:100%;border:0;background:transparent;display:block"></iframe>`;
+}
 function bubbleHtml(role,text){const av=_av();
-  if(role==='char')return `<div class="brow char">${av?`<img class="cavatar" src="${av}">`:''}<div class="bubble char">${esc(text)}</div></div>`;
+  if(role==='char'){
+    const m=String(text).match(/```html\s*([\s\S]*?)```/i);
+    if(m){const prose=esc(String(text).replace(m[0],'').trim());
+      return `<div class="brow char">${av?`<img class="cavatar" src="${av}">`:''}<div class="bubble char">${prose?prose+'<br>':''}${_hudIframe(m[1])}</div></div>`;}
+    return `<div class="brow char">${av?`<img class="cavatar" src="${av}">`:''}<div class="bubble char">${esc(text)}</div></div>`;
+  }
   return `<div class="brow user"><div class="bubble user">${esc(text)}</div></div>`;}
+// iframe 高度自适应(只认 _svh 数字消息)+ 面板脚本错误可见化(_sverr)
+window.addEventListener('message',ev=>{const d=ev.data;if(!d)return;
+  if(typeof d._svh==='number')document.querySelectorAll('iframe.hud').forEach(f=>{if(f.contentWindow===ev.source)f.style.height=Math.min(d._svh+4,1200)+'px';});
+  else if(d._sverr)console.warn('[HUD 面板脚本错误]',d._sverr);});
 function _addBubble(role,text){const box=document.getElementById('chatbox');const w=document.createElement('div');
   w.innerHTML=bubbleHtml(role,text);const row=w.firstElementChild;box.appendChild(row);
   window.scrollTo(0,document.body.scrollHeight);return row.querySelector('.bubble');}
 async function chatClear(){if(!window._chat)return;if(!confirm('清空与该角色的对话?'))return;
   await post('/chat/clear',{world:window._chat.wid,entity:window._chat.eid});route();}
 async function chatUndo(){if(!window._chat)return;await post('/chat/undo',{world:window._chat.wid,entity:window._chat.eid});route();}
-async function chatRegen(){if(!window._chat)return;const c=window._chat,box=document.getElementById('chatbox');
-  const rows=box.querySelectorAll('.brow.char');const last=rows[rows.length-1];
-  const tgt=last?last.querySelector('.bubble'):_addBubble('char','…');tgt.textContent='…';
-  try{const r=await post('/chat/regenerate',{world:c.wid,entity:c.eid});tgt.textContent=r.reply||r.note||'(无)';}
-  catch(e){tgt.textContent='✗ '+e.message}}
-function renderVars(v){const box=document.getElementById('varpanel');if(!box)return;const ks=Object.keys(v||{});
-  box.innerHTML=ks.length?ks.map(k=>`<div class="varrow"><span class="vn">${esc(k)}</span><span><span class="vv">${esc(''+v[k])}</span><a onclick="varSet('${esc(k)}')">改</a><a onclick="varDel('${esc(k)}')">✕</a></span></div>`).join('')
-    :'<div style="color:var(--faint);font-size:13px">无。对话中角色可能自动产生,或点＋手动加(如 好感度/HP/进度)</div>';}
+function _lastCharBubble(){const rows=document.getElementById('chatbox').querySelectorAll('.brow.char .bubble');return rows[rows.length-1]||null;}
+function updateSwBar(r){const c=document.getElementById('swcount');if(!c)return;
+  if(r&&typeof r.swipe_n==='number'){c.textContent=((r.swipe_id||0)+1)+'/'+r.swipe_n;c.dataset.n=r.swipe_n;c.dataset.i=r.swipe_id||0;}
+  if(r&&r.vars)renderVars(r.vars);if(r&&r.var_changed&&r.var_changed.length)toast('变量更新:'+r.var_changed.join('、'));
+  if(r&&r.emotion&&r.emotion.sprite){const sa=document.querySelector('.sideav');if(sa){sa.src='/img/'+r.emotion.sprite;sa.title=r.emotion.zh||'';}}}
+async function chatSwipe(delta){if(!window._chat)return;const c=window._chat,tgt=_lastCharBubble();if(!tgt)return;
+  const old=tgt.textContent;if(delta>0)tgt.textContent='…';
+  try{const r=await post('/chat/swipe',{world:c.wid,entity:c.eid,delta});
+    if(r.note){tgt.textContent=old;toast(r.note);return;}
+    tgt.textContent=r.reply||'(无)';updateSwBar(r);}
+  catch(e){tgt.textContent=old;toast('✗ '+e.message)}}
+async function chatRegen(){return chatSwipe(1);}   // 🔄 换一个回复 = 右滑生成新候选(旧的可◀切回)
+async function chatExpr(){if(!window._chat)return;const c=window._chat;toast('锁脸生成情绪立绘中…(需配出图后端,约 8 张)');
+  try{const r=await post('/entity/expressions',{world:c.wid,entity:c.eid});
+    if(r.enabled===false)toast(r.note||'未配出图后端');else toast('✓ 生成 '+(r.emotions||[]).length+' 张表情立绘');}
+  catch(e){toast('✗ '+e.message)}}
+function renderVars(v){const box=document.getElementById('varpanel');if(!box)return;
+  const meta=(window._chat&&window._chat.varmeta)||{};
+  const ks=Object.keys(v||{}).filter(k=>(meta[k]||{}).vis!=='hidden');
+  if(!ks.length){box.innerHTML='<div style="color:var(--faint);font-size:13px">无。对话中角色可自动产生,或点＋手动加(如 好感度/HP/进度)</div>';return;}
+  box.innerHTML=ks.map(k=>{const m=meta[k]||{},val=v[k];const label=esc(m.label||k),icon=m.icon?esc(m.icon)+' ':'';
+    let disp;
+    if(m.vis==='bar'&&typeof val==='number'){const mn=(m.min!=null?m.min:0),mx=(m.max!=null?m.max:100);
+      const pct=Math.max(0,Math.min(100,(val-mn)/((mx-mn)||1)*100));
+      disp=`<span class="vbar"><span class="vbar-f" style="width:${pct}%;background:${m.color||'var(--acc)'}"></span></span><span class="vv">${esc(''+val)}</span>`;}
+    else if(Array.isArray(val))disp=`<span class="vv">${val.map(x=>esc(''+x)).join('、')||'—'}</span>`;
+    else if(val&&typeof val==='object')disp=`<span class="vv">${esc(JSON.stringify(val,null,0))}</span>`;
+    else disp=`<span class="vv">${esc(''+val)}</span>`;
+    return `<div class="varrow"><span class="vn">${icon}${label}</span><span>${disp}<a onclick="varSet('${esc(k)}')">改</a><a onclick="varDel('${esc(k)}')">✕</a></span></div>`;}).join('');}
 async function actEditPlayer(){let pl={name:'你',persona:''};try{pl=(await api('/chat/'+window._chat.wid+'/'+window._chat.eid)).player}catch(e){}
   formModal('你扮演谁(用户身份)',[
     {n:'name',label:'你的名字(角色会这样称呼你)',value:pl.name||'你'},
@@ -493,28 +599,45 @@ async function varAdd(){const c=window._chat;formModal('加变量',[{n:'name',la
 async function varSet(name){const c=window._chat;const val=prompt('设「'+name+'」(数值可写 +5 / -3 增减,或直接写新值):');if(val==null)return;
   const r=await post('/chat/var',{world:c.wid,entity:c.eid,name,value:val});renderVars(r.vars)}
 async function varDel(name){const c=window._chat;if(!confirm('删变量「'+name+'」?'))return;const r=await post('/chat/var/del',{world:c.wid,entity:c.eid,name});renderVars(r.vars)}
+async function varInit(){const c=window._chat;if(!c)return;if(!confirm('让 AI 据人设建一张状态卡?会覆盖现有变量。'))return;toast('AI 建卡中…');
+  try{const r=await post('/chat/init-vars',{world:c.wid,entity:c.eid});
+    if(r.available===false){toast(r.note||'需配 LLM');return;}
+    window._chat.varmeta={};Object.entries(r.meta||{}).forEach(([k,m])=>window._chat.varmeta[k]=m);
+    Object.entries(r.rules||{}).forEach(([k,rl])=>{window._chat.varmeta[k]=Object.assign({min:rl.min,max:rl.max},window._chat.varmeta[k]||{});});
+    renderVars(r.data);toast('✓ 已建 '+Object.keys(r.data||{}).length+' 个状态变量');}
+  catch(e){toast('✗ '+e.message,true)}}
 async function viewChat(m,wid,eid){
   let d;try{d=await api('/chat/'+wid+'/'+eid)}catch(e){m.innerHTML=`<div class="empty">${esc(e.message)}</div>`;return}
-  window._chat={wid,eid,avatar:d.avatar};
+  window._chat={wid,eid,avatar:d.avatar,varmeta:{}};
+  (d.var_view||[]).forEach(x=>{window._chat.varmeta[x.name]={label:x.label,vis:x.vis,color:x.color,icon:x.icon,min:x.min,max:x.max};});
+  Object.entries(d.var_meta||{}).forEach(([k,m])=>{window._chat.varmeta[k]=Object.assign({},window._chat.varmeta[k],m);});
   const bubbles=d.history.length?d.history:[{role:'char',text:d.greeting}];
   const av=d.avatar?('/img/'+d.avatar):'';
   m.innerHTML=`<div class="crumb"><a href="#/">总览</a> / <a href="#/world/${wid}">${esc(wid)}</a> / <a href="#/entity/${wid}/${eid}">${esc(d.name)}</a> / 对话</div>
     <div class="chat-head">${av?`<img class="bigav" src="${av}">`:''}<h1 style="margin:0">💬 ${esc(d.name)}</h1></div>
     ${d.llm_available?'':'<p class="lead" style="color:var(--gold)">还没配 LLM —— 去左边 <a href="#/settings" style="color:var(--acc2)">⚙ 设置</a> 填一个 provider + key,回来就能真聊。</p>'}
     <div class="rp"><div class="rp-main">
-      <div class="actions"><button class="btn ghost" onclick="chatRegen()">🔄 换一个回复</button><button class="btn ghost" onclick="chatUndo()">↩ 撤回上一轮</button><button class="btn ghost" onclick="chatClear()">🗑 重置</button></div>
+      <div class="actions"><span class="swbar" title="一楼多候选:◀▶ 切换,▶到末尾自动生成新候选"><button class="btn ghost" onclick="chatSwipe(-1)">◀</button><span id="swcount" style="min-width:42px;text-align:center;display:inline-block;color:var(--faint)">1/1</span><button class="btn ghost" onclick="chatSwipe(1)">▶</button></span><button class="btn ghost" onclick="chatRegen()">🔄 换一个</button><button class="btn ghost" onclick="chatExpr()">🎭 生成表情</button><button class="btn ghost" onclick="chatUndo()">↩ 撤回上一轮</button><button class="btn ghost" onclick="chatClear()">🗑 重置</button></div>
       <div class="chat" id="chatbox">${bubbles.map(b=>bubbleHtml(b.role,b.text)).join('')}</div>
       <div class="chat-input"><input id="chatmsg" placeholder="以 ${esc(d.player.name)} 的身份说…(回车发送)"><button class="btn" id="chatsend">发送</button></div>
     </div><aside class="rp-side">
       <div class="card"><h2>你扮演 <a onclick="actEditPlayer()" style="color:var(--acc2);cursor:pointer">编辑</a></h2>
         <div style="color:var(--gold)">${esc(d.player.name)}</div>${d.player.persona?`<div style="color:var(--faint);font-size:13px;margin-top:3px">${esc(d.player.persona)}</div>`:'<div style="color:var(--faint);font-size:12px;margin-top:3px">未设身份 → 角色易认错你,建议点编辑</div>'}</div>
-      <div class="card"><h2>变量 <a onclick="varAdd()" style="color:var(--acc2);cursor:pointer">＋</a></h2><div id="varpanel"></div></div>
+      <div class="card"><h2>变量 <a onclick="varAdd()" style="color:var(--acc2);cursor:pointer">＋</a> <a onclick="varInit()" style="color:var(--gold);cursor:pointer;font-size:13px" title="AI 据人设建一张状态卡">🎲AI建卡</a></h2><div id="varpanel"></div></div>
       ${av?`<img class="sideav" src="${av}">`:''}
     </aside></div>`;
   renderVars(d.vars);
+  (function(){const lc=[...(d.history||[])].reverse().find(x=>x.role==='char'&&x.swipes);const sc=document.getElementById('swcount');
+    if(sc&&lc)sc.textContent=((lc.swipe_id||0)+1)+'/'+lc.swipes.length;})();
   const send=async()=>{const inp=document.getElementById('chatmsg');const msg=inp.value.trim();if(!msg)return;
     inp.value='';inp.disabled=true;_addBubble('user',msg);const w=_addBubble('char','…');
-    try{const r=await post('/chat',{world:wid,entity:eid,message:msg});w.textContent=r.reply;renderVars(r.vars);
+    try{const r=await post('/chat',{world:wid,entity:eid,message:msg});
+      const row=w.closest('.brow');
+      if(/```html/i.test(r.reply)&&row){const tmp=document.createElement('div');tmp.innerHTML=bubbleHtml('char',r.reply);row.replaceWith(tmp.firstElementChild);}
+      else w.textContent=r.reply;
+      renderVars(r.vars);
+      const sc=document.getElementById('swcount');if(sc)sc.textContent='1/'+(r.swipe_n||1);
+      if(r.emotion&&r.emotion.sprite){const sa=document.querySelector('.sideav');if(sa){sa.src='/img/'+r.emotion.sprite;sa.title=r.emotion.zh||'';}}
       if(r.var_changed&&r.var_changed.length)toast('变量更新:'+r.var_changed.join('、'));}
     catch(e){w.textContent='✗ '+e.message}
     inp.disabled=false;inp.focus();};

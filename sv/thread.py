@@ -197,6 +197,30 @@ class Thread:
     def open_hooks(self) -> list[dict]:
         return [h for h in self.hooks_data()["hooks"] if h["status"] in ("待回收", "进行中")]
 
+    def related_chapters(self, *, k: int = 5, exclude_recent: int = 10) -> list[dict]:
+        """四维相关章节反查(零 embedding,借 ainovel-cli novel_context):伏笔埋设/计划回收章 + 近期事件章。
+
+        给长篇「该回看哪几章」一个不靠向量的结构化召回(排除最近 exclude_recent 章——它们已在上下文)。
+        """
+        last = self.last_chapter_no()
+        cutoff = last - exclude_recent
+        cand: dict[int, list[str]] = {}
+        for h in self.hooks_data().get("hooks", []):
+            for key, why in (("plant_chapter", "伏笔埋设"), ("payoff_target", "计划回收")):
+                c = h.get(key)
+                if isinstance(c, int) and 1 <= c <= cutoff:
+                    cand.setdefault(c, []).append(f"{why}:{(h.get('desc') or '')[:12]}")
+        for b in self.beats():
+            w = b.get("where", "")
+            if w.startswith("ch:"):
+                try:
+                    c = int(w[3:])
+                except ValueError:
+                    continue
+                if 1 <= c <= cutoff:
+                    cand.setdefault(c, []).append(f"事件:{(b.get('text') or '')[:12]}")
+        return [{"chapter": c, "reasons": r} for c, r in sorted(cand.items(), key=lambda x: -x[0])[:k]]
+
     def overdue_hooks(self, current: int | None = None) -> list[dict]:
         """计划回收章已过、却仍未回收的钩子(确定性揪漏伏笔)。"""
         cur = current if current is not None else self.last_chapter_no()

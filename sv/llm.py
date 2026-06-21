@@ -36,7 +36,34 @@ def _post(url: str, body: dict, headers: dict, timeout: int = 180) -> dict:
     req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"),
                                  headers={"Content-Type": "application/json", **headers})
     with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read().decode("utf-8"))
+        ctype = r.headers.get("Content-Type", "")
+        raw = r.read().decode("utf-8")
+    # 有些 OpenAI 兼容代理(one-api 等)对部分模型强制 SSE 流式,即使没传 stream。
+    # body 形如 `data: {chunk}` 而非整块 JSON,这里合并回非流式结构,调用方无感。
+    if "text/event-stream" in ctype or raw.lstrip().startswith("data:"):
+        return _merge_sse(raw)
+    return json.loads(raw)
+
+
+def _merge_sse(raw: str) -> dict:
+    """合并 OpenAI 兼容 SSE 流(逐块 choices[].delta.content)为非流式响应结构。"""
+    text: list[str] = []
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line.startswith("data:"):
+            continue
+        payload = line[5:].strip()
+        if not payload or payload == "[DONE]":
+            continue
+        try:
+            chunk = json.loads(payload)
+        except json.JSONDecodeError:
+            continue
+        for ch in chunk.get("choices", []):
+            piece = (ch.get("delta") or {}).get("content")
+            if piece:
+                text.append(piece)
+    return {"choices": [{"message": {"content": "".join(text)}}]}
 
 
 def _openai(system: str, user: str, mt: int, temp: float) -> str:
