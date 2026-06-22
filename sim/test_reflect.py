@@ -6,6 +6,8 @@ import sys
 import tempfile
 
 os.environ["SV_UNIVERSE_DIR"] = tempfile.mkdtemp(prefix="sv_t_rfl_")
+os.environ["SV_LOCAL_CONF"] = tempfile.mktemp(suffix=".conf")   # 隔离本机配置,免测试误打真实 provider
+os.environ.pop("SV_PROVIDER", None)                             # 强制 stub:诊断测试不依赖网络
 
 from sv import checks, clock  # noqa: E402
 

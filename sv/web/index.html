@@ -36,6 +36,7 @@
   h1 small{font-size:13px;color:var(--faint);font-weight:400;margin-left:10px}
   .lead{color:var(--dim);margin:0 0 18px}
   .actions{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 20px}
+  .actions.rp-actions{position:sticky;top:0;z-index:6;margin:0 0 10px;padding:10px 0;background:var(--bg);border-bottom:1px solid var(--line)}
   .btn{background:var(--acc);color:#fff;border:none;border-radius:9px;padding:8px 15px;font-size:14px;cursor:pointer;transition:.15s}
   .btn:hover{filter:brightness(1.12)}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--dim)}
@@ -83,12 +84,24 @@
   .bubble{padding:10px 14px;border-radius:14px;max-width:80%;line-height:1.75;white-space:pre-wrap}
   .bubble.char{background:var(--panel2);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px}
   .bubble.user{background:var(--acc);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+  .bubble.char.typing{animation:svblink 1s steps(2,start) infinite;color:var(--faint)}
+  @keyframes svblink{50%{opacity:.35}}
   .chat-input{display:flex;gap:8px;margin-top:14px;max-width:720px;position:sticky;bottom:14px}
   .chat-input input{flex:1;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:11px 14px;font:inherit}
   .chat-input input:focus{outline:none;border-color:var(--acc)}
   .gallery{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
   .gallery img{max-width:200px;max-height:300px;border-radius:10px;border:1px solid var(--line);background:var(--panel)}
   .chat-head{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  .ctxmeter{color:var(--faint);font-size:12.5px}
+  .brow{position:relative}
+  .msgctrl{position:absolute;top:-9px;right:6px;display:none;gap:3px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:2px 5px}
+  .brow:hover .msgctrl{display:flex}
+  .msgctrl a{cursor:pointer;font-size:12.5px;padding:1px 3px;color:var(--dim)}
+  .msgctrl a:hover{color:var(--ink)}
+  .qrbar{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 0;max-width:720px}
+  .qr{background:var(--panel);border:1px solid var(--line);color:var(--dim);border-radius:14px;padding:5px 11px;font:inherit;font-size:12.5px;cursor:pointer;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .qr:hover{border-color:var(--acc);color:var(--ink)}
+  .qr.edit{color:var(--faint);border-style:dashed}
   .bigav{width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--acc)}
   .brow{display:flex;gap:8px;margin:8px 0;align-items:flex-end}
   .brow.user{flex-direction:row-reverse}
@@ -142,7 +155,7 @@
   <main id="main"><div class="empty">载入中…</div></main>
 </div>
 <script>
-const esc=(s)=>(s==null?'':(''+s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const esc=(s)=>(s==null?'':(''+s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(p){const r=await fetch('/api'+p);if(!r.ok)throw new Error((await r.json()).error||r.status);return r.json()}
 async function post(p,b){const r=await fetch('/api'+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
   const j=await r.json();if(!r.ok||j.ok===false)throw new Error(j.error||r.status);return j}
@@ -154,7 +167,7 @@ function md(t){const lines=(t||'').split('\n');let h='',ul=false;const cu=()=>{i
     else if(/^#\s/.test(ln)){cu();h+='<h1>'+esc(ln.slice(2))+'</h1>'}
     else if(/^>\s?/.test(ln)){cu();h+='<blockquote>'+inl(ln.replace(/^>\s?/,''))+'</blockquote>'}
     else if(/^[-*]\s/.test(ln)){if(!ul){h+='<ul>';ul=true}h+='<li>'+inl(ln.slice(2))+'</li>'}
-    else if(/^<!--/.test(ln.trim())){cu()}
+    else if(/^<!\x2d\x2d/.test(ln.trim())){cu()}
     else if(ln.trim()===''){cu()}
     else{cu();h+='<p>'+inl(ln)+'</p>'}}
   cu();return h}
@@ -250,6 +263,55 @@ function actImportCard(){
   };
   inp.click();
 }
+function actImportPreset(){
+  const inp=document.createElement('input');inp.type='file';inp.accept='.json';
+  inp.onchange=async()=>{const f=inp.files[0];if(!f)return;let txt,nameGuess=f.name.replace(/\.json$/i,'');
+    try{txt=await f.text();try{const j=JSON.parse(txt);if(j.name)nameGuess=j.name;}catch(e){return toast('✗ 不是合法 JSON',true)}}catch(e){return toast('✗ 读文件失败:'+e.message,true)}
+    formModal('导入预设 · ST 采样集+提示词模块',[
+      {n:'name',label:'预设名',value:nameGuess},
+    ],'导入',async v=>{
+      const r=await post('/import/preset',{data:txt,name:v.name});closeModal();
+      toast(`✓ 导入预设 <b>${esc(r.name)}</b>(${esc(r.preset)})— 模块 ${r.module_count}(自定义 ${r.custom_count})、采样参数 ${Object.keys(r.sampling||{}).length} 项`);
+      location.hash='#/assets';route();
+    });
+  };
+  inp.click();
+}
+function actImportRegex(){
+  const inp=document.createElement('input');inp.type='file';inp.accept='.json';
+  inp.onchange=async()=>{const f=inp.files[0];if(!f)return;let txt,nameGuess=f.name.replace(/\.json$/i,'');
+    try{txt=await f.text();try{const j=JSON.parse(txt);if(j.scriptName)nameGuess=j.scriptName;}catch(e){return toast('✗ 不是合法 JSON',true)}}catch(e){return toast('✗ 读文件失败:'+e.message,true)}
+    formModal('导入正则 · ST 消息渲染改写',[
+      {n:'name',label:'正则脚本名(留空用脚本自带名)',value:nameGuess},
+    ],'导入',async v=>{
+      const r=await post('/import/regex',{data:txt,name:v.name});closeModal();
+      toast(`✓ 导入正则 <b>${esc(r.regex)}</b>(${r.count} 条:${esc((r.names||[]).slice(0,3).join('、'))})`);
+      location.hash='#/assets';route();
+    });
+  };
+  inp.click();
+}
+async function viewAssets(m){
+  let d;try{d=await api('/presets')}catch(e){m.innerHTML=`<div class="empty">${esc(e.message)}</div>`;return}
+  const ps=d.presets||[],rx=d.regex||[],active=d.active_preset||'';
+  const pCards=ps.length?ps.map(p=>{const on=p.id===active;
+    return `<div class="card" style="${on?'border-color:var(--acc)':''}"><h3>🎚 ${esc(p.name||p.id)} ${on?'<span class="tag forge">生效中</span>':''}</h3>
+      <div class="meta">${esc(p.id)} · 模块 ${p.module_count??'?'}(自定义 ${p.custom_count??'?'})</div>
+      <div style="margin-top:8px">${on?`<button class="btn ghost" onclick="actPresetUse('')">停用</button>`:`<button class="btn" onclick="actPresetUse('${p.id}')">启用</button>`}</div></div>`;}).join('')
+    :'<div class="empty">还没有预设。点上方「📥 导入预设」吃一个 SillyTavern 预设 JSON。</div>';
+  const rCards=rx.length?rx.map(r=>`<div class="card"><h3>🔤 ${esc(r.id)}</h3>
+      <div class="meta">${r.count} 条规则${r.names&&r.names.length?' · '+esc(r.names.slice(0,4).join('、')):''}</div></div>`).join('')
+    :'<div class="empty">还没有正则。点上方「📥 导入正则」吃一个 SillyTavern 正则脚本 JSON。</div>';
+  m.innerHTML=`<h1>预设 / 正则 <small>ST 资产</small></h1>
+    <p class="lead">从 SillyTavern 生态导入的采样集+提示词模块(预设)与消息渲染改写(正则)。落盘在 <code>universe/presets/</code> 与 <code>universe/regex/</code>。
+    <b>启用</b>一个预设 → 它的作者模块(系统/越狱/文风)会前置叠加进对话系统提示;导入的<b>正则</b>自动套用于角色回复显示。</p>
+    <div class="actions"><button class="btn" onclick="actImportPreset()">📥 导入预设</button>
+      <button class="btn" onclick="actImportRegex()">📥 导入正则</button></div>
+    <div class="section"><h2>预设 (${ps.length})</h2><div class="grid">${pCards}</div></div>
+    <div class="section"><h2>正则 (${rx.length})</h2><div class="grid">${rCards}</div></div>`;
+}
+async function actPresetUse(pid){try{await post('/config',{SV_PRESET:pid});await refresh();route();
+  toast(pid?'✓ 预设已启用,对话即时生效':'✓ 已停用预设');}catch(e){toast('✗ '+e.message,true)}}
 function actSetAvatar(wid,eid){
   const inp=document.createElement('input');inp.type='file';inp.accept='image/png,image/jpeg,image/webp';
   inp.onchange=async()=>{const f=inp.files[0];if(!f)return;
@@ -446,6 +508,7 @@ function renderNav(active){
     <a href="#/groups" class="${active==='groups'?'on':''}">👥 群聊</a>
     <a href="#/modes" class="${active==='modes'?'on':''}">🎚 模式</a>
     <a href="#/codex" class="${active==='codex'?'on':''}">🧬 元件库 <span class="b">${OV.codex.count}</span></a>
+    <a href="#/assets" class="${active==='assets'?'on':''}">📦 预设/正则</a>
     <a href="#/settings" class="${active==='settings'?'on':''}">⚙ 设置 <span class="b" style="${OV.llm&&OV.llm.available?'color:var(--good)':''}">${OV.llm&&OV.llm.available?'LLM✓':'LLM✗'}</span></a>
     <h4>世界 (${OV.worlds.length})</h4>`;
   for(const w of OV.worlds)
@@ -465,6 +528,7 @@ function route(){
   else if(p[0]==='nexus'&&p[1])viewNexusEntity(m,p[1]);
   else if(p[0]==='nexus')viewNexus(m);
   else if(p[0]==='codex')viewCodex(m);
+  else if(p[0]==='assets')viewAssets(m);
   else if(p[0]==='settings')viewSettings(m);
   else if(p[0]==='timeline'&&p[1])viewTimeline(m,p[1]);
   else if(p[0]==='chat'&&p[2])viewChat(m,p[1],p[2]);
@@ -542,14 +606,15 @@ function _hudIframe(html){
   const wrapped=`<!DOCTYPE html><html><head><meta charset="utf-8"><style>:root{${vars};--sv-vh:${window.innerHeight/100}px;color-scheme:dark}*{box-sizing:border-box}html,body{margin:0;overflow:hidden;background:transparent;color:var(--ink,#d8dee5);font-family:system-ui,'Segoe UI',sans-serif;font-size:14px}</style></head><body>${body}<script>(function(){var s=false;function post(){s=false;parent.postMessage({_svh:document.documentElement.scrollHeight},'*')}function h(){if(s)return;s=true;(window.requestAnimationFrame||setTimeout)(post)}/* ③ rAF 合批防刷爆 */if(window.ResizeObserver)new ResizeObserver(h).observe(document.body);/* ② 图片加载完再回报一次,兜高度跳变 */[].forEach.call(document.images,function(im){if(!im.complete)im.addEventListener('load',h)});window.addEventListener('load',h);window.onerror=function(m){parent.postMessage({_sverr:String(m)},'*');return false};setTimeout(h,60);h()})()<\/script></body></html>`;
   return `<iframe class="hud" sandbox="allow-scripts" srcdoc="${wrapped.replace(/"/g,'&quot;')}" style="width:100%;border:0;background:transparent;display:block"></iframe>`;
 }
-function bubbleHtml(role,text){const av=_av();
+function _msgctrl(floor){return (floor!=null&&floor>=0)?`<div class="msgctrl"><a onclick="actEditFloor(${floor})" title="编辑这楼">✎</a><a onclick="actRegenFloor(${floor})" title="从这楼重生成(丢弃其后)">🔄</a><a onclick="actDelFloor(${floor})" title="删除这楼">🗑</a></div>`:'';}
+function bubbleHtml(role,text,floor){const av=_av();const ctrl=_msgctrl(floor);
   if(role==='char'){
     const m=String(text).match(/```html\s*([\s\S]*?)```/i);
     if(m){const prose=esc(String(text).replace(m[0],'').trim());
-      return `<div class="brow char">${av?`<img class="cavatar" src="${av}">`:''}<div class="bubble char">${prose?prose+'<br>':''}${_hudIframe(m[1])}</div></div>`;}
-    return `<div class="brow char">${av?`<img class="cavatar" src="${av}">`:''}<div class="bubble char">${esc(text)}</div></div>`;
+      return `<div class="brow char">${av?`<img class="cavatar" src="${av}">`:''}<div class="bubble char">${prose?prose+'<br>':''}${_hudIframe(m[1])}</div>${ctrl}</div>`;}
+    return `<div class="brow char">${av?`<img class="cavatar" src="${av}">`:''}<div class="bubble char">${esc(text)}</div>${ctrl}</div>`;
   }
-  return `<div class="brow user"><div class="bubble user">${esc(text)}</div></div>`;}
+  return `<div class="brow user"><div class="bubble user">${esc(text)}</div>${ctrl}</div>`;}
 // iframe 高度自适应(只认 _svh 数字消息)+ 面板脚本错误可见化(_sverr)
 window.addEventListener('message',ev=>{const d=ev.data;if(!d)return;
   if(typeof d._svh==='number')document.querySelectorAll('iframe.hud').forEach(f=>{if(f.contentWindow===ev.source)f.style.height=Math.min(d._svh+4,1200)+'px';});
@@ -613,38 +678,115 @@ async function viewChat(m,wid,eid){
   Object.entries(d.var_meta||{}).forEach(([k,m])=>{window._chat.varmeta[k]=Object.assign({},window._chat.varmeta[k],m);});
   const bubbles=d.history.length?d.history:[{role:'char',text:d.greeting}];
   const av=d.avatar?('/img/'+d.avatar):'';
+  window._chat.base_chars=d.base_chars||0;window._chat.qr=d.quick_replies||[];window._chat.stopped=false;
+  window._chat.greetings=d.greetings||[];window._chat.gid=d.greeting_id||0;
+  window._chat.histWin=d.history_window||12;window._chat.hist=d.history||[];   // 原文+窗口大小,给编辑模态/token表用
   m.innerHTML=`<div class="crumb"><a href="#/">总览</a> / <a href="#/world/${wid}">${esc(wid)}</a> / <a href="#/entity/${wid}/${eid}">${esc(d.name)}</a> / 对话</div>
-    <div class="chat-head">${av?`<img class="bigav" src="${av}">`:''}<h1 style="margin:0">💬 ${esc(d.name)}</h1></div>
+    <div class="chat-head">${av?`<img class="bigav" src="${av}">`:''}<h1 style="margin:0">💬 ${esc(d.name)}</h1>
+      <span id="ctxmeter" class="ctxmeter" title="当前注入上下文的粗估 token 数(系统提示+全历史)">⌛ …</span>
+      ${d.preset_active?`<span class="tag forge" title="生效预设">🎚 ${esc(d.preset_active)}</span>`:''}</div>
     ${d.llm_available?'':'<p class="lead" style="color:var(--gold)">还没配 LLM —— 去左边 <a href="#/settings" style="color:var(--acc2)">⚙ 设置</a> 填一个 provider + key,回来就能真聊。</p>'}
     <div class="rp"><div class="rp-main">
-      <div class="actions"><span class="swbar" title="一楼多候选:◀▶ 切换,▶到末尾自动生成新候选"><button class="btn ghost" onclick="chatSwipe(-1)">◀</button><span id="swcount" style="min-width:42px;text-align:center;display:inline-block;color:var(--faint)">1/1</span><button class="btn ghost" onclick="chatSwipe(1)">▶</button></span><button class="btn ghost" onclick="chatRegen()">🔄 换一个</button><button class="btn ghost" onclick="chatExpr()">🎭 生成表情</button><button class="btn ghost" onclick="chatUndo()">↩ 撤回上一轮</button><button class="btn ghost" onclick="chatClear()">🗑 重置</button></div>
-      <div class="chat" id="chatbox">${bubbles.map(b=>bubbleHtml(b.role,b.text)).join('')}</div>
-      <div class="chat-input"><input id="chatmsg" placeholder="以 ${esc(d.player.name)} 的身份说…(回车发送)"><button class="btn" id="chatsend">发送</button></div>
+      <div class="actions rp-actions"><span class="swbar" title="一楼多候选:◀▶ 切换,▶到末尾自动生成新候选"><button class="btn ghost" onclick="chatSwipe(-1)">◀</button><span id="swcount" style="min-width:42px;text-align:center;display:inline-block;color:var(--faint)">1/1</span><button class="btn ghost" onclick="chatSwipe(1)">▶</button></span><button class="btn ghost" onclick="chatRegen()">🔄 换一个</button><button class="btn ghost" onclick="chatExpr()">🎭 生成表情</button><button class="btn ghost" onclick="chatUndo()">↩ 撤回上一轮</button><button class="btn ghost" onclick="chatClear()">🗑 重置</button></div>
+      <div class="chat" id="chatbox">${bubbles.map((b,i)=>bubbleHtml(b.role,b.text,d.history.length?i:-1)).join('')}</div>
+      ${(!d.history.length&&d.greetings&&d.greetings.length>1)?`<div class="qrbar"><span class="ctxmeter">开场白(发第一句前可切)</span><button class="qr" onclick="gswipe(-1)">◀</button><span class="ctxmeter" id="gscount">${(d.greeting_id||0)+1}/${d.greetings.length}</span><button class="qr" onclick="gswipe(1)">▶</button></div>`:''}
+      <div class="qrbar" id="qrbar"></div>
+      <div class="chat-input"><input id="chatmsg" placeholder="以 ${esc(d.player.name)} 的身份说…(回车发送)"><button class="btn" id="chatsend">发送</button><button class="btn" id="chatstop" style="display:none;background:var(--rose)">⏹ 停止</button></div>
     </div><aside class="rp-side">
       <div class="card"><h2>你扮演 <a onclick="actEditPlayer()" style="color:var(--acc2);cursor:pointer">编辑</a></h2>
         <div style="color:var(--gold)">${esc(d.player.name)}</div>${d.player.persona?`<div style="color:var(--faint);font-size:13px;margin-top:3px">${esc(d.player.persona)}</div>`:'<div style="color:var(--faint);font-size:12px;margin-top:3px">未设身份 → 角色易认错你,建议点编辑</div>'}</div>
+      <div class="card"><h2>📝 作者笔记 <a onclick="actSaveNote()" style="color:var(--acc2);cursor:pointer;font-size:13px">保存</a></h2>
+        <textarea id="authornote" rows="3" placeholder="给模型的导演旁注(创作方向/基调/避免什么),贯穿注入但不复述" style="width:100%;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px;font:inherit;font-size:13px;resize:vertical">${esc(d.author_note||'')}</textarea></div>
       <div class="card"><h2>变量 <a onclick="varAdd()" style="color:var(--acc2);cursor:pointer">＋</a> <a onclick="varInit()" style="color:var(--gold);cursor:pointer;font-size:13px" title="AI 据人设建一张状态卡">🎲AI建卡</a></h2><div id="varpanel"></div></div>
       ${av?`<img class="sideav" src="${av}">`:''}
     </aside></div>`;
   renderVars(d.vars);
+  function recountCtx(){const el=document.getElementById('ctxmeter');if(!el)return;
+    let chars=window._chat.base_chars||0;
+    // 只数模型实际收到的最近 HISTORY_WINDOW 楼,跟后端窗口对齐(否则长聊会越数越大,误导用户)
+    const bs=[...document.querySelectorAll('#chatbox .bubble')].slice(-(window._chat.histWin||12));
+    bs.forEach(b=>chars+=(b.textContent||'').length);
+    const tok=Math.round(chars/1.6);el.textContent='⌛ ≈ '+(tok>=1000?(tok/1000).toFixed(1)+'k':tok)+' tok';}
+  function renderQR(){const bar=document.getElementById('qrbar');if(!bar)return;const qr=window._chat.qr||[];
+    bar.innerHTML=qr.map((q,i)=>`<button class="qr" onclick="qrSend(${i})" title="${esc(q.message)}">${esc(q.label||q.message)}</button>`).join('')
+      +`<button class="qr edit" onclick="actQuickReplies()">＋ 快速回复</button>`;}
+  renderQR();recountCtx();
   (function(){const lc=[...(d.history||[])].reverse().find(x=>x.role==='char'&&x.swipes);const sc=document.getElementById('swcount');
     if(sc&&lc)sc.textContent=((lc.swipe_id||0)+1)+'/'+lc.swipes.length;})();
-  const send=async()=>{const inp=document.getElementById('chatmsg');const msg=inp.value.trim();if(!msg)return;
-    inp.value='';inp.disabled=true;_addBubble('user',msg);const w=_addBubble('char','…');
-    try{const r=await post('/chat',{world:wid,entity:eid,message:msg});
-      const row=w.closest('.brow');
-      if(/```html/i.test(r.reply)&&row){const tmp=document.createElement('div');tmp.innerHTML=bubbleHtml('char',r.reply);row.replaceWith(tmp.firstElementChild);}
-      else w.textContent=r.reply;
-      renderVars(r.vars);
-      const sc=document.getElementById('swcount');if(sc)sc.textContent='1/'+(r.swipe_n||1);
-      if(r.emotion&&r.emotion.sprite){const sa=document.querySelector('.sideav');if(sa){sa.src='/img/'+r.emotion.sprite;sa.title=r.emotion.zh||'';}}
-      if(r.var_changed&&r.var_changed.length)toast('变量更新:'+r.var_changed.join('、'));}
-    catch(e){w.textContent='✗ '+e.message}
-    inp.disabled=false;inp.focus();};
-  document.getElementById('chatsend').onclick=send;
+  // 用最终(正则渲染过的)整段回复重绘气泡 + 更新变量/表情/候选计数(流式 done 与回退共用)
+  const finalize=(bubble,r)=>{const row=bubble.closest('.brow');
+    const tmp=document.createElement('div');tmp.innerHTML=bubbleHtml('char',r.reply!=null?r.reply:bubble.textContent);
+    if(row&&tmp.firstElementChild)row.replaceWith(tmp.firstElementChild);else bubble.textContent=r.reply||'';
+    updateSwBar(r);};
+  const sendBlocking=async(bubble,msg)=>{const r=await post('/chat',{world:wid,entity:eid,message:msg});finalize(bubble,r);};
+  let abort=null,deltasSeen=0;
+  const setBusy=b=>{const s=document.getElementById('chatsend'),st=document.getElementById('chatstop'),inp=document.getElementById('chatmsg'),qb=document.getElementById('qrbar');
+    if(s)s.style.display=b?'none':'';if(st)st.style.display=b?'':'none';if(inp)inp.disabled=b;
+    if(qb){qb.style.pointerEvents=b?'none':'';qb.style.opacity=b?'0.5':'';}};   // 忙时挡 QR 点击,免双发
+  const sendStream=async(bubble,msg)=>{
+    deltasSeen=0;abort=new AbortController();
+    const resp=await fetch('/api/chat/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({world:wid,entity:eid,message:msg}),signal:abort.signal});
+    if(!resp.ok||!resp.body)throw new Error('stream unavailable');
+    const reader=resp.body.getReader(),dec=new TextDecoder();let buf='',acc='',fin=null;
+    for(;;){const{value,done}=await reader.read();if(done)break;
+      buf+=dec.decode(value,{stream:true});let i;
+      while((i=buf.indexOf('\n\n'))>=0){const line=buf.slice(0,i).split('\n').find(l=>l.startsWith('data:'));buf=buf.slice(i+2);
+        if(!line)continue;let o;try{o=JSON.parse(line.slice(5).trim())}catch(e){continue}
+        if(o.t!=null){
+          // 智能滚动:只在用户已在底部时跟进;否则别把人从上面拽回来(用户正在回看)
+          const nearBottom=window.innerHeight+window.scrollY>=document.body.scrollHeight-80;
+          deltasSeen++;acc+=o.t;bubble.classList.remove('typing');bubble.textContent=acc;recountCtx();
+          if(nearBottom)window.scrollTo(0,document.body.scrollHeight);
+        }
+        else if(o.done)fin=o;}}
+    if(fin&&fin.error){const err=new Error(fin.error);err.partial=acc;throw err;}
+    if(fin&&fin.available===false){bubble.textContent=fin.reply;return;}
+    finalize(bubble,fin||{reply:acc});};
+  const send=async(forced)=>{
+    if(window._chat.busy)return;                                                // 单发栏:已在跑就丢弃这次请求
+    const inp=document.getElementById('chatmsg');const msg=(forced!=null?forced:inp.value).trim();if(!msg)return;
+    if(forced==null)inp.value='';_addBubble('user',msg);const w=_addBubble('char','…');w.classList.add('typing');
+    window._chat.busy=true;setBusy(true);window._chat.stopped=false;
+    try{
+      if(d.llm_available){
+        try{await sendStream(w,msg);}
+        catch(e){
+          if(window._chat.stopped)throw e;
+          // 已经吐过字了就别再阻塞重发一遍——免得连续花两次钱、产出两条同 user 的历史
+          if(deltasSeen>0){w.textContent=(w.textContent||'')+'\n✗ 中断:'+e.message;throw e;}
+          await sendBlocking(w,msg);
+        }
+      } else {await sendBlocking(w,msg);}                                       // 未配 LLM:走引导
+    }catch(e){if(window._chat.stopped){w.classList.remove('typing');if(!w.textContent||w.textContent==='…')w.textContent='（已停止）';else w.textContent+=' ⏹';}
+      else if(!w.textContent.includes('✗')){w.textContent='✗ '+e.message;}}
+    finally{window._chat.busy=false;setBusy(false);recountCtx();inp.focus();}};
+  window._chat.send=send;
+  document.getElementById('chatsend').onclick=()=>send();
+  document.getElementById('chatstop').onclick=()=>{window._chat.stopped=true;if(abort)abort.abort();};
   document.getElementById('chatmsg').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();send();}});
   document.getElementById('chatmsg').focus();
 }
+function qrSend(i){const q=(window._chat&&window._chat.qr||[])[i];if(q&&window._chat.send)window._chat.send(q.message);}
+async function gswipe(delta){if(!window._chat)return;const c=window._chat,n=(c.greetings||[]).length;if(n<2)return;
+  const idx=((c.gid||0)+delta+n)%n;try{await post('/chat/set-greeting',{world:c.wid,entity:c.eid,idx});route();}catch(e){toast('✗ '+e.message,true)}}
+async function actSaveNote(){if(!window._chat)return;const t=document.getElementById('authornote').value;
+  try{await post('/chat/author-note',{world:window._chat.wid,entity:window._chat.eid,text:t});toast('✓ 作者笔记已存,下条起生效');}catch(e){toast('✗ '+e.message,true)}}
+async function actQuickReplies(){const cur=(window._chat&&window._chat.qr||[]).map(q=>q.label&&q.label!==q.message?q.label+' | '+q.message:q.message).join('\n');
+  formModal('快速回复(每行一条;可写「按钮名 | 发送内容」)',[{n:'list',label:'每行一条',type:'textarea',rows:7,value:cur,ph:'打招呼 | 嗨,在吗\n继续'}],'保存',async v=>{
+    const items=v.list.split('\n').map(s=>s.trim()).filter(Boolean).map(s=>{const i=s.indexOf('|');return i>=0?{label:s.slice(0,i).trim(),message:s.slice(i+1).trim()}:{label:s,message:s};});
+    const r=await post('/quick-replies',{items});closeModal();if(window._chat)window._chat.qr=r.quick_replies;route();toast('✓ 快速回复已存');});}
+function _floorText(i){
+  // 优先取后端原文(包含 ```html HUD 块);DOM textContent 只是 fallback——HUD 渲染到 iframe srcdoc 里,textContent 里没有,直接拿过来保存会把 HUD 块抹掉
+  const h=window._chat&&window._chat.hist;if(h&&h[i]&&h[i].text!=null)return h[i].text;
+  const rows=document.querySelectorAll('#chatbox .brow');const b=rows[i]&&rows[i].querySelector('.bubble');return b?b.textContent:'';}
+async function actEditFloor(i){if(!window._chat)return;const c=window._chat;
+  formModal('编辑这楼',[{n:'text',label:'内容',type:'textarea',rows:6,value:_floorText(i)}],'保存',async v=>{
+    await post('/chat/edit',{world:c.wid,entity:c.eid,floor:i,text:v.text});closeModal();route();toast('✓ 已改');});}
+async function actDelFloor(i){if(!window._chat)return;if(!confirm('删除这一楼?'))return;const c=window._chat;
+  try{await post('/chat/delete',{world:c.wid,entity:c.eid,floor:i});route();toast('✓ 已删');}catch(e){toast('✗ '+e.message,true)}}
+async function actRegenFloor(i){if(!window._chat)return;const c=window._chat;
+  const rows=document.querySelectorAll('#chatbox .brow');if(i<rows.length-1&&!confirm('从这楼重生成会丢弃它之后的对话,继续?'))return;
+  toast('重生成中…');try{await post('/chat/floor-regen',{world:c.wid,entity:c.eid,floor:i});route();toast('✓ 已重生成');}catch(e){toast('✗ '+e.message,true)}}
 
 async function viewTimeline(m,wid){
   let d;try{d=await api('/timeline/'+wid)}catch(e){m.innerHTML=`<div class="empty">${esc(e.message)}</div>`;return}
@@ -677,6 +819,8 @@ function viewOverview(m){
     <p class="lead">从元件生成世界,角色在世界间穿梭,世界彼此相连。</p>
     <div class="actions"><button class="btn" onclick="actNewWorld()">＋ 新世界</button>
       <button class="btn" onclick="actImportCard()">📥 导入角色卡</button>
+      <button class="btn ghost" onclick="actImportPreset()">📥 导入预设</button>
+      <button class="btn ghost" onclick="actImportRegex()">📥 导入正则</button>
       <button class="btn ghost" onclick="actLink()">⇄ 连接世界</button>
       <button class="btn ghost" onclick="actNewCodex()">＋ 元件</button></div>
     <div class="stat-row">
@@ -807,6 +951,11 @@ async function viewSettings(m){
         <div class="field"><label>Ollama Base URL（本地）</label><input id="cf_ollama" value="${esc(c.ollama_base_url)}"></div>
         <div class="field"><label>temperature</label><input id="cf_temp" value="${esc(c.temperature)}"></div>
       </div>
+      <div class="row2">
+        <div class="field"><label>备援 provider（主 provider 失败自动切;治代理时好时坏）</label><select id="cf_fb_provider">${opt(['','openai','anthropic','ollama'],c.fallback_provider||'')}</select></div>
+        <div class="field"><label>备援 model（留空用该 provider 默认）</label><input id="cf_fb_model" value="${esc(c.fallback_model||'')}" placeholder="如本地 ollama 的 qwen2.5"></div>
+      </div>
+      <div class="field"><label>请求超时（秒,默认 180;调小则代理卡死更快放弃→切备援）</label><input id="cf_timeout" value="${esc(c.llm_timeout||180)}"></div>
       <div class="actions"><button class="btn" onclick="saveSettings()">💾 保存（即时生效）</button><button class="btn ghost" onclick="testLLM()">🔌 测试连接</button></div>
       <div class="packet" id="cf_test" style="display:none"></div>
     </div>
@@ -820,6 +969,7 @@ async function viewSettings(m){
     </div>
     <div class="section"><h2>当前状态</h2><table class="kv">
       <tr><td>LLM</td><td>${c.llm_available?`<span style="color:var(--good)">✓ ${esc(c.provider)}${c.model?' · '+esc(c.model):''}</span>`:'✗ stub（占位，未启用真实生成）'}</td></tr>
+      <tr><td>备援 / 超时</td><td>${c.fallback_provider?`<span style="color:var(--good)">✓ ${esc(c.fallback_provider)}${c.fallback_model?' · '+esc(c.fallback_model):''}</span>`:'✗ 无备援'} ｜ ${esc(c.llm_timeout||180)}s</td></tr>
       <tr><td>渲染</td><td>${c.render==='gitee'&&sec('GITEE_API_KEY').set?'<span style="color:var(--good)">✓ gitee</span>':'✗ 未启用'}</td></tr>
       <tr><td>向量记忆</td><td>${esc(c.embed_provider)}（none = 关键词检索）</td></tr>
       <tr><td>自演化</td><td>${c.simulate?'on':'off（默认关）'}</td></tr>
@@ -830,7 +980,8 @@ async function viewSettings(m){
 async function saveSettings(){
   const g=id=>{const e=document.getElementById(id);return e?e.value.trim():''};
   const body={SV_PROVIDER:g('cf_provider'),SV_MODEL:g('cf_model'),OPENAI_BASE_URL:g('cf_openai_base'),
-    OLLAMA_BASE_URL:g('cf_ollama'),SV_LLM_TEMPERATURE:g('cf_temp'),SV_RENDER:g('cf_render'),SV_IMAGE_SIZE:g('cf_imgsize')};
+    OLLAMA_BASE_URL:g('cf_ollama'),SV_LLM_TEMPERATURE:g('cf_temp'),SV_RENDER:g('cf_render'),SV_IMAGE_SIZE:g('cf_imgsize'),
+    SV_FALLBACK_PROVIDER:g('cf_fb_provider'),SV_FALLBACK_MODEL:g('cf_fb_model'),SV_LLM_TIMEOUT:g('cf_timeout')};
   ['cf_openai_key:OPENAI_API_KEY','cf_anthropic_key:ANTHROPIC_API_KEY','cf_gitee_key:GITEE_API_KEY'].forEach(p=>{
     const [id,k]=p.split(':');const v=g(id);if(v)body[k]=v;});  // 密钥仅填了才发(空=保持不变)
   try{await post('/config',body);await refresh();toast('✓ 设置已保存，即时生效');route()}catch(e){toast('✗ '+e.message,true)}
@@ -841,7 +992,7 @@ async function testLLM(){const box=document.getElementById('cf_test');box.style.
   }catch(e){box.textContent='✗ '+e.message}}
 
 window.showCh=showCh;
-['actNewWorld','actNewEntity','actNewThread','actNewCodex','actSeedCodex','actLink','actAscend','actSummon','actWriteChapter','actPlay','actEditWorldMd','actNarrateRun','actReflect','actExportThread','actDelWorld','actDelThread','actDelEntity','actDelCodex','actRenderEntity','actRenderScene','actSetAlpha','actAddHook','actSetHook','actImportCard','actUndoImport','actMergeWorld','chatClear','chatUndo','chatRegen','actSetAvatar','actEditPlayer','varAdd','varSet','varDel','renderVars','saveSettings','clearSecret','testLLM','closeModal'].forEach(f=>window[f]=eval(f));
+['actNewWorld','actNewEntity','actNewThread','actNewCodex','actSeedCodex','actLink','actAscend','actSummon','actWriteChapter','actPlay','actEditWorldMd','actNarrateRun','actReflect','actExportThread','actDelWorld','actDelThread','actDelEntity','actDelCodex','actRenderEntity','actRenderScene','actSetAlpha','actAddHook','actSetHook','actImportCard','actImportPreset','actImportRegex','actPresetUse','actUndoImport','actMergeWorld','chatClear','chatUndo','chatRegen','qrSend','gswipe','actSaveNote','actQuickReplies','actEditFloor','actDelFloor','actRegenFloor','actSetAvatar','actEditPlayer','varAdd','varSet','varDel','renderVars','saveSettings','clearSecret','testLLM','closeModal'].forEach(f=>window[f]=eval(f));
 window.addEventListener('hashchange',route);
 (async()=>{try{await refresh()}catch(e){}route()})();
 </script>

@@ -117,14 +117,73 @@ def api_config() -> dict:
     return config.settings_snapshot()
 
 
+def _regex_render(text: str, scripts: list | None = None) -> str:
+    """显示前套用已导入的 ST 正则脚本(scope=output);不改 chat.jsonl 原文(非破坏性)。
+    scripts 可由调用方一次性 load 后传入,免在循环里每行重读 universe/regex/*.json。"""
+    if not text:
+        return text
+    try:
+        if scripts is None:
+            scripts = importer.load_regex_scripts()
+        return importer.apply_regex(text, scripts, scope="output")
+    except Exception:  # noqa: BLE001 — 正则渲染绝不阻断对话
+        return text
+
+
+def _regex_out(d: dict) -> dict:
+    """聊天响应里的 reply 字段套正则(给前端展示用)。"""
+    if isinstance(d, dict) and d.get("reply"):
+        d["reply"] = _regex_render(d["reply"])
+    return d
+
+
 def api_chat(wid: str, eid: str) -> dict:
     w = World.load(wid); e = LocalEntity.load(w, eid)
+    scripts = importer.load_regex_scripts()     # 一次读盘:历史 N 行 + 主开场白 + alt 开场白 共用
+    st = chatmod.var_state(e)                   # 一次 load:vars/var_view/var_meta/base_chars 全用它
+    pl = chatmod.player()
+    hist = chatmod.history(e)
+    for h in hist:                              # 历史里 char 行显示前套正则(原文不动)
+        if h.get("role") == "char" and h.get("text"):
+            h["text"] = _regex_render(h["text"], scripts)
     return {"world": wid, "entity": eid, "name": e.card().get("name", eid),
-            "greeting": chatmod.greeting(e), "history": chatmod.history(e),
-            "avatar": e.avatar_rel(), "player": chatmod.player(), "vars": chatmod.vars(e),
-            "var_view": varstate.visible(chatmod.var_state(e)),   # HUD 用(已滤 hidden + 带 vis)
-            "var_meta": chatmod.var_state(e).get("meta", {}),
-            "llm_available": llm.available()}
+            "greeting": _regex_render(chatmod.greeting(e), scripts), "history": hist,
+            "greetings": [_regex_render(g, scripts) for g in chatmod.greetings(e)], "greeting_id": chatmod.greeting_id(e),
+            "avatar": e.avatar_rel(), "player": pl, "vars": st["data"],
+            "var_view": varstate.visible(st),   # HUD 用(已滤 hidden + 带 vis)
+            "var_meta": st.get("meta", {}),
+            "author_note": chatmod.author_note(e).get("text", ""),
+            "quick_replies": chatmod.quick_replies(),
+            "base_chars": len(chatmod._system(w, e, pl, st["data"])),  # 上下文表的基线(系统提示长度)
+            "preset_active": config.PRESET,
+            "llm_available": llm.available(),
+            "history_window": chatmod.HISTORY_WINDOW}   # 前端 token 表只该数最近这么多条
+
+
+def post_chat_edit(b: dict) -> dict:
+    w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
+    return chatmod.edit_floor(e, int(b["floor"]), b.get("text", ""))
+
+
+def post_chat_delete(b: dict) -> dict:
+    w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
+    return chatmod.delete_floor(e, int(b["floor"]))
+
+
+def post_chat_set_greeting(b: dict) -> dict:
+    w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
+    r = chatmod.set_greeting(e, int(b["idx"]))
+    r["greeting"] = _regex_render(r.get("greeting", ""))
+    return r
+
+
+def post_author_note(b: dict) -> dict:
+    w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
+    return {"ok": True, **chatmod.set_author_note(e, b.get("text", ""))}
+
+
+def post_quick_replies(b: dict) -> dict:
+    return {"ok": True, "quick_replies": chatmod.set_quick_replies(b.get("items", []))}
 
 
 def api_timeline(wid: str) -> dict:
@@ -282,7 +341,7 @@ def post_hook_alpha(b: dict) -> dict:
 
 def post_chat(b: dict) -> dict:
     w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
-    return chatmod.turn(w, e, b.get("message", ""))
+    return _regex_out(chatmod.turn(w, e, b.get("message", "")))
 
 
 def post_chat_clear(b: dict) -> dict:
@@ -292,7 +351,7 @@ def post_chat_clear(b: dict) -> dict:
 
 def post_chat_regenerate(b: dict) -> dict:
     w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
-    return chatmod.regenerate(w, e)
+    return _regex_out(chatmod.regenerate(w, e))
 
 
 def api_modes() -> dict:
@@ -338,13 +397,13 @@ def post_group_clear(b: dict) -> dict:
 def post_chat_swipe(b: dict) -> dict:
     """左右切候选(delta=±1);右滑到末尾自动生成新候选。"""
     w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
-    return chatmod.swipe_next(w, e, int(b.get("delta", 1)))
+    return _regex_out(chatmod.swipe_next(w, e, int(b.get("delta", 1))))
 
 
 def post_chat_floor_regen(b: dict) -> dict:
     """从第 idx 楼重生成(截断其后)。"""
     w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
-    return chatmod.floor_regenerate(w, e, int(b.get("idx", -1)))
+    return _regex_out(chatmod.floor_regenerate(w, e, int(b.get("idx", -1))))
 
 
 def post_chat_undo(b: dict) -> dict:
@@ -395,6 +454,21 @@ def post_import_card(b: dict) -> dict:
     w = World.load(b["world"])     # 并入现有世界
     r = importer.import_card(w, card, role=b.get("role", "secondary"), as_id=b.get("as") or None, avatar_png=png)
     return {"ok": True, "world": w.id, **r}
+
+
+def post_import_preset(b: dict) -> dict:
+    """导入 ST 预设(采样集 + 提示词模块)。data=预设 JSON 文本。"""
+    return {"ok": True, **importer.import_preset(b["data"], name=b.get("name", ""))}
+
+
+def post_import_regex(b: dict) -> dict:
+    """导入 ST 正则脚本(消息渲染改写)。data=正则 JSON 文本(单个或数组)。"""
+    return {"ok": True, **importer.import_regex(b["data"], name=b.get("name", ""))}
+
+
+def api_presets() -> dict:
+    return {"presets": importer.list_presets(), "regex": importer.list_regex(),
+            "active_preset": config.PRESET}
 
 
 def post_import_undo(b: dict) -> dict:
@@ -485,6 +559,7 @@ GET_ROUTES = [
     (re.compile(r"^/api/prep/play$"), lambda m, q: api_play_prep(q)),
     (re.compile(r"^/api/prep/world$"), lambda m, q: api_world_prep(q)),
     (re.compile(r"^/api/recipe$"), lambda m, q: api_recipe(q)),
+    (re.compile(r"^/api/presets$"), lambda m, q: api_presets()),
 ]
 POST_ROUTES = [
     (re.compile(r"^/api/world/create$"), post_world_create),
@@ -517,6 +592,8 @@ POST_ROUTES = [
     (re.compile(r"^/api/hook/set$"), post_hook_set),
     (re.compile(r"^/api/hook/alpha$"), post_hook_alpha),
     (re.compile(r"^/api/import/card$"), post_import_card),
+    (re.compile(r"^/api/import/preset$"), post_import_preset),
+    (re.compile(r"^/api/import/regex$"), post_import_regex),
     (re.compile(r"^/api/import/undo$"), post_import_undo),
     (re.compile(r"^/api/world/merge$"), post_world_merge),
     (re.compile(r"^/api/chat$"), post_chat),
@@ -534,6 +611,11 @@ POST_ROUTES = [
     (re.compile(r"^/api/chat/var$"), post_chat_var),
     (re.compile(r"^/api/chat/var/del$"), post_chat_var_del),
     (re.compile(r"^/api/chat/init-vars$"), post_chat_init_vars),
+    (re.compile(r"^/api/chat/set-greeting$"), post_chat_set_greeting),
+    (re.compile(r"^/api/chat/edit$"), post_chat_edit),
+    (re.compile(r"^/api/chat/delete$"), post_chat_delete),
+    (re.compile(r"^/api/chat/author-note$"), post_author_note),
+    (re.compile(r"^/api/quick-replies$"), post_quick_replies),
 ]
 
 
@@ -575,6 +657,35 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(500, {"error": repr(e)})
         self._json(404, {"error": "not found"})
 
+    def _sse(self, obj):
+        self.wfile.write(b"data: " + json.dumps(obj, ensure_ascii=False).encode("utf-8") + b"\n\n")
+        self.wfile.flush()
+
+    def _chat_stream(self, b: dict):
+        """流式对话(SSE):逐块吐正文增量,收尾吐 done 元信息(含正则渲染后的整段 reply)。"""
+        try:
+            w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
+        except (FileNotFoundError, ValueError, KeyError) as ex:
+            return self._json(400, {"error": str(ex)})
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("X-Accel-Buffering", "no")   # 关代理缓冲,逐块到达
+        self.end_headers()
+        try:
+            for kind, payload in chatmod.stream_turn(w, e, b.get("message", "")):
+                if kind == "delta":
+                    self._sse({"t": payload})
+                else:
+                    self._sse({**_regex_out(payload), "done": True})
+        except (BrokenPipeError, ConnectionResetError):
+            return                                     # 客户端断开,静默收场
+        except Exception as ex:  # noqa: BLE001
+            try:
+                self._sse({"done": True, "error": repr(ex)})
+            except Exception:  # noqa: BLE001
+                pass
+
     def do_POST(self):
         path = self.path.split("?", 1)[0]
         n = int(self.headers.get("Content-Length", 0))
@@ -582,6 +693,8 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(n).decode("utf-8")) if n else {}
         except (json.JSONDecodeError, UnicodeDecodeError):
             return self._json(400, {"error": "请求体必须是 UTF-8 编码的 JSON"})
+        if path == "/api/chat/stream":
+            return self._chat_stream(body)
         for rx, fn in POST_ROUTES:
             if rx.match(path):
                 try:

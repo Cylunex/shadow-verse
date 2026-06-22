@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import base64
+import functools
 import json
 import re
 import struct
@@ -116,8 +117,11 @@ def import_card(world: World, card: dict, *, role: str = "secondary", as_id: str
     c = e.card()
     if card["tags"]:
         c["tags"] = card["tags"]
-    if card.get("first_mes"):
-        c["greeting"] = card["first_mes"].strip()   # 开场白,对话时用
+    greetings = [g.strip() for g in [card.get("first_mes", ""), *card.get("alternate_greetings", [])] if (g or "").strip()]
+    if greetings:
+        c["greeting"] = greetings[0]                 # 主开场白(向后兼容)
+        if len(greetings) > 1:
+            c["greetings"] = greetings               # 多开场白,可在对话页 swipe 选(含 alternate_greetings)
     if card.get("appearance"):
         c["appearance"] = card["appearance"]        # SD 正向词 → 锁脸立绘 appearance
     if card.get("depth_prompt"):
@@ -374,8 +378,10 @@ def load_regex_scripts() -> list[dict]:
     return scripts
 
 
+@functools.lru_cache(maxsize=256)
 def _compile_find(find: str):
-    """解析 /pat/flags;返回 (compiled, global?)。flags 支持 i/m/s/g。"""
+    """解析 /pat/flags;返回 (compiled, global?)。flags 支持 i/m/s/g。
+    lru_cache:同一段 find 在一次进程里只编译一次(api_chat 渲染 N 行历史时,N×S 次降为 S 次)。"""
     m = _FIND_DELIM.match(find or "")
     pat, fl = (m.group(1), m.group(2)) if m else (find or "", "")
     flags = (re.I if "i" in fl else 0) | (re.M if "m" in fl else 0) | (re.S if "s" in fl else 0)

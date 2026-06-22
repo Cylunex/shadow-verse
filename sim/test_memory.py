@@ -29,7 +29,8 @@ for i in range(8):
     memory.append_experience(e.dir, f"经历{i}", level="持久", where=f"ch:{i}")
 allx = memory.all_experiences(e.dir)
 ok(len(allx) == 8, "只追加:8 条全在")
-ok(allx[0]["id"] == "exp-0001" and allx[-1]["id"] == "exp-0008", "经历带递增 id")
+ok(all(x["id"].startswith("exp-") for x in allx) and len({x["id"] for x in allx}) == len(allx),
+   "经历每条都带唯一 id(uuid 后缀:免并发追加重复)")
 
 # ① rebuild:确定性、范围小
 e.update_state({"location": "茶馆", "mood": "平静"})

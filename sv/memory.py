@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import math
+import uuid
 from pathlib import Path
 
 from . import clock, util
@@ -49,9 +50,10 @@ def append_experience(
     """追加一条经历。level ∈ 瞬时/持久/身份。返回写入的条目(含 id)。"""
     if level not in LEVEL_IMPORTANCE:
         level = "持久"
-    existing = read_jsonl(_exp_path(char_dir))
+    # uuid 后缀:避免并发追加(后台 auto-summary 线程 vs 前台成长写入)读到同一 len() 而生成重复 id;
+    # 也省掉了每次追加都全文件 read_jsonl 一次的开销。
     entry = {
-        "id": f"exp-{len(existing) + 1:04d}",
+        "id": f"exp-{uuid.uuid4().hex[:8]}",
         "ts": clock.now_iso(),
         "where": where,
         "level": level,

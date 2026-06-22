@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -50,6 +51,7 @@ MANAGED_KEYS = (
     "SV_PROVIDER", "SV_MODEL", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENAI_BASE_URL",
     "SV_LLM_TEMPERATURE", "SV_RENDER", "GITEE_API_KEY", "GITEE_BASE_URL", "SV_IMAGE_SIZE",
     "SV_EMBED_PROVIDER", "SV_EMBED_MODEL", "OLLAMA_BASE_URL", "SV_SIMULATE",
+    "SV_PRESET", "SV_FALLBACK_PROVIDER", "SV_FALLBACK_MODEL", "SV_LLM_TIMEOUT",
 )
 SECRET_KEYS = {"ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GITEE_API_KEY"}
 
@@ -95,6 +97,10 @@ def _compute() -> None:
     g["OPENAI_BASE_URL"] = _get("OPENAI_BASE_URL", "https://api.openai.com/v1")
     g["LLM_MAX_TOKENS"] = int(_get("SV_LLM_MAX_TOKENS", "4096"))
     g["LLM_TEMPERATURE"] = float(_get("SV_LLM_TEMPERATURE", "0.9"))
+    g["PRESET"] = _get("SV_PRESET", "")              # 当前生效预设 id(空=不用预设,走引擎原生系统提示)
+    g["FALLBACK_PROVIDER"] = _get("SV_FALLBACK_PROVIDER", "")   # 主 provider 失败时的备援(空=不容错)
+    g["FALLBACK_MODEL"] = _get("SV_FALLBACK_MODEL", "")
+    g["LLM_TIMEOUT"] = int(_get("SV_LLM_TIMEOUT", "180"))       # 单次 LLM 请求超时(秒);治代理卡死干等
     # 向量(休眠,规模驱动才上)
     g["EMBED_PROVIDER"] = _get("SV_EMBED_PROVIDER", "none")
     g["EMBED_MODEL"] = _get("SV_EMBED_MODEL", "")
@@ -135,7 +141,8 @@ def settings_snapshot() -> dict:
         return {"set": bool(val), "preview": (val[:4] + "…" + val[-2:]) if len(val) > 8 else ("已设" if val else "")}
     return {
         "provider": PROVIDER, "model": MODEL, "openai_base_url": OPENAI_BASE_URL,
-        "temperature": LLM_TEMPERATURE, "llm_available": PROVIDER != "stub",
+        "temperature": LLM_TEMPERATURE, "llm_available": PROVIDER != "stub", "preset": PRESET,
+        "fallback_provider": FALLBACK_PROVIDER, "fallback_model": FALLBACK_MODEL, "llm_timeout": LLM_TIMEOUT,
         "render": RENDER, "gitee_base_url": GITEE_BASE_URL, "image_size": IMAGE_SIZE,
         "embed_provider": EMBED_PROVIDER, "embed_model": EMBED_MODEL, "ollama_base_url": OLLAMA_BASE_URL,
         "simulate": SIMULATE_ENABLED,
@@ -153,9 +160,19 @@ def load_json(path: Path, default: Any = None) -> Any:
 
 
 def save_json(path: Path, data: Any) -> None:
+    """原子写:先写同目录临时文件再 os.replace 换上,避免并发读到截断/半成品 JSON,也避免崩溃留下残文件。"""
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=path.name + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, path)            # 原子换名:读者要么看到旧的完整版,要么新的完整版
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def append_jsonl(path: Path, record: dict) -> None:

@@ -25,7 +25,7 @@ L0 元件    创世素材(元素周期表式可复用元件;内置 ~40 个亲手
 
 ```bash
 PYTHONUTF8=1 python -m sv.skill_api doctor      # 自检
-PYTHONUTF8=1 python -m sim.run_tests            # 全套测试(34 套全绿)
+PYTHONUTF8=1 python -m sim.run_tests            # 全套测试(35 套全绿)
 
 # 看得见也能用:播一个 demo 多元宇宙 → 启动网页控制台
 PYTHONUTF8=1 python -m sim.seed                 # 造2世界/3角色/2章正文/跨世界穿梭
@@ -90,7 +90,7 @@ sv/web/index.html   网页控制台(零依赖 stdlib server 的深色 SPA)
 universe/   数据真相:codex/ · worlds/<w>/{world.md, entities/<e>/{card,profile,state,experiences,chat,vars,avatar,portraits/<emotion>},
             threads/<t>/{thread,meta,hooks,beats,chapters/,sessions/,renders/,branches/,runs/}, worldbook.json, wi_state/}
             · nexus/ · groups/ · presets/ · regex/ · skills/ · player.json
-sim/        run_tests(总跑) · 34 套测试 · smoke · seed(demo 播种)
+sim/        run_tests(总跑) · 35 套测试 · smoke · seed(demo 播种)
 docs/       ARCHITECTURE.md(master spec) · BORROW-ROADMAP.md(竞品借鉴) · VISION-MAP.md(愿景对照) · competitor-archives/(20 项目逐个档案)
 sv.conf / sv.local.conf · deploy/
 ```
@@ -129,7 +129,7 @@ sv.conf / sv.local.conf · deploy/
 
 ## 状态
 
-**五层贯通 + 模式层 + 完整可用**(测试 **34 套全绿**,37 模块 / 59 MCP 工具):元件取料 · AIGC 锻造世界/实体/线 + **创作包(一句话→角色卡+四类世界书)** · narrate 产线(写→审→改→落 + 钩子 + 全书 stylestat + 规则化诊断 + Run Event Journal 审计 + 写作 skill 库 + 四维相关章节反查) · **扮演页**(swipe一楼多候选 + 变量三段式+护栏 + HUD sandbox iframe + 立绘表情切换 + AI建变量卡 + 内联宏) · **群聊**(多角色同场+发言人选择+意图路由) · **线分支**(从某章分叉+蝴蝶效应) · **模式层**(11 模式注册表 + 数据互通转换) · **世界书触发引擎**(关键词/selective/递归 + sticky/cooldown/delay时效 + position@D + probability + 互斥组) · 别名合并去重 · 跨世界穿梭+互联+融合 · 多模态出图 · 导入 ST 角色卡/世界书/预设/正则(+安全三件套) · 中文写作工艺库 · LLM 脏 JSON 容错 · 故事时间线 · 导出/管理 · 网页配 LLM。
+**五层贯通 + 模式层 + 完整可用**(测试 **35 套全绿**,37 模块 / 59 MCP 工具):元件取料 · AIGC 锻造世界/实体/线 + **创作包(一句话→角色卡+四类世界书)** · narrate 产线(写→审→改→落 + 钩子 + 全书 stylestat + 规则化诊断 + Run Event Journal 审计 + 写作 skill 库 + 四维相关章节反查) · **扮演页**(swipe一楼多候选 + 变量三段式+护栏 + HUD sandbox iframe + 立绘表情切换 + AI建变量卡 + 内联宏 + **流式输出+中止 · 多 provider 容错链+超时 · 作者笔记 · 快速回复 · 多开场白 · 任意楼编辑/删除/重生成 · 后台自动总结进长期记忆**) · **群聊**(多角色同场+发言人选择+意图路由) · **线分支**(从某章分叉+蝴蝶效应) · **模式层**(11 模式注册表 + 数据互通转换) · **世界书触发引擎**(关键词/selective/递归 + sticky/cooldown/delay时效 + position@D + probability + 互斥组) · 别名合并去重 · 跨世界穿梭+互联+融合 · 多模态出图 · 导入 ST 角色卡/世界书/预设/正则(+安全三件套) · 中文写作工艺库 · LLM 脏 JSON 容错 · 故事时间线 · 导出/管理 · 网页配 LLM。
 
 **两批竞品吸收**已落地(详见 [BORROW-ROADMAP.md](BORROW-ROADMAP.md) + [docs/competitor-archives/](docs/competitor-archives/INDEX.md));**愿景骨架**(统一底层+多模式+数据互通)已搭(详见 [docs/VISION-MAP.md](docs/VISION-MAP.md))。
 
