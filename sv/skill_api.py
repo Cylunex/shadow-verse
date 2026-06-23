@@ -370,6 +370,27 @@ def cmd_summon(a):
     print(f"✓ {a.nexus_id} 进入世界 {a.world}(化身已开,{a.entry})。当前化身:{', '.join(r['incarnations'])}")
 
 
+def cmd_extract(a):
+    from . import ascension
+    r = ascension.extract(World.load(a.world), a.entity, soul_id=a.as_soul or None)
+    print(f"✓ 提取升华:{r['name']} → 魂 `{r['soul']}`(就地抽魂,搬走身份记忆 {r['moved_identity']} 条,已落数值攻略卡)")
+    print(f"  锚点(唯一真相):{r['anchors'] or '—'}")
+
+
+def cmd_summon_soul(a):
+    from . import ascension
+    r = ascension.summon(a.soul, World.load(a.world), entry=a.entry, as_id=a.as_id or None)
+    print(f"✓ 召唤:魂 `{r['soul']}` 降临世界 {r['world']}(化身 {r['incarnation']},{r['entry']}"
+          + (f",经『{r['via']}』" if r.get("via") else "") + ")。已落 cross beat 到目标世界线。")
+
+
+def cmd_create_soul(a):
+    from . import ascension
+    anchors = [x.strip() for x in (a.anchors or "").split("|") if x.strip()]
+    r = ascension.create_soul(World.load(a.world), a.entity, a.name, role=a.role, anchors=anchors)
+    print(f"✓ 创造即魂:{r['name']}(`{r['soul']}` @ {r['incarnation']})。锚点:{r['anchors'] or '—'}")
+
+
 def cmd_link(a):
     e = nexus.link_worlds(a.world_a, a.world_b, a.relation, note=a.note or "")
     print(f"✓ 世界互联:{e['a']} ⇄ {e['b']} :{e['relation']}")
@@ -615,6 +636,11 @@ def build_parser():
     add("summon", cmd_summon, ["nexus_id", "world"], [("entry", {"default": "本体进"})])
     add("link", cmd_link, ["world_a", "world_b", "relation"], [("note", {"default": ""})])
     add("nexus", cmd_nexus)
+    # 魂模型新路径(一魂·多门重设计):提取/创造升华 + 跨世界召唤
+    add("extract", cmd_extract, ["world", "entity"], [("as-soul", {"default": None})])
+    add("summon-soul", cmd_summon_soul, ["soul", "world"], [("entry", {"default": "本体进"}), ("as-id", {"default": None})])
+    add("create-soul", cmd_create_soul, ["world", "entity", "name"],
+        [("role", {"default": "main"}), ("anchors", {"default": ""})])
 
     add("export-thread", cmd_export_thread, ["world", "thread"])
     add("delete-world", cmd_delete_world, ["id"])

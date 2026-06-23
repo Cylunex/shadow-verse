@@ -502,6 +502,35 @@ def post_link(b: dict) -> dict:
     return nexus.link_worlds(b["a"], b["b"], b["relation"], note=b.get("note", ""))
 
 
+# ---- 魂模型新路径(一魂·多门):提取/创造升华 + 跨世界召唤 ----
+def post_extract(b: dict) -> dict:
+    from . import ascension
+    return {"ok": True, **ascension.extract(World.load(b["world"]), b["entity"],
+                                            player_name=b.get("player", "你"), soul_id=b.get("soul_id") or None)}
+
+
+def post_summon_soul(b: dict) -> dict:
+    from . import ascension
+    return {"ok": True, **ascension.summon(b["soul"], World.load(b["world"]),
+                                           entry=b.get("entry", "本体进"), as_id=b.get("as") or None)}
+
+
+def post_create_soul(b: dict) -> dict:
+    from . import ascension
+    return {"ok": True, **ascension.create_soul(World.load(b["world"]), b["entity"], b["name"],
+                                                role=b.get("role", "main"), anchors=b.get("anchors") or [])}
+
+
+def api_soul(sid: str) -> dict:
+    from .config import read_jsonl
+    from .memory import _identity_path
+    from .soul import Soul
+    s = Soul.load(sid)
+    return {"id": s.id, "name": s.meta().get("name", sid), "anchors": s.anchors(),
+            "incarnations": s.incarnations(),
+            "identity": [x.get("text", "") for x in read_jsonl(_identity_path(s.dir))]}
+
+
 # ---- AIGC 生成(返回正文供人审后再 create/commit;需配 SV_PROVIDER)----
 def post_gen_world(b: dict) -> dict:
     return {"body": forge.generate_world_body(b.get("prompt", ""), genre=b.get("genre", ""),
@@ -547,6 +576,7 @@ GET_ROUTES = [
     (re.compile(r"^/api/thread/([\w-]+)/([\w-]+)$"), lambda m, q: api_thread(m.group(1), m.group(2))),
     (re.compile(r"^/api/entity/([\w-]+)/([\w-]+)$"), lambda m, q: api_entity(m.group(1), m.group(2))),
     (re.compile(r"^/api/nexus/([\w-]+)$"), lambda m, q: api_nexus_entity(m.group(1))),
+    (re.compile(r"^/api/soul/([\w-]+)$"), lambda m, q: api_soul(m.group(1))),
     (re.compile(r"^/api/codex$"), lambda m, q: api_codex()),
     (re.compile(r"^/api/export/thread/([\w-]+)/([\w-]+)$"), lambda m, q: api_export_thread(m.group(1), m.group(2))),
     (re.compile(r"^/api/config$"), lambda m, q: api_config()),
@@ -573,6 +603,9 @@ POST_ROUTES = [
     (re.compile(r"^/api/ascend$"), post_ascend),
     (re.compile(r"^/api/summon$"), post_summon),
     (re.compile(r"^/api/link$"), post_link),
+    (re.compile(r"^/api/extract$"), post_extract),
+    (re.compile(r"^/api/summon-soul$"), post_summon_soul),
+    (re.compile(r"^/api/create-soul$"), post_create_soul),
     (re.compile(r"^/api/gen/world$"), post_gen_world),
     (re.compile(r"^/api/gen/entity$"), post_gen_entity),
     (re.compile(r"^/api/gen/thread$"), post_gen_thread),
