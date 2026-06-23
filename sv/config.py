@@ -62,6 +62,7 @@ CODEX_DIR = UNIVERSE / "codex"        # L0 元件库
 WORLDS_DIR = UNIVERSE / "worlds"      # L2 世界
 NEXUS_DIR = UNIVERSE / "nexus"        # L4 枢纽(跨世界实体 + 世界互联)
 GROUPS_DIR = UNIVERSE / "groups"      # 群聊(多角色同场)
+SOULS_DIR = UNIVERSE / "souls"        # 魂(跨世界不变量核心:opt-in,角色被提取/创造才升华)
 
 # ---- 纯常量(不随配置变)----
 RECENT_EXP_REBUILD = 5     # 状态重建读取的近期经历条数(确定性、范围小)

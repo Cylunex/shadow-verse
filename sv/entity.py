@@ -127,7 +127,19 @@ class LocalEntity:
         if self.dir.exists():
             shutil.rmtree(self.dir)
 
+    def _soul(self):
+        """这具化身背后的魂(card.soul_id 指向且存在则返回 Soul,否则 None=独立角色,行为同今天)。"""
+        sid = self.card().get("soul_id")
+        if not sid:
+            return None
+        from .soul import Soul
+        s = Soul(sid)
+        return s if s.exists() else None
+
     def anchors(self) -> list[str]:
+        s = self._soul()
+        if s is not None:                         # 有魂:锚点走魂的唯一真相(grow 一次处处可见)
+            return s.anchors()
         return _extract_section_lines(self.dir / "profile.md", "核心事实")
 
     # 核心循环委托(铁律由 memory.py 保证)
@@ -135,11 +147,19 @@ class LocalEntity:
         return memory.rebuild(self.dir, self.anchors())
 
     def retrieve(self, query: str):
+        s = self._soul()
+        if s is not None:                         # 有魂:本地经历 ∪ 魂的身份记忆(身份处处浮现)
+            return memory.retrieve_soul(self.dir, s.dir, query)
         return memory.retrieve(self.dir, query)
 
     def sediment(self, text: str, **kw) -> dict | None:
-        """按 role 门控:cameo 不写回(返回 None)。"""
-        return memory.append_experience(self.dir, text, **kw) if self.grows() else None
+        """按 role 门控:cameo 不写回(返回 None)。身份级 + 有魂 → 写进魂的共享身份层。"""
+        if not self.grows():
+            return None
+        s = self._soul()
+        if s is not None and kw.get("level") == "身份":
+            return memory.append_identity(s.dir, text, **{k: v for k, v in kw.items() if k != "level"})
+        return memory.append_experience(self.dir, text, **kw)
 
     def update_state(self, updates: dict) -> dict:
         return memory.write_state(self.dir, updates)
