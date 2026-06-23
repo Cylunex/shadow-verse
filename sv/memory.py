@@ -9,7 +9,10 @@
 """
 from __future__ import annotations
 
+import json
 import math
+import os
+import tempfile
 import uuid
 from pathlib import Path
 
@@ -83,6 +86,24 @@ def append_identity(soul_dir: Path, text: str, *, where: str = "", trace: str = 
 
 def all_experiences(char_dir: Path) -> list[dict]:
     return read_jsonl(_exp_path(char_dir))
+
+
+def set_experiences(char_dir: Path, entries: list[dict]) -> None:
+    """原子覆盖写 experiences.jsonl —— 提取魂时把身份级经历搬进魂后,回写剩余的非身份级。"""
+    p = _exp_path(char_dir)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=str(p.parent), prefix=".exp.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            for e in entries:
+                f.write(json.dumps(e, ensure_ascii=False) + "\n")
+        os.replace(tmp, p)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def recent_experiences(char_dir: Path, n: int = RECENT_EXP_REBUILD) -> list[dict]:
