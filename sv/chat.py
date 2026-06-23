@@ -14,6 +14,8 @@ import threading
 from . import clock, config, expressions, importer, jsonloose, llm, macros, memory, util, varstate, worldbook
 from .config import UNIVERSE, append_jsonl, load_json, read_jsonl, save_json
 from .entity import LocalEntity
+from .lens import commit_core       # RP 落世界线走统一写入口
+from .thread import Thread
 from .world import World
 
 HISTORY_WINDOW = 12
@@ -385,6 +387,7 @@ def stream_turn(world: World, e: LocalEntity, message: str):
         yield ("done", {"available": True, "reply": prose, "vars": newvars, "var_changed": list(updates or {}),
                         "var_notes": notes, "swipe_id": 0, "swipe_n": 1, "emotion": _emotion(world, e, prose)})
         _kick_summary(world, e)           # done 已发,这里只是快速 spawn 后台线程,不拖慢客户端
+        _rp_commit(world, e, message, prose, updates)   # RP → 世界线
     finally:
         if not persisted:                 # 流中途异常 / 客户端中止(GeneratorExit):把已出的部分也落盘,刷新后不蒸发
             prose, updates = _split_vars("".join(raw_parts).strip())
@@ -425,6 +428,38 @@ def _emotion(world: World, e: LocalEntity, text: str) -> dict | None:
     return {"emotion": emo, "sprite": sprites.get(emo), "zh": expressions.EMOTION_ZH.get(emo, emo)}
 
 
+# ---------- RP 落世界线(不放弃世界线:每轮 RP 进入世界的时间轴 thread.beats,RP 不再是孤岛)----------
+def _rp_thread(world: World, e: LocalEntity) -> Thread:
+    """这场 RP 的世界线 thread:chat_meta.thread_id 指定则用(可绑某副本),否则自动建/取 rp-<eid>。
+    它落在世界的 threads/ 下,所以 RP 事件自然进入【世界】的时间轴(世界与魂同等一等)。"""
+    meta = load_json(_meta_path(e), {}) or {}
+    tid = meta.get("thread_id")
+    if tid and Thread(world, tid).exists():
+        return Thread(world, tid)
+    tid = f"rp-{e.id}"
+    if not Thread(world, tid).exists():
+        Thread.create(world, tid, f"{e.card().get('name', e.id)} · RP 线", genre=world.meta().get("genre", ""))
+    meta["thread_id"] = tid
+    save_json(_meta_path(e), meta)
+    return Thread(world, tid)
+
+
+def _rp_beat_text(message: str, prose: str) -> str:
+    snip = lambda s: " ".join((s or "").split())[:60]   # noqa: E731
+    return snip(prose) or snip(message) or "（一轮对话）"
+
+
+def _rp_commit(world: World, e: LocalEntity, message: str, prose: str, updates: dict) -> None:
+    """把这一轮 RP 落到世界线(thread.beats,走统一 commit_core)。门控 config.RP_COMMIT,关时零行为=旧逻辑。"""
+    if not config.RP_COMMIT or not (prose or "").strip():
+        return
+    try:
+        t = _rp_thread(world, e)
+        commit_core(world, t, lens="play", where=f"play:{t.id}", beat=_rp_beat_text(message, prose), mark=True)
+    except Exception:  # noqa: BLE001 — 落世界线绝不阻断对话
+        pass
+
+
 def turn(world: World, e: LocalEntity, message: str) -> dict:
     if not llm.available():
         return {"available": False,
@@ -437,6 +472,7 @@ def turn(world: World, e: LocalEntity, message: str) -> dict:
     append_jsonl(_path(e), _new_char_row(reply, updates, baseline))
     newvars, notes = _apply_baseline(e, baseline, updates)
     _kick_summary(world, e)
+    _rp_commit(world, e, message, reply, updates)   # RP → 世界线
     return {"available": True, "reply": reply, "vars": newvars, "var_changed": list(updates or {}),
             "var_notes": notes, "swipe_id": 0, "swipe_n": 1, "emotion": _emotion(world, e, reply)}
 

@@ -52,6 +52,7 @@ MANAGED_KEYS = (
     "SV_LLM_TEMPERATURE", "SV_RENDER", "GITEE_API_KEY", "GITEE_BASE_URL", "SV_IMAGE_SIZE",
     "SV_EMBED_PROVIDER", "SV_EMBED_MODEL", "OLLAMA_BASE_URL", "SV_SIMULATE",
     "SV_PRESET", "SV_FALLBACK_PROVIDER", "SV_FALLBACK_MODEL", "SV_LLM_TIMEOUT",
+    "SV_RP_COMMIT",
 )
 SECRET_KEYS = {"ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GITEE_API_KEY"}
 
@@ -102,6 +103,7 @@ def _compute() -> None:
     g["FALLBACK_PROVIDER"] = _get("SV_FALLBACK_PROVIDER", "")   # 主 provider 失败时的备援(空=不容错)
     g["FALLBACK_MODEL"] = _get("SV_FALLBACK_MODEL", "")
     g["LLM_TIMEOUT"] = int(_get("SV_LLM_TIMEOUT", "180"))       # 单次 LLM 请求超时(秒);治代理卡死干等
+    g["RP_COMMIT"] = _get("SV_RP_COMMIT", "off").lower() in ("on", "1", "true")  # RP 一轮落世界线(thread.beats);默认关=旧行为
     # 向量(休眠,规模驱动才上)
     g["EMBED_PROVIDER"] = _get("SV_EMBED_PROVIDER", "none")
     g["EMBED_MODEL"] = _get("SV_EMBED_MODEL", "")
