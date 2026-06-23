@@ -52,6 +52,20 @@ pr = lenses.play_commit(w, t, {
 ok(len(pr["written_back"]) == 1 and len(pr["candidates"]) == 1, "play:触发才写回,余者候选")
 ok("play" in t.meta()["lenses"], "玩过的线标记 play 透镜")
 
+# 统一写入口 commit_core:唯一落盘路径 + 闭合透镜标签 + 角色门控
+from sv.lens import commit_core, LENS_TAGS  # noqa: E402
+beats_before = len(t.beats())
+core = commit_core(w, t, lens="play", where="play:probe", beat="探针 beat",
+                   sediments=[{"entity": "hero", "text": "成长", "level": "持久"},
+                              {"entity": "cam", "text": "客串", "level": "瞬时"}])
+ok(len(t.beats()) == beats_before + 1 and t.beats()[-1]["where"] == "play:probe", "commit_core 落 beat 到统一时间线")
+ok(len(core["sedimented"]) == 1 and len(core["skipped"]) == 1, "commit_core 角色门控:cameo 客串被丢弃")
+ok("play" in LENS_TAGS and "companion" in LENS_TAGS and "cross" in LENS_TAGS, "透镜标签集为新门预留(companion/cross)")
+try:
+    commit_core(w, t, lens="not-a-lens", beat="x"); ok(False, "未知透镜标签应报错")
+except ValueError:
+    ok(True, "commit_core 拒绝闭合集外的透镜标签")
+
 # simulate 默认关 / render 未配休眠
 ok(lenses.simulate_prep(w, t).get("enabled") is False, "simulate 默认关")
 ok(lenses.render_prep(w, "主角立绘").get("enabled") is False, "render 未配 key 休眠")

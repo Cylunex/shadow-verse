@@ -16,6 +16,7 @@ import urllib.request
 from . import checks, config, craft, expressions, journal, jsonloose, llm, recipes, skills, util, worldbook
 from .config import SUMMARY_EVERY   # 静态默认(函数签名用)
 from .entity import LocalEntity
+from .lens import commit_core       # 统一写入口(落 beat + 门控沉淀 + 写回状态 + 标记透镜)
 from .thread import Thread
 from .world import World
 
@@ -124,28 +125,17 @@ def _split_chapter(raw: str) -> dict:
 def narrate_commit(world: World, thread: Thread, payload: dict) -> dict:
     no = thread.add_chapter(payload.get("chapter_text", ""), payload.get("title", ""))
     where = f"ch:{no:03d}"
-    sedimented, skipped = [], []
-    for s in payload.get("sediments", []) or []:
-        e = LocalEntity(world, s.get("entity"))
-        if not e.exists():
-            skipped.append({"entity": s.get("entity"), "why": "实体不存在"}); continue
-        ent = e.sediment(s.get("text", ""), level=s.get("level", "持久"), where=where, trace=s.get("trace", ""), tags=s.get("tags", []))
-        if ent is None:
-            skipped.append({"entity": e.id, "why": f"role={e.role} 不写回"})
-        else:
-            sedimented.append({"entity": e.id, "id": ent["id"], "level": ent["level"]})
-    for eid, upd in (payload.get("state_updates") or {}).items():
-        e = LocalEntity(world, eid)
-        if e.exists():
-            upd = dict(upd); upd["chapter"] = no; e.update_state(upd)
-    thread.add_beat(payload.get("beat", payload.get("title", f"第{no}章")), lens="narrate", where=where)
+    state_updates = {eid: {**upd, "chapter": no} for eid, upd in (payload.get("state_updates") or {}).items()}
+    core = commit_core(world, thread, lens="narrate", where=where,
+                       beat=payload.get("beat", payload.get("title", f"第{no}章")),
+                       sediments=payload.get("sediments", []) or [], state_updates=state_updates)
     if payload.get("summary"):
         thread.write_summary(payload["summary"])
     auto = checks.check_chapter(thread, no)   # 落章即自动质检(字数/去AI味/题材疲劳词)
     return {
         "chapter": no, "hanzi": auto["hanzi"],
         "hanzi_target": thread.meta().get("hanzi_target"),
-        "sedimented": sedimented, "skipped": skipped,
+        "sedimented": core["sedimented"], "skipped": core["skipped"],
         "summary_due": no % SUMMARY_EVERY == 0 and not payload.get("summary"),
         "auto_checks": auto["findings"],
     }
@@ -315,8 +305,8 @@ def play_commit(world: World, thread: Thread, payload: dict) -> dict:
     if candidates:
         md += ["", "## 成长苗头候选(待拍板,未写回)"] + [f"- [{c['entity']}] {c['text']}" for c in candidates]
     util.write_md(thread.sessions_dir / f"{sid}.md", "\n".join(md))
-    thread.add_beat(f"小剧场 {sid}:{payload.get('scene','')}", lens="play", where=f"play:{sid}")
-    thread.mark_lens("play")
+    commit_core(world, thread, lens="play", where=f"play:{sid}",
+                beat=f"小剧场 {sid}:{payload.get('scene','')}", mark=True)   # 时间线写入走统一入口
     return {"session": sid, "written_back": written, "candidates": candidates, "skipped": skipped}
 
 
