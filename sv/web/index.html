@@ -35,18 +35,24 @@ code{background:#ffffff10;border-radius:5px;padding:1px 6px;font-size:12.5px;col
 
 /* ---------- top bar ---------- */
 .topbar{
-  position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:6px;
-  padding:0 22px;height:58px;
+  position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:8px;
+  padding:0 28px;height:62px;
   background:#0a0a14cc;backdrop-filter:blur(14px);border-bottom:1px solid var(--line-soft);
 }
-.brand{display:flex;align-items:baseline;gap:9px;margin-right:18px;user-select:none;cursor:pointer}
+.brand{display:flex;align-items:baseline;gap:9px;margin-right:26px;user-select:none;cursor:pointer}
 .brand .logo{font-size:19px;font-weight:800;letter-spacing:.5px;
   background:linear-gradient(92deg,var(--violet),var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
 .brand .en{font-size:10px;letter-spacing:3px;color:var(--faint);text-transform:uppercase}
-.nav{display:flex;gap:2px}
-.nav a{display:flex;align-items:center;gap:6px;padding:7px 11px;border-radius:10px;color:var(--dim);font-size:14px;transition:.15s;white-space:nowrap}
-.nav a:hover{background:#ffffff0a;color:var(--ink)}
-.nav a.on{color:var(--ink);background:linear-gradient(180deg,#ffffff12,#ffffff06);box-shadow:inset 0 0 0 1px var(--line)}
+.nav{display:flex;gap:6px;align-items:center}
+.nav a,.navdrop>.dt{display:flex;align-items:center;gap:7px;padding:9px 15px;border-radius:11px;color:var(--dim);font-size:14.5px;transition:.15s;white-space:nowrap;cursor:pointer}
+.nav a:hover,.navdrop:hover>.dt{background:#ffffff0a;color:var(--ink)}
+.nav a.on,.navdrop.on>.dt{color:var(--ink);background:linear-gradient(180deg,#ffffff12,#ffffff06);box-shadow:inset 0 0 0 1px var(--line)}
+.navdrop{position:relative}
+.navmenu{display:none;position:absolute;top:100%;left:0;margin-top:8px;background:var(--surface2);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;min-width:154px;z-index:40}
+.navdrop:hover .navmenu{display:block}
+.navmenu a{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;color:var(--dim);font-size:14px}
+.navmenu a:hover{background:#ffffff0a;color:var(--ink)}
+.navmenu a.on{color:var(--violet)}
 .spacer{flex:1}
 .iconbtn{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;color:var(--dim);background:transparent;border:none;transition:.15s}
 .iconbtn:hover{background:#ffffff0d;color:var(--ink)}
@@ -394,7 +400,10 @@ iframe.hud{padding:0}
 .kb-stage{display:none;align-items:flex-end;gap:12px}
 .kb-stage.on{display:flex;animation:fade .25s}
 .kb-opts{display:flex;flex-direction:column;align-items:flex-end;gap:9px;margin-bottom:26px}
-.kb-say{max-width:230px;background:var(--surface2);border:1px solid var(--line);border-radius:14px;border-bottom-right-radius:4px;padding:10px 13px;font-size:12.5px;color:var(--dim);line-height:1.65;box-shadow:var(--shadow);margin-bottom:3px}
+.kb-name{display:flex;align-items:baseline;justify-content:flex-end;gap:7px;margin-bottom:3px}
+.kb-name b{font-size:13.5px;color:var(--violet);font-weight:700;letter-spacing:.5px}
+.kb-name span{font-size:10.5px;color:var(--faint)}
+.kb-say{max-width:236px;background:var(--surface2);border:1px solid var(--line);border-radius:14px;border-bottom-right-radius:4px;padding:11px 14px;font-size:13px;color:var(--dim);line-height:1.7;box-shadow:var(--shadow);margin-bottom:8px}
 .kb-say b{color:var(--ink)}
 .kb-opt{display:inline-flex;align-items:center;gap:8px;background:#15131fe6;backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:22px;padding:9px 16px;font-size:13px;color:var(--dim);cursor:pointer;box-shadow:var(--shadow);transition:.14s;white-space:nowrap}
 .kb-opt:hover{border-color:var(--violet);color:var(--ink);transform:translateX(-4px)}
@@ -487,11 +496,12 @@ iframe.hud{padding:0}
   <div class="kb-stage" id="kbstage">
     <div class="kb-opts">
       <div class="kb-console" id="kbconsole">⌬ —</div>
+      <div class="kb-name"><b>星瞳</b><span>向导 · 看板娘</span></div>
       <div class="kb-say" id="kbsay">在的。<b>要做点什么？</b></div>
-      <div class="kb-opt" onclick="location.hash='#/works'">🎴 逛作品库</div>
-      <div class="kb-opt" onclick="location.hash='#/chat'">💬 继续对话</div>
-      <div class="kb-opt" onclick="location.hash='#/companion'">💗 去陪伴</div>
-      <div class="kb-opt" onclick="actNewWorld()">✨ 造个新世界</div>
+      <div class="kb-opt" onclick="kbGo('works','那我带你去看看世界们')">🎴 逛作品库</div>
+      <div class="kb-opt" onclick="kbGo('chat','嗯，去听她说话')">💬 继续对话</div>
+      <div class="kb-opt" onclick="kbGo('companion','她一直在等你呢')">💗 去陪伴</div>
+      <div class="kb-opt" onclick="kbSay('新世界…我帮你起个头');actNewWorld()">✨ 造个新世界</div>
     </div>
     <div class="kb-figure">
       <button class="kb-close" id="kbclose">✕</button>
@@ -618,13 +628,16 @@ const NAV=[
   {fam:'chars',label:'角色',icon:'👤',href:'#/chars'},
 ];
 function renderNav(active){
-  let h=NAV.map(n=>`<a href="${n.href}" data-fam="${n.fam}" class="${active===n.fam?'on':''}">${n.icon} <span class="lbl">${n.label}</span></a>`).join('');
+  const main=NAV.map(n=>`<a href="${n.href}" data-fam="${n.fam}" class="${active===n.fam?'on':''}">${n.icon} <span class="lbl">${n.label}</span></a>`).join('');
   const resOn=['worldbook','assets','presets'].includes(active);
-  h+=`<a href="#/worldbook" data-fam="worldbook" class="${active==='worldbook'?'on':''}">📜 <span class="lbl">世界书</span></a>`;
-  h+=`<a href="#/assets" data-fam="assets" class="${active==='assets'?'on':''}">🧩 <span class="lbl">素材</span></a>`;
-  h+=`<a href="#/presets" data-fam="presets" class="${active==='presets'?'on':''}">🎚 <span class="lbl">预设</span></a>`;
-  h+=`<a href="#/settings" data-fam="settings" class="${active==='settings'?'on':''}">⚙ <span class="lbl">设置</span></a>`;
-  el('nav').innerHTML=h;
+  const drop=`<div class="navdrop ${resOn?'on':''}"><span class="dt">🗂 <span class="lbl">资源</span> <span style="font-size:10px;opacity:.7">▾</span></span>
+    <div class="navmenu">
+      <a href="#/worldbook" class="${active==='worldbook'?'on':''}">📜 世界书</a>
+      <a href="#/assets" class="${active==='assets'?'on':''}">🧩 素材</a>
+      <a href="#/presets" class="${active==='presets'?'on':''}">🎚 预设</a>
+    </div></div>`;
+  const settings=`<a href="#/settings" data-fam="settings" class="${active==='settings'?'on':''}">⚙ <span class="lbl">设置</span></a>`;
+  el('nav').innerHTML=main+drop+settings;
   const ok=OV.llm&&OV.llm.available;const pill=el('llmpill');
   pill.className='llmpill '+(ok?'ok':'no');pill.textContent=ok?('LLM ✓ '+(OV.llm.provider||'')):'LLM 未配';
   pill.style.cursor='pointer';pill.onclick=()=>location.hash='#/settings';
@@ -1434,8 +1447,20 @@ function openFarewell(wid,eid){ /* reserved for direct link */ route(); }
 function updateConsole(){const box=el('kbconsole');if(!box)return;
   if(CHAT&&location.hash.startsWith('#/chat')){const tok=CHAT.tok||0;box.textContent=`⌬ ≈${tok>=1000?(tok/1000).toFixed(1)+'k':tok} tok · ${CHAT.name||''}`;}
   else box.textContent=`⌬ ${OV.worlds.length} 世界 · ${OV.nexus.entities.length} 跨世界`;}
+function kbSay(html){const s=el('kbsay');if(s)s.innerHTML=html;}
+function kbLine(){          // 星瞳:看时段 + 看你在哪一页,说一句应景的话
+  let h=12;try{h=new Date().getHours();}catch(e){}
+  const greet=h<5?'夜深了':h<11?'早安':h<13?'午安':h<18?'下午好':h<23?'晚上好':'夜深了';
+  const fam=(location.hash.slice(1).split('/').filter(Boolean)[0])||'works';
+  const byPage={chat:'在听呢。<b>想让谁开口？</b>',companion:'她一直在的。<b>去陪陪她？</b>',
+    novel:'笔还搁着。<b>续写哪一章？</b>',works:'想进哪个世界？<b>我带你去。</b>',
+    chars:'这些住在你世界里的人，<b>想见见谁？</b>',worldbook:'设定我都替你记着。<b>要翻哪条？</b>',
+    assets:'素材都在架上呢。',presets:'文风的旋钮在这儿。',settings:'要调点什么？'};
+  return `${greet}。${byPage[fam]||'<b>要做点什么？</b>'}`;
+}
+function kbGo(fam,line){kbSay(line);setTimeout(()=>{location.hash='#/'+fam;const st=el('kbstage'),mn=el('kbmini');if(st)st.classList.remove('on');if(mn)mn.style.display='';},420);}
 (function(){const mini=el('kbmini'),stage=el('kbstage'),close=el('kbclose');
-  mini.onclick=()=>{stage.classList.add('on');mini.style.display='none';updateConsole();};
+  mini.onclick=()=>{stage.classList.add('on');mini.style.display='none';kbSay(kbLine());updateConsole();};
   close.onclick=()=>{stage.classList.remove('on');mini.style.display='';};})();
 
 /* ===================== boot ===================== */
