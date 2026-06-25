@@ -43,14 +43,17 @@ code{background:#ffffff10;border-radius:5px;padding:1px 6px;font-size:12.5px;col
 .brand .logo{font-size:19px;font-weight:800;letter-spacing:.5px;
   background:linear-gradient(92deg,var(--violet),var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
 .brand .en{font-size:10px;letter-spacing:3px;color:var(--faint);text-transform:uppercase}
-.nav{display:flex;gap:6px;align-items:center}
-.nav a,.navdrop>.dt{display:flex;align-items:center;gap:7px;padding:9px 15px;border-radius:11px;color:var(--dim);font-size:14.5px;transition:.15s;white-space:nowrap;cursor:pointer}
-.nav a:hover,.navdrop:hover>.dt{background:#ffffff0a;color:var(--ink)}
+.nav{flex:1;display:flex;gap:8px;align-items:stretch}
+.nav>a,.nav>.navdrop{flex:1}
+.nav a,.navdrop>.dt{display:flex;align-items:center;justify-content:center;gap:7px;height:40px;padding:0 10px;border-radius:11px;color:var(--dim);font-size:14.5px;transition:.15s;white-space:nowrap;cursor:pointer}
+.nav a:hover,.navdrop:hover>.dt,.navdrop.open>.dt{background:#ffffff0a;color:var(--ink)}
 .nav a.on,.navdrop.on>.dt{color:var(--ink);background:linear-gradient(180deg,#ffffff12,#ffffff06);box-shadow:inset 0 0 0 1px var(--line)}
 .navdrop{position:relative}
-.navmenu{display:none;position:absolute;top:100%;left:0;margin-top:8px;background:var(--surface2);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;min-width:154px;z-index:40}
-.navdrop:hover .navmenu{display:block}
-.navmenu a{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;color:var(--dim);font-size:14px}
+/* 菜单与触发器紧贴(top:100%,无 margin 间隙)——否则鼠标移向菜单时会先离开 :hover 区导致点不到 */
+.navmenu{display:none;position:absolute;top:100%;left:0;right:0;padding-top:6px;z-index:40}
+.navmenu>.inner{background:var(--surface2);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;min-width:150px}
+.navdrop:hover .navmenu,.navdrop.open .navmenu{display:block}
+.navmenu a{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;color:var(--dim);font-size:14px}
 .navmenu a:hover{background:#ffffff0a;color:var(--ink)}
 .navmenu a.on{color:var(--violet)}
 .spacer{flex:1}
@@ -480,7 +483,6 @@ iframe.hud{padding:0}
 <div class="topbar">
   <div class="brand" onclick="location.hash='#/works'"><span class="logo">暗宇宙</span><span class="en">ShadowVerse</span></div>
   <nav class="nav" id="nav"></nav>
-  <div class="spacer"></div>
   <span class="llmpill" id="llmpill">LLM …</span>
   <a class="iconbtn" title="旧版创作者控制台" href="/legacy" target="_blank">🛠</a>
 </div>
@@ -630,12 +632,12 @@ const NAV=[
 function renderNav(active){
   const main=NAV.map(n=>`<a href="${n.href}" data-fam="${n.fam}" class="${active===n.fam?'on':''}">${n.icon} <span class="lbl">${n.label}</span></a>`).join('');
   const resOn=['worldbook','assets','presets'].includes(active);
-  const drop=`<div class="navdrop ${resOn?'on':''}"><span class="dt">🗂 <span class="lbl">资源</span> <span style="font-size:10px;opacity:.7">▾</span></span>
-    <div class="navmenu">
+  const drop=`<div class="navdrop ${resOn?'on':''}"><span class="dt" onclick="this.closest('.navdrop').classList.toggle('open')">🗂 <span class="lbl">资源</span> <span style="font-size:10px;opacity:.7">▾</span></span>
+    <div class="navmenu"><div class="inner">
       <a href="#/worldbook" class="${active==='worldbook'?'on':''}">📜 世界书</a>
       <a href="#/assets" class="${active==='assets'?'on':''}">🧩 素材</a>
       <a href="#/presets" class="${active==='presets'?'on':''}">🎚 预设</a>
-    </div></div>`;
+    </div></div></div>`;
   const settings=`<a href="#/settings" data-fam="settings" class="${active==='settings'?'on':''}">⚙ <span class="lbl">设置</span></a>`;
   el('nav').innerHTML=main+drop+settings;
   const ok=OV.llm&&OV.llm.available;const pill=el('llmpill');
@@ -1464,6 +1466,7 @@ function kbGo(fam,line){kbSay(line);setTimeout(()=>{location.hash='#/'+fam;const
   close.onclick=()=>{stage.classList.remove('on');mini.style.display='';};})();
 
 /* ===================== boot ===================== */
+document.addEventListener('click',e=>{if(!e.target.closest('.navdrop'))document.querySelectorAll('.navdrop.open').forEach(d=>d.classList.remove('open'));});
 window.addEventListener('hashchange',async()=>{await route();
   // companion → chat handoff
   if(window._pendingMsg&&CHAT&&CHAT.send){const m=window._pendingMsg;window._pendingMsg=null;setTimeout(()=>CHAT.send(m),120);}
