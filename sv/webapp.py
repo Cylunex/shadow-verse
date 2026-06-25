@@ -576,6 +576,63 @@ def post_worldbook_delete(b: dict) -> dict:
     return {"ok": True, "removed": before - len(data["entries"]), "entries": data["entries"]}
 
 
+# ---- 记忆溯源(把"这句话从哪来"摊开:命中的世界书条目 + 检索到的记忆 + 起作用锚点)----
+def api_trace(q: dict) -> dict:
+    """只读重算:据一段上下文,显示哪些世界书条目会命中、检索召回哪些记忆、哪些锚点常驻。
+    纯关键词/加权,不调模型;给创作者把看不见的机器摊开(REDESIGN §六)。"""
+    from . import worldbook as wb
+    w = World.load(q["world"]); e = LocalEntity.load(w, q["entity"])
+    buf = q.get("q", "") or ""
+    fired = [{"name": x.get("name", ""), "keys": x.get("keys", []), "constant": bool(x.get("constant"))}
+             for x in wb.load(w).get("entries", [])
+             if x.get("enabled", True) and (x.get("constant") or wb.entry_matches(x, buf))]
+    mem = [{"text": m.get("text", ""), "where": m.get("where", ""), "level": m.get("level", ""),
+            "score": round(float(m.get("score", 0)), 3) if m.get("score") is not None else None}
+           for m in memory.retrieve(e.dir, buf)] if buf.strip() else []
+    return {"worldbook": fired, "memory": mem, "anchors": e.anchors()}
+
+
+# ---- 关系攻略板:给一个角色落上 galgame 关系数值卡(幂等)----
+def post_apply_relationship(b: dict) -> dict:
+    from . import attrs
+    w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
+    st = attrs.apply_panel(e, player_name=b.get("player", "你"))
+    return {"ok": True, "vars": st.get("data", {})}
+
+
+# ---- 质检(确定性,0 token):全书纵向基线 ----
+def post_checks(b: dict) -> dict:
+    from . import checks
+    w = World.load(b["world"]); t = Thread.load(w, b["thread"])
+    return {"ok": True, **checks.check_book(t, last_n=b.get("last") or None)}
+
+
+# ---- 一稿多吃(convert):chat→小说 / 章→CYOA / beats→剧本… ----
+def post_convert(b: dict) -> dict:
+    from . import convert
+    w = World.load(b["world"]); to = b.get("to", "novel")
+    if b.get("entity"):
+        pack = convert.chat_to(w, LocalEntity.load(w, b["entity"]), to)
+    elif b.get("chapter"):
+        pack = convert.chapter_to(w, Thread.load(w, b["thread"]), int(b["chapter"]), to)
+    else:
+        pack = convert.beats_to(w, Thread.load(w, b["thread"]), to)
+    return {"ok": True, "pack": pack, **(convert.run(pack) if b.get("run") else {})}
+
+
+# ---- 线分支 · 蝴蝶效应 ----
+def api_branches(wid: str, tid: str) -> dict:
+    from . import branch
+    return {"branches": branch.list_branches(Thread.load(World.load(wid), tid))}
+
+
+def post_branch(b: dict) -> dict:
+    from . import branch
+    w = World.load(b["world"]); t = Thread.load(w, b["thread"])
+    br = branch.Branch.create(t, int(b["from_chapter"]), name=b.get("name", "") or "", divergence=b.get("divergence", "") or "")
+    return {"ok": True, "branch": br.meta()}
+
+
 # ---- AIGC 生成(返回正文供人审后再 create/commit;需配 SV_PROVIDER)----
 def post_gen_world(b: dict) -> dict:
     return {"body": forge.generate_world_body(b.get("prompt", ""), genre=b.get("genre", ""),
@@ -623,6 +680,8 @@ GET_ROUTES = [
     (re.compile(r"^/api/nexus/([\w-]+)$"), lambda m, q: api_nexus_entity(m.group(1))),
     (re.compile(r"^/api/soul/([\w-]+)$"), lambda m, q: api_soul(m.group(1))),
     (re.compile(r"^/api/worldbook/([\w-]+)$"), lambda m, q: api_worldbook(m.group(1))),
+    (re.compile(r"^/api/trace$"), lambda m, q: api_trace(q)),
+    (re.compile(r"^/api/branches/([\w-]+)/([\w-]+)$"), lambda m, q: api_branches(m.group(1), m.group(2))),
     (re.compile(r"^/api/codex$"), lambda m, q: api_codex()),
     (re.compile(r"^/api/export/thread/([\w-]+)/([\w-]+)$"), lambda m, q: api_export_thread(m.group(1), m.group(2))),
     (re.compile(r"^/api/config$"), lambda m, q: api_config()),
@@ -697,6 +756,10 @@ POST_ROUTES = [
     (re.compile(r"^/api/quick-replies$"), post_quick_replies),
     (re.compile(r"^/api/worldbook/save$"), post_worldbook_save),
     (re.compile(r"^/api/worldbook/delete$"), post_worldbook_delete),
+    (re.compile(r"^/api/apply-relationship$"), post_apply_relationship),
+    (re.compile(r"^/api/checks$"), post_checks),
+    (re.compile(r"^/api/convert$"), post_convert),
+    (re.compile(r"^/api/branch$"), post_branch),
 ]
 
 

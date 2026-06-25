@@ -803,17 +803,30 @@ function bubbleHtml(role,text,floor){
   if(role==='char'){
     const m=String(text).match(/```html\s*([\s\S]*?)```/i);
     const ctrl=_msgctrl(floor);
-    const trace=(floor!=null&&floor>=0)?`<div class="trace" id="trace${floor}">${traceBody()}</div>`:'';
+    const trace=(floor!=null&&floor>=0)?`<div class="trace" id="trace${floor}"></div>`:'';
     if(m){const prose=esc(String(text).replace(m[0],'').trim());
       return `<div class="brow char msg">${_avHtml()}<div class="bcol"><div class="bubble char">${prose?prose+'<br>':''}${_hudIframe(m[1])}</div>${ctrl}${trace}</div></div>`;}
     return `<div class="brow char msg">${_avHtml()}<div class="bcol"><div class="bubble char">${esc(text)}</div>${ctrl}${trace}</div></div>`;
   }
   return `<div class="brow user"><div class="bubble user">${esc(text)}</div></div>`;}
-function traceBody(){const an=(CHAT&&CHAT.anchors)||[];
-  return `<div class="tt">⌖ 这句话从哪来</div>
-    <div class="tr"><span class="tk">起作用锚点</span><span>${an.length?an.map(a=>`<span class="tag2">${esc(a)}</span>`).join(''):'（暂无锚点）'}</span></div>
-    <div class="tr"><span class="tk">说明</span><span style="color:var(--faint)">世界书触发明细与记忆检索权重，引擎已记录，尚未在此接口暴露。</span></div>`;}
-function traceToggle(f){const t=el('trace'+f);if(t)t.classList.toggle('on');}
+function renderTrace(d){
+  const wb=(d.worldbook||[]).map(x=>`<span class="tag2">${esc(x.name||(x.keys&&x.keys[0])||'条目')}${x.constant?' · 常驻':''}</span>`).join('')||'<span style="color:var(--faint)">无命中</span>';
+  const mem=(d.memory||[]).map(m=>`<div style="margin:2px 0">· ${esc(m.text)} <span style="color:var(--faint)">(${esc(m.where||m.level||'')})</span></div>`).join('')||'<span style="color:var(--faint)">无</span>';
+  const an=(d.anchors||[]).map(a=>`<span class="tag2">${esc(a)}</span>`).join('')||'<span style="color:var(--faint)">无</span>';
+  return `<div class="tt">⌖ 这句话从哪来 · 把看不见的机器摊开</div>
+    <div class="tr"><span class="tk">触发世界书</span><span>${wb}</span></div>
+    <div class="tr"><span class="tk">检索记忆</span><span>${mem}</span></div>
+    <div class="tr"><span class="tk">起作用锚点</span><span>${an}</span></div>`;}
+async function traceToggle(f){const t=el('trace'+f);if(!t||!CHAT)return;
+  const open=t.classList.toggle('on');
+  if(!open||t.dataset.loaded)return;
+  t.dataset.loaded='1';
+  // 取本楼之前最近的一条「你」的话作为检索上下文
+  let q='',prev=(t.closest('.brow')||{}).previousElementSibling;
+  while(prev){if(prev.classList&&prev.classList.contains('user')){q=(prev.querySelector('.bubble')||{}).textContent||'';break;}prev=prev.previousElementSibling;}
+  t.innerHTML=`<div class="tt">⌖ 这句话从哪来</div><div class="tr" style="color:var(--faint)">载入中…</div>`;
+  try{const d=await api('/trace?world='+encodeURIComponent(CHAT.wid)+'&entity='+encodeURIComponent(CHAT.eid)+'&q='+encodeURIComponent(q));t.innerHTML=renderTrace(d);}
+  catch(e){t.dataset.loaded='';t.innerHTML=`<div class="tt">⌖ 这句话从哪来</div><div class="tr">✗ ${esc(e.message)}</div>`;}}
 function _addBubble(role,text){const box=el('chatbox');const w=document.createElement('div');
   w.innerHTML=bubbleHtml(role,text);const row=w.firstElementChild;box.appendChild(row);
   scrollChat();return row.querySelector('.bubble');}
@@ -1097,7 +1110,8 @@ async function viewCompanion(wid,eid){
     const bars=(chat.var_view||[]).filter(x=>x.vis==='bar'&&typeof x.value==='number');
     relHtml=bars.length?`<div class="rel" style="margin-top:16px">`+bars.map(x=>{const mn=x.min!=null?x.min:0,mx=x.max!=null?x.max:100;const pct=Math.max(0,Math.min(100,(x.value-mn)/((mx-mn)||1)*100));
       return `<div class="relrow"><div class="rt"><span class="rn">${esc(x.label||x.name)}</span><span class="rv">${x.value}</span></div><div class="reltrack"><div class="rf" style="width:${pct}%;background:${x.color||'var(--violet)'}"></div></div></div>`;}).join('')+`</div>`
-      :'<p class="note">还没有关系数值。在对话里推几轮，或用「🎲AI建卡」生成一张攻略板（含好感/心动/信任/心防…）。</p>';
+      :`<p class="note" style="margin:0 0 12px">还没有关系数值。建立一张 galgame 式攻略板（好感/心动/信任/心防/亲密…9 轴 + 阶段/称呼/里程碑），对话里就会随剧情推进。</p>
+        <button class="btn ghost sm" onclick="actApplyRel('${jsq(wid)}','${jsq(eid)}')">＋ 建立关系攻略板</button>`;
   }
   // milestones from experiences (身份级标★)
   const exps=ent.experiences||[];
@@ -1118,6 +1132,10 @@ async function viewCompanion(wid,eid){
           <div class="line"><i>◷</i> 此刻：${esc(st.location||'—')}</div>
           <div class="line"><i>♡</i> 心情：${esc(st.mood||'—')}</div>
           <div class="line"><i>✎</i> 目标：${esc(st.goal||'—')}</div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn ghost sm" style="flex:1;justify-content:center" onclick="actAvatar('${jsq(wid)}','${jsq(eid)}')">🖼 头像</button>
+            <button class="btn ghost sm" style="flex:1;justify-content:center" onclick="actRenderEntity('${jsq(wid)}','${jsq(eid)}')">🎭 立绘</button>
+          </div>
         </div>
       </div>
       <div class="compmain">
@@ -1135,6 +1153,17 @@ async function viewCompanion(wid,eid){
       </div>
     </div></div>`;
 }
+async function actApplyRel(wid,eid){try{await post('/apply-relationship',{world:wid,entity:eid});toast('✓ 已建立关系攻略板，对话里会随剧情推进');route();}catch(e){toast('✗ '+e.message,true)}}
+async function actRenderEntity(wid,eid){toast('生成立绘中…（需配出图后端）');
+  try{const r=await post('/render/entity',{world:wid,entity:eid});
+    if(r&&(r.enabled===false||r.error)){toast(r.note||r.error||'未配出图后端 —— 设置 › 渲染',true);return;}
+    toast('✓ 立绘已生成');route();}catch(e){toast('✗ '+e.message,true)}}
+function actAvatar(wid,eid){const inp=document.createElement('input');inp.type='file';inp.accept='image/*';
+  inp.onchange=async()=>{const f=inp.files&&inp.files[0];if(!f)return;
+    const bytes=new Uint8Array(await f.arrayBuffer());let bin='';for(let i=0;i<bytes.length;i++)bin+=String.fromCharCode(bytes[i]);
+    const ext=(f.name.split('.').pop()||'png').toLowerCase();
+    try{await post('/entity/avatar',{world:wid,entity:eid,img_b64:btoa(bin),ext});toast('✓ 头像已上传');route();}catch(e){toast('✗ '+e.message,true)}};
+  inp.click();}
 function compSend(wid,eid){const t=el('compmsg');if(!t||!t.value.trim())return;const msg=t.value.trim();
   location.hash='#/chat/'+wid+'/'+eid;
   // hand off the message to chat once it loads
@@ -1150,7 +1179,8 @@ async function viewNovel(wid,tid){
     <p class="empty">《${esc(wd.meta.name)}》还没有世界线/书。<a style="color:var(--violet)" href="/legacy" target="_blank">去控制台新建一条 ›</a></p></div>`;return;}
   if(!tid)tid=wd.threads[0].id;
   let d;try{d=await api('/thread/'+wid+'/'+tid);}catch(e){app().innerHTML=`<div class="wrap"><div class="empty">${esc(e.message)}</div></div>`;return;}
-  window._chs=d.chapters;window._novel={wid,tid};
+  window._chs=d.chapters;window._novel={wid,tid,chNo:(d.chapters[0]||{}).no||1};
+  const branches=await api('/branches/'+wid+'/'+tid).then(r=>r.branches||[]).catch(()=>[]);
   const otherWorlds=OV.worlds.filter(w=>w.id!==wid&&w.threads>0);
   const chSel=d.chapters.map((c,i)=>`<div class="nv-ch ${i===0?'on':''}" data-ch="${i}" onclick="showCh(${i})">第${c.no}章${c.title?' · '+esc(c.title):''} <span class="w">${c.hanzi}字</span></div>`).join('');
   const threadSel=wd.threads.map(t=>`<div class="nv-ch ${t.id===tid?'on':''}" onclick="location.hash='#/novel/${wid}/${t.id}'">${esc(t.title)} <span class="w">${t.chapters}章</span></div>`).join('');
@@ -1163,6 +1193,8 @@ async function viewNovel(wid,tid){
     <div class="nv-side">
       <div class="grp">${esc(wd.meta.name)} · 世界线</div>${threadSel}
       <div class="grp" style="margin-top:18px">${esc(d.meta.title)} · 目录</div>${chSel||'<p class="note">还没有章节</p>'}
+      <div class="grp" style="margin-top:18px">分支 · 蝴蝶效应 <a style="color:var(--violet);cursor:pointer;float:right;font-weight:400" onclick="actBranch()">＋</a></div>
+      ${branches.length?branches.map(b=>`<div class="nv-ch" title="${esc(b.divergence||'')}">⑂ ${esc(b.name||b.id)} <span class="w">第${b.from_chapter}章</span></div>`).join(''):'<p class="note" style="margin:4px 6px">还没有分支。从某章分叉出一条平行线（蝴蝶效应）。</p>'}
       ${otherWorlds.length?`<div class="grp" style="margin-top:18px">其他作品</div>${otherWorlds.map(w=>`<div class="nv-ch" onclick="location.hash='#/novel/${w.id}'">${esc(w.name)}</div>`).join('')}`:''}
     </div>
     <div class="nv-read"><div class="reader2" id="reader">
@@ -1173,8 +1205,8 @@ async function viewNovel(wid,tid){
       <div class="metarow"><span>章数</span><b>${d.meta.chapter_count||d.chapters.length}</b></div>
       <div class="metarow"><span>字数</span><b>${d.chapters.reduce((a,c)=>a+c.hanzi,0)}</b></div>
       <h3>产线 · 写→审→改→落</h3>
-      <div class="pipe"><span class="step" onclick="actWriteChapter()">✍ 写一章</span><span class="step" onclick="actNarrateRun()">✨ AI产线</span><span class="step" onclick="actReflect()">🧠 反思</span><span class="step" onclick="actExport()">⤓ 导出</span></div>
-      <p class="note">「AI产线」自动写→质检→修订；「反思」校验全局自洽。</p>
+      <div class="pipe"><span class="step" onclick="actWriteChapter()">✍ 写一章</span><span class="step" onclick="actNarrateRun()">✨ AI产线</span><span class="step" onclick="actExport()">⤓ 导出</span></div>
+      <p class="note">「AI产线」自动写→质检→修订。</p>
       <h3>钩子台账</h3>
       ${alpha?`<div class="hook"><span class="hdot alpha"></span>α 悬念：${esc(alpha)}</div>`:''}
       ${hookHtml||'<p class="note">还没有钩子。</p>'}
@@ -1182,13 +1214,17 @@ async function viewNovel(wid,tid){
       ${(d.entities||[]).map(e=>`<div class="metarow"><span>${esc(e.name)}</span><b>${esc(e.role||'')}</b></div>`).join('')||'<p class="note">—</p>'}
       <h3>跨透镜事件（beats）</h3>
       ${beats.length?`<div class="timeline">${beats.slice(-6).map(b=>`<div class="ev"><div class="w">${esc(b.where||'')} · ${esc(b.lens||'')}</div>${esc((b.text||'').slice(0,90))}</div>`).join('')}</div>`:'<p class="note">RP / 玩一场会在这里落事件。</p>'}
+      <h3>质检 · 反思</h3>
+      <div class="pipe"><span class="step" onclick="actChecks()">✓ 全书质检</span><span class="step" onclick="actReflect()">🧠 反思自洽</span></div>
+      <div id="qaout" class="note" style="margin-top:8px"></div>
       <h3>一稿多吃</h3>
-      <div class="pipe"><span class="step">→ CYOA</span><span class="step">→ 剧本</span><span class="step">→ 漫画</span><span class="step">→ 跑团</span></div>
-      <p class="note">同一条 beats 线可一键转换（CLI <code>convert</code>）。</p>
+      <div class="pipe"><span class="step" onclick="actConvert('cyoa')">→ CYOA</span><span class="step" onclick="actConvert('screenplay')">→ 剧本</span><span class="step" onclick="actConvert('comic')">→ 漫画</span><span class="step" onclick="actConvert('tabletop')">→ 跑团</span></div>
+      <p class="note">把当前章 / 事件线转成另一种镜头（走 convert：配 LLM 一键生成，否则给"转换包"交宿主模型改写）。</p>
     </div></div>`;
   if(d.chapters.length)showCh(0);else el('reader').innerHTML='<div class="empty">还没有章节 —— 点右侧「✍ 写一章」或「✨ AI产线」。</div>';
 }
 function showCh(i){const c=window._chs[i];if(!c)return;
+  if(window._novel)window._novel.chNo=c.no;
   document.querySelectorAll('.nv-side .nv-ch[data-ch]').forEach(n=>n.classList.toggle('on',+n.dataset.ch===i));
   el('reader').innerHTML=`<div class="ch-t">第 ${c.no} 章</div><h2>${esc(c.title||'')}</h2>
     <div class="prose">${md(c.text)}</div>
@@ -1208,9 +1244,37 @@ async function actNarrateRun(){if(!window._novel)return;const {wid,tid}=window._
     closeModal();toast('AI 产线运行中（写→质检→修订）…');
     try{await post('/narrate/run',{world:wid,thread:tid,intent:v.intent||''});toast('✓ 新章已落');route();}catch(e){toast('✗ '+e.message,true)}});}
 async function actWriteChapter(){window.open('/legacy','_blank');toast('手写章节请在控制台（写作包→回填）');}
+function _qa(html){const o=el('qaout');if(o)o.innerHTML=html;}
+async function actChecks(){if(!window._novel)return;const {wid,tid}=window._novel;_qa('<span style="color:var(--faint)">全书质检中…（确定性，0 token）</span>');
+  try{const r=await post('/checks',{world:wid,thread:tid});const f=r.findings||[];
+    _qa(`<b style="color:var(--ink)">✓ 全书质检（${r.chapters||0} 章）</b><br>`+(f.length?f.map(x=>'· '+esc(x)).join('<br>'):'<span style="color:var(--good)">未见基线问题</span>'));}
+  catch(e){_qa('✗ '+esc(e.message));}}
 async function actReflect(){if(!window._novel)return;const {wid,tid}=window._novel;
-  if(!(OV.llm&&OV.llm.available)){toast('需先配 LLM',true);return;}
-  toast('反思校验中…');try{const r=await post('/narrate/reflect',{world:wid,thread:tid,last:5});toast('✓ 反思完成');console.log(r);}catch(e){toast('✗ '+e.message,true)}}
+  if(!(OV.llm&&OV.llm.available)){_qa('<span style="color:var(--gold)">反思自洽需配 LLM（确定性质检可直接用「全书质检」）。</span>');return;}
+  _qa('<span style="color:var(--faint)">反思校验中…</span>');
+  try{const r=await post('/narrate/reflect',{world:wid,thread:tid,last:5});
+    const f=r.findings||r.issues||[];_qa('<b style="color:var(--ink)">🧠 反思</b><br>'+(Array.isArray(f)&&f.length?f.map(x=>'· '+esc(typeof x==='string'?x:JSON.stringify(x))).join('<br>'):esc(JSON.stringify(r)).slice(0,600)));}
+  catch(e){_qa('✗ '+esc(e.message));}}
+async function actConvert(to){if(!window._novel)return;const {wid,tid,chNo}=window._novel;
+  const beatsBased=(to==='screenplay'||to==='tabletop');
+  const body={world:wid,thread:tid,to,run:!!(OV.llm&&OV.llm.available)};
+  if(!beatsBased)body.chapter=chNo||1;
+  _qa('<span style="color:var(--faint)">转换中…</span>');
+  try{const r=await post('/convert',body);_qa('');const pack=r.pack||{};
+    const tname=(pack.target&&pack.target.name)||to;
+    const result=r.output||(r.available===false?'':r.note||'');
+    openModal(`<h3>一稿多吃 → ${esc(tname)}</h3>
+      <p class="note" style="margin-top:0">源：${esc(pack.from||'')}${pack.title?' · '+esc(pack.title):''}</p>
+      ${result?`<div class="packet" style="max-height:52vh;overflow:auto;white-space:pre-wrap">${esc(result)}</div>`
+        :`<p class="note">未配 LLM —— 这是「转换包」，可整段交给宿主模型改写：</p><div class="packet" style="max-height:46vh;overflow:auto;white-space:pre-wrap">${esc((pack.guide||'')+'\n\n— 源材料 —\n'+(pack.material||'').slice(0,1400))}</div>`}
+      <div class="modal-actions"><button class="btn" onclick="closeModal()">好</button></div>`);}
+  catch(e){_qa('✗ '+esc(e.message));}}
+async function actBranch(){if(!window._novel)return;const {wid,tid}=window._novel;
+  formModal('从某章分叉一条平行线（蝴蝶效应）',[
+    {n:'from_chapter',label:'从第几章分叉',value:String(window._novel.chNo||1)},
+    {n:'name',label:'分支名',ph:'如 若苏栀先出手'},
+    {n:'divergence',label:'这一支哪里不同',type:'textarea',rows:2,ph:'第一层不靠悖论，直接强闯'},
+  ],'分叉 ⑂',async v=>{await post('/branch',{world:wid,thread:tid,from_chapter:parseInt(v.from_chapter)||1,name:v.name,divergence:v.divergence});closeModal();route();toast('✓ 已分叉一条平行线');});}
 
 /* ===================== 世界书 / worldbook ===================== */
 let WB={wid:null,entries:[],sel:null};
