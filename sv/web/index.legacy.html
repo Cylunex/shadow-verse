@@ -197,6 +197,31 @@ function formModal(title,fields,submitLabel,onSubmit,aux){
     try{await aux.run(vals(),setF)}catch(e){o.querySelector('#m_err').textContent='✗ '+e.message}finally{ab.textContent=t0;ab.disabled=false}}}
 }
 
+/* ---------- 组件层(复用件:减重复 + 更组件化)---------- */
+function crumb(parts){return '<div class="crumb">'+parts.map((p,i)=>(i?' / ':'')+(p.href?`<a href="${esc(p.href)}">${esc(p.label)}</a>`:esc(p.label))).join('')+'</div>';}
+function section(title,bodyHtml,actionsHtml){return `<div class="section"><h2>${esc(title)}${actionsHtml?`<span>${actionsHtml}</span>`:''}</h2>${bodyHtml}</div>`;}
+function emptyState(msg){return `<div class="empty">${msg}</div>`;}
+function tagList(arr,cls){return (arr||[]).map(t=>`<span class="tag ${cls||''}">${esc(t)}</span>`).join('');}
+function card(o){const click=o.onclick?` onclick="${o.onclick}" style="cursor:pointer"`:'';
+  return `<div class="card"${o.hl?' style="border-color:var(--acc)"':''}${click}>
+    <h3>${o.title}</h3>${o.meta?`<div class="meta">${o.meta}</div>`:''}${o.tagsHtml||''}${o.body||''}${o.foot||''}</div>`;}
+function actionBar(items){return '<div class="actions">'+(items||[]).filter(Boolean).map(b=>
+  `<button class="btn ${b.ghost?'ghost':''} ${b.sm?'sm':''}" onclick="${b.onclick}"${b.danger?' style="border-color:#5a2336;color:var(--bad)"':''}>${b.label}</button>`).join('')+'</div>';}
+// 统一「确认→post→toast→刷新」骨架,收掉 ~12 个同形 act* 函数
+async function crudAction(opts){
+  if(opts.confirm&&!confirm(opts.confirm))return;
+  try{const r=await opts.run();if(opts.ok)toast(typeof opts.ok==='function'?opts.ok(r):opts.ok);
+    if(opts.after)await opts.after(r);else{if(opts.refresh)await refresh();route();}}
+  catch(e){toast('✗ '+e.message,true);}}
+// 统一文件选择 + 读取(text / base64),收掉 4 处重复的 input+ArrayBuffer→btoa 样板
+function filePicker(accept){return new Promise(res=>{const inp=document.createElement('input');inp.type='file';if(accept)inp.accept=accept;
+  inp.onchange=async()=>{const f=inp.files&&inp.files[0];if(!f)return res(null);
+    try{const u=new Uint8Array(await f.arrayBuffer());let bin='';for(let i=0;i<u.length;i++)bin+=String.fromCharCode(u[i]);
+      let text=null;try{text=new TextDecoder('utf-8').decode(u);}catch(e){}
+      res({name:f.name,ext:(f.name.split('.').pop()||'').toLowerCase(),b64:btoa(bin),text});}
+    catch(e){toast('✗ 读文件失败:'+e.message,true);res(null);}};
+  inp.click();});}
+
 /* ---------- actions ---------- */
 async function actNewWorld(){formModal('新建世界',[
   {n:'id',label:'id (kebab-case,如 infinite-tower)',ph:'唯一英文 id'},
@@ -237,59 +262,40 @@ async function actNewCodex(){const cats=(await api('/codex')).categories;formMod
 async function actSeedCodex(){try{const r=await post('/codex/seed',{});await refresh();toast(`✓ 起始元件库:新增 <b>${r.added}</b>,跳过 ${r.skipped},共 ${r.total} 个`);route()}catch(e){toast('✗ '+e.message,true)}}
 
 // 导入 SillyTavern 角色卡(.json 或内嵌卡的 .png)—— 默认新建独立世界(卡自带世界),也可并入现有
-function actImportCard(){
-  const inp=document.createElement('input');inp.type='file';inp.accept='.json,.png';
-  inp.onchange=async()=>{const f=inp.files[0];if(!f)return;
-    let payload={},nameGuess='';
-    try{
-      if(f.name.toLowerCase().endsWith('.png')){const buf=await f.arrayBuffer();let bin='';const u=new Uint8Array(buf);
-        for(let i=0;i<u.length;i++)bin+=String.fromCharCode(u[i]);payload.png_b64=btoa(bin);}
-      else{const txt=await f.text();payload.card=txt;try{const j=JSON.parse(txt);const d=j.data||j;nameGuess=d.name||'';}catch(e){}}
-    }catch(e){return toast('✗ 读文件失败:'+e.message,true)}
-    const worlds=OV.worlds.map(w=>w.id);
-    formModal('导入角色卡'+(nameGuess?' · '+nameGuess:''),[
-      {n:'target',label:'导入方式(卡一般自带世界,推荐新建独立世界)',type:'select',options:['新建独立世界','并入现有世界'],value:'新建独立世界'},
-      {n:'world_name',label:'新世界名(留空自动)',value:nameGuess?nameGuess+'·世界':''},
-      {n:'world',label:'并入哪个世界(选「并入现有世界」时)',type:'select',options:worlds.length?worlds:['(暂无世界)'],value:worlds[0]||''},
-      {n:'role',label:'角色戏份',type:'select',options:['main','secondary','cameo','npc'],value:'main'},
-    ],'导入',async v=>{
-      const body={...payload,role:v.role};
-      if(v.target==='新建独立世界'){body.target='new';if(v.world_name)body.world_name=v.world_name;}
-      else{body.target='existing';body.world=v.world;}
-      const r=await post('/import/card',body);await refresh();closeModal();
-      toast(`✓ 导入 <b>${esc(r.name)}</b>${r.new_world?(' → 新世界 <b>'+esc(r.world)+'</b>'):(' → '+esc(r.world))}（世界书 ${r.lorebook_entries} 条）`);
-      location.hash='#/entity/'+r.world+'/'+r.entity;
-    });
-  };
-  inp.click();
+async function actImportCard(){const p=await filePicker('.json,.png');if(!p)return;
+  let payload={},nameGuess='';
+  if(p.ext==='png')payload.png_b64=p.b64;
+  else{payload.card=p.text;try{const j=JSON.parse(p.text);const d=j.data||j;nameGuess=d.name||'';}catch(e){}}
+  const worlds=OV.worlds.map(w=>w.id);
+  formModal('导入角色卡'+(nameGuess?' · '+nameGuess:''),[
+    {n:'target',label:'导入方式(卡一般自带世界,推荐新建独立世界)',type:'select',options:['新建独立世界','并入现有世界'],value:'新建独立世界'},
+    {n:'world_name',label:'新世界名(留空自动)',value:nameGuess?nameGuess+'·世界':''},
+    {n:'world',label:'并入哪个世界(选「并入现有世界」时)',type:'select',options:worlds.length?worlds:['(暂无世界)'],value:worlds[0]||''},
+    {n:'role',label:'角色戏份',type:'select',options:['main','secondary','cameo','npc'],value:'main'},
+  ],'导入',async v=>{
+    const body={...payload,role:v.role};
+    if(v.target==='新建独立世界'){body.target='new';if(v.world_name)body.world_name=v.world_name;}
+    else{body.target='existing';body.world=v.world;}
+    const r=await post('/import/card',body);await refresh();closeModal();
+    toast(`✓ 导入 <b>${esc(r.name)}</b>${r.new_world?(' → 新世界 <b>'+esc(r.world)+'</b>'):(' → '+esc(r.world))}（世界书 ${r.lorebook_entries} 条）`);
+    location.hash='#/entity/'+r.world+'/'+r.entity;
+  });
 }
-function actImportPreset(){
-  const inp=document.createElement('input');inp.type='file';inp.accept='.json';
-  inp.onchange=async()=>{const f=inp.files[0];if(!f)return;let txt,nameGuess=f.name.replace(/\.json$/i,'');
-    try{txt=await f.text();try{const j=JSON.parse(txt);if(j.name)nameGuess=j.name;}catch(e){return toast('✗ 不是合法 JSON',true)}}catch(e){return toast('✗ 读文件失败:'+e.message,true)}
-    formModal('导入预设 · ST 采样集+提示词模块',[
-      {n:'name',label:'预设名',value:nameGuess},
-    ],'导入',async v=>{
-      const r=await post('/import/preset',{data:txt,name:v.name});closeModal();
-      toast(`✓ 导入预设 <b>${esc(r.name)}</b>(${esc(r.preset)})— 模块 ${r.module_count}(自定义 ${r.custom_count})、采样参数 ${Object.keys(r.sampling||{}).length} 项`);
-      location.hash='#/assets';route();
-    });
-  };
-  inp.click();
+async function actImportPreset(){const p=await filePicker('.json');if(!p)return;
+  let nameGuess=p.name.replace(/\.json$/i,'');try{const j=JSON.parse(p.text);if(j.name)nameGuess=j.name;}catch(e){return toast('✗ 不是合法 JSON',true);}
+  formModal('导入预设 · ST 采样集+提示词模块',[{n:'name',label:'预设名',value:nameGuess}],'导入',async v=>{
+    const r=await post('/import/preset',{data:p.text,name:v.name});closeModal();
+    toast(`✓ 导入预设 <b>${esc(r.name)}</b>(${esc(r.preset)})— 模块 ${r.module_count}(自定义 ${r.custom_count})、采样参数 ${Object.keys(r.sampling||{}).length} 项`);
+    location.hash='#/assets';route();
+  });
 }
-function actImportRegex(){
-  const inp=document.createElement('input');inp.type='file';inp.accept='.json';
-  inp.onchange=async()=>{const f=inp.files[0];if(!f)return;let txt,nameGuess=f.name.replace(/\.json$/i,'');
-    try{txt=await f.text();try{const j=JSON.parse(txt);if(j.scriptName)nameGuess=j.scriptName;}catch(e){return toast('✗ 不是合法 JSON',true)}}catch(e){return toast('✗ 读文件失败:'+e.message,true)}
-    formModal('导入正则 · ST 消息渲染改写',[
-      {n:'name',label:'正则脚本名(留空用脚本自带名)',value:nameGuess},
-    ],'导入',async v=>{
-      const r=await post('/import/regex',{data:txt,name:v.name});closeModal();
-      toast(`✓ 导入正则 <b>${esc(r.regex)}</b>(${r.count} 条:${esc((r.names||[]).slice(0,3).join('、'))})`);
-      location.hash='#/assets';route();
-    });
-  };
-  inp.click();
+async function actImportRegex(){const p=await filePicker('.json');if(!p)return;
+  let nameGuess=p.name.replace(/\.json$/i,'');try{const j=JSON.parse(p.text);if(j.scriptName)nameGuess=j.scriptName;}catch(e){return toast('✗ 不是合法 JSON',true);}
+  formModal('导入正则 · ST 消息渲染改写',[{n:'name',label:'正则脚本名(留空用脚本自带名)',value:nameGuess}],'导入',async v=>{
+    const r=await post('/import/regex',{data:p.text,name:v.name});closeModal();
+    toast(`✓ 导入正则 <b>${esc(r.regex)}</b>(${r.count} 条:${esc((r.names||[]).slice(0,3).join('、'))})`);
+    location.hash='#/assets';route();
+  });
 }
 async function viewAssets(m){
   let d;try{d=await api('/presets')}catch(e){m.innerHTML=`<div class="empty">${esc(e.message)}</div>`;return}
@@ -312,15 +318,9 @@ async function viewAssets(m){
 }
 async function actPresetUse(pid){try{await post('/config',{SV_PRESET:pid});await refresh();route();
   toast(pid?'✓ 预设已启用,对话即时生效':'✓ 已停用预设');}catch(e){toast('✗ '+e.message,true)}}
-function actSetAvatar(wid,eid){
-  const inp=document.createElement('input');inp.type='file';inp.accept='image/png,image/jpeg,image/webp';
-  inp.onchange=async()=>{const f=inp.files[0];if(!f)return;
-    try{const buf=await f.arrayBuffer();let bin='';const u=new Uint8Array(buf);for(let i=0;i<u.length;i++)bin+=String.fromCharCode(u[i]);
-      const ext=(f.name.split('.').pop()||'png').toLowerCase();
-      await post('/entity/avatar',{world:wid,entity:eid,img_b64:btoa(bin),ext});toast('✓ 头像已设');route();
-    }catch(e){toast('✗ '+e.message,true)}};
-  inp.click();
-}
+async function actSetAvatar(wid,eid){const p=await filePicker('image/png,image/jpeg,image/webp');if(!p)return;
+  try{await post('/entity/avatar',{world:wid,entity:eid,img_b64:p.b64,ext:p.ext||'png'});toast('✓ 头像已设');route();}
+  catch(e){toast('✗ '+e.message,true);}}
 async function actUndoImport(wid,eid,name){if(!confirm(`撤销导入「${name}」?会删掉这个角色,并剥掉它并进世界设定的世界书。`))return;
   try{await post('/import/undo',{world:wid,entity:eid});await refresh();toast(`✓ 已撤销导入「${esc(name)}」`);location.hash='#/world/'+wid}catch(e){toast('✗ '+e.message,true)}}
 async function actMergeWorld(wid,name){const others=OV.worlds.filter(w=>w.id!==wid).map(w=>w.id);
@@ -507,6 +507,45 @@ async function actReflect(wid,tid){
       out.innerHTML=`<b>全局自洽问题</b>:\n${(r.findings||[]).map(f=>'  · '+esc(f)).join('\n')||'  （无,或需配 LLM）'}\n\n<b>建议补的成长</b>:\n${(r.suggested_sediments||[]).map(s=>`  · [${esc(s.entity)}] ${esc(s.text)} (${esc(s.level)})`).join('\n')||'  （无）'}${r.note?'\n\n'+esc(r.note):''}`;
     }catch(e){o.querySelector('#m_err').textContent='✗ '+e.message}finally{b.textContent=t0;b.disabled=false}};
 }
+
+/* ---------- 世界书编辑器(引擎+web 已建,旧控制台原先零调用)---------- */
+function wbNew(wid){wbForm(wid,null,{name:'',keys:[],content:'',order:100,constant:false,position:0});}
+async function wbEdit(wid,uid){const d=await api('/worldbook/'+wid);const e=(d.entries||[]).find(x=>x.uid===uid)||{};wbForm(wid,uid,e);}
+function wbForm(wid,uid,e){formModal(uid==null?'新建世界书条目':'编辑世界书条目',[
+  {n:'name',label:'条目名',value:e.name||''},
+  {n:'keys',label:'关键词(逗号分隔,命中即注入上下文)',value:(e.keys||[]).join(', ')},
+  {n:'content',label:'内容',type:'textarea',rows:6,value:e.content||''},
+  {n:'order',label:'排序优先级',value:String(e.order!=null?e.order:100)},
+  {n:'constant',label:'常驻(始终注入)',type:'select',options:['否','是'],value:e.constant?'是':'否'},
+],'保存',async v=>{
+  const entry={name:v.name,keys:v.keys.split(/[,，]/).map(s=>s.trim()).filter(Boolean),content:v.content,
+    order:parseInt(v.order)||100,constant:v.constant==='是',position:e.position!=null?e.position:0,depth:4};
+  if(!entry.name)throw new Error('给条目起个名');
+  if(!entry.keys.length&&!entry.constant)throw new Error('加关键词,或设为常驻');
+  await post('/worldbook/save',{world:wid,uid:uid==null?undefined:uid,entry});closeModal();toast('✓ 世界书已保存');route();});}
+async function wbDel(wid,uid){crudAction({confirm:'删除这条世界书条目?',run:()=>post('/worldbook/delete',{world:wid,uid}),ok:'✓ 已删条目'});}
+
+/* ---------- 线分支 / 一稿多吃 / 全书质检(底层原语:routes 已建)---------- */
+async function actBranchNew(wid,tid){formModal('从某章分叉一条平行线(蝴蝶效应)',[
+  {n:'from_chapter',label:'从第几章分叉',value:String((window._chs&&window._chs.length)||1)},
+  {n:'name',label:'分支名',ph:'如 若苏栀先出手'},
+  {n:'divergence',label:'这一支哪里不同',type:'textarea',rows:2,ph:'第一层不靠悖论,直接强闯'},
+],'分叉 ⑂',async v=>{await post('/branch',{world:wid,thread:tid,from_chapter:parseInt(v.from_chapter)||1,name:v.name,divergence:v.divergence});closeModal();toast('✓ 已分叉一条平行线');route();});}
+async function actCheckBook(wid,tid){const out=document.getElementById('thr_out');if(out){out.style.display='block';out.textContent='全书质检中…(确定性,0 token)';}
+  try{const r=await post('/checks',{world:wid,thread:tid});const f=r.findings||[];
+    if(out)out.innerHTML=`<b>✓ 全书质检(${r.chapters||0} 章)</b>\n`+(f.length?f.map(x=>'· '+esc(x)).join('\n'):'（未见基线问题）')+`\n\n句式 tic:${esc(JSON.stringify(r.tics||{}))}　跨章复读:${Object.keys(r.cross_repeats||{}).length} 处`;}
+  catch(e){if(out)out.textContent='✗ '+e.message;}}
+async function actConvertThread(wid,tid){formModal('一稿多吃 · 换一种镜头',[
+  {n:'kind',label:'转换',type:'select',options:['当前章 → CYOA','当前章 → 漫画','事件线 → 剧本','事件线 → 跑团'],value:'当前章 → CYOA'},
+  {n:'chapter',label:'章号(章→… 时用)',value:String((window._chs&&window._chs.length)||1)},
+],'转换',async v=>{
+  const map={'当前章 → CYOA':['cyoa',true],'当前章 → 漫画':['comic',true],'事件线 → 剧本':['screenplay',false],'事件线 → 跑团':['tabletop',false]};
+  const [to,chapterBased]=map[v.kind];const body={world:wid,thread:tid,to,run:!!(OV.llm&&OV.llm.available)};
+  if(chapterBased)body.chapter=parseInt(v.chapter)||1;
+  const r=await post('/convert',body);closeModal();const pack=r.pack||{};const out=document.getElementById('thr_out');
+  if(out){out.style.display='block';
+    out.innerHTML=`<b>一稿多吃 → ${esc((pack.target&&pack.target.name)||to)}</b>\n源:${esc(pack.from||'')}${pack.title?' · '+esc(pack.title):''}\n\n`+
+      (r.output?esc(r.output):'(未配 LLM,下面是转换包,可交宿主模型改写)\n'+esc((pack.guide||'')+'\n— 源材料 —\n'+(pack.material||'').slice(0,1200)));}});}
 
 /* ---------- nav + router ---------- */
 function renderNav(active){
@@ -845,6 +884,7 @@ function viewOverview(m){
 }
 
 async function viewWorld(m,id){try{const d=await api('/world/'+id);const meta=d.meta;
+  const wb=await api('/worldbook/'+id).then(r=>r.entries||[]).catch(()=>[]);
   m.innerHTML=`<div class="crumb"><a href="#/">总览</a> / ${esc(meta.name)}</div>
     <h1>🌍 ${esc(meta.name)} <small>${esc(meta.genre)} · 尺度 ${esc(meta.scale)}</small></h1>
     <div>${(meta.links||[]).map(l=>`<span class="tag">⇄ ${esc(l.to)} (${esc(l.relation)})</span>`).join('')}${meta.provenance&&meta.provenance.source==='forge'?'<span class="tag forge">AIGC锻造</span>':''}</div>
@@ -861,12 +901,17 @@ async function viewWorld(m,id){try{const d=await api('/world/'+id);const meta=d.
       <div class="card"><h3 onclick="location.hash='#/entity/${id}/${e.id}'">👤 ${esc(e.name)}</h3>
         <div><span class="tag role-${e.role}">${esc(e.role)}</span>${e.provenance==='forge'?'<span class="tag forge">锻造</span>':''}</div>
         ${(e.role==='main'||e.role==='secondary')?`<button class="btn sm ghost" style="margin-top:8px" onclick="event.stopPropagation();actAscend('${id}','${e.id}','${esc(e.name)}')">⬆ 升格跨世界</button>`:''}</div>`).join(''):'<div class="empty">暂无实体</div>'}</div></div>
+    ${section('世界书 · '+wb.length+' 条',
+      (wb.length?'<div class="grid">'+wb.map(e=>card({title:'📜 '+esc(e.name||'(无名)')+(e.constant?' <span class="tag forge">常驻</span>':''),meta:'关键词:'+esc((e.keys||[]).join('、')||'—'),body:`<div class="md" style="font-size:13px;max-height:80px;overflow:hidden;color:var(--dim)">${esc((e.content||'').slice(0,160))}</div>`,foot:`<div style="margin-top:8px"><a onclick="wbEdit('${id}',${e.uid})" style="color:var(--acc2);cursor:pointer;font-size:13px">编辑</a> · <a onclick="wbDel('${id}',${e.uid})" style="color:var(--bad);cursor:pointer;font-size:13px">删除</a></div>`})).join('')+'</div>'
+        :emptyState('暂无世界书条目 — 命中关键词即注入设定;常驻条目始终注入')),
+      `<button class="btn sm ghost" onclick="wbNew('${id}')">＋ 条目</button>`)}
     <div class="section"><h2>世界设定</h2><div class="md reader">${md(d.world_md)}</div></div>`;
   }catch(e){m.innerHTML=`<div class="empty">${esc(e.message)}</div>`}}
 
 async function viewThread(m,wid,tid){try{const d=await api('/thread/'+wid+'/'+tid);const meta=d.meta;
   const chTabs=d.chapters.map((c,i)=>`<button onclick="showCh(${i})" id="cht${i}" class="${i===d.chapters.length-1?'on':''}">第${c.no}章${c.title?' · '+esc(c.title):''}</button>`).join('');
-  window._chs=d.chapters;
+  window._chs=d.chapters;window._thr={wid,tid};
+  const branches=await api('/branches/'+wid+'/'+tid).then(r=>r.branches||[]).catch(()=>[]);
   m.innerHTML=`<div class="crumb"><a href="#/">总览</a> / <a href="#/world/${wid}">${esc(wid)}</a> / ${esc(meta.title)}</div>
     <h1>📖 ${esc(meta.title)} <small>${esc(meta.genre)} · ${meta.chapter_count} 章</small></h1>
     <div>${(meta.lenses||[]).map(l=>`<span class="tag lens">${esc(l)}</span>`).join('')}</div>
@@ -874,9 +919,15 @@ async function viewThread(m,wid,tid){try{const d=await api('/thread/'+wid+'/'+ti
       <button class="btn" onclick="actNarrateRun('${wid}','${tid}')">✨ AI产线写章</button>
       <button class="btn ghost" onclick="actPlay('${wid}','${tid}')">🎭 玩一场</button>
       <button class="btn ghost" onclick="actReflect('${wid}','${tid}')">🧠 反思</button>
+      <button class="btn ghost" onclick="actCheckBook('${wid}','${tid}')">✓ 全书质检</button>
+      <button class="btn ghost" onclick="actConvertThread('${wid}','${tid}')">🔄 一稿多吃</button>
       <button class="btn ghost" onclick="actRenderScene('${wid}','${tid}')">🖼 场景图</button>
       <button class="btn ghost" onclick="actExportThread('${wid}','${tid}')">📖 导出全书</button>
       <button class="btn ghost" onclick="actDelThread('${wid}','${tid}','${esc(meta.title)}')">🗑 删除</button></div>
+    <div class="packet" id="thr_out" style="display:none"></div>
+    ${section('分支 · 蝴蝶效应',
+      (branches.length?'<div class="timeline">'+branches.map(b=>`<div class="ev"><div class="w">从第 ${b.from_chapter} 章 · 源 ${esc(b.parent||'main')}</div>⑂ ${esc(b.name||b.id)}</div>`).join('')+'</div>':emptyState('暂无分支 — 从某章分叉出一条平行线(蝴蝶效应)')),
+      `<button class="btn sm ghost" onclick="actBranchNew('${wid}','${tid}')">＋ 分支</button>`)}
     ${(d.renders&&d.renders.length)?`<div class="section"><h2>场景图</h2><div class="gallery">${d.renders.map(p=>`<img src="/img/${esc(p)}" loading="lazy">`).join('')}</div></div>`:''}
     <div class="section"><h2>节奏契约 / 配方</h2><div class="md">${esc(meta.pacing||'')}<br><span style="color:var(--faint);font-size:13px">爽点:${esc((d.recipe||{}).climax||'')}　｜　套路:${esc(((d.recipe||{}).tropes||[]).join('、'))}</span></div></div>
     <div class="section"><h2>钩子台账 <span><button class="btn sm ghost" onclick="actAddHook('${wid}','${tid}')">＋钩子</button> <button class="btn sm ghost" onclick="actSetAlpha('${wid}','${tid}',${JSON.stringify((d.hooks||{}).alpha||'')})">设 α 悬念</button></span></h2>
@@ -1001,8 +1052,7 @@ async function testLLM(){const box=document.getElementById('cf_test');box.style.
   try{const r=await post('/llm-test',{});box.innerHTML=r.ok?`<b style="color:var(--good)">✓ ${esc(r.provider)}${r.stub?'（stub 占位，配真 provider 才是真生成）':''}</b>\n回复样本：${esc(r.sample)}`:`<b style="color:var(--bad)">✗ ${esc(r.provider)} 连接失败</b>\n${esc(r.error)}`;
   }catch(e){box.textContent='✗ '+e.message}}
 
-window.showCh=showCh;
-['actNewWorld','actNewEntity','actNewThread','actNewCodex','actSeedCodex','actLink','actAscend','actSummon','actExtract','actSummonSoul','actWriteChapter','actPlay','actEditWorldMd','actNarrateRun','actReflect','actExportThread','actDelWorld','actDelThread','actDelEntity','actDelCodex','actRenderEntity','actRenderScene','actSetAlpha','actAddHook','actSetHook','actImportCard','actImportPreset','actImportRegex','actPresetUse','actUndoImport','actMergeWorld','chatClear','chatUndo','chatRegen','qrSend','gswipe','actSaveNote','actQuickReplies','actEditFloor','actDelFloor','actRegenFloor','actSetAvatar','actEditPlayer','varAdd','varSet','varDel','renderVars','saveSettings','clearSecret','testLLM','closeModal'].forEach(f=>window[f]=eval(f));
+// (经典脚本里 `function foo(){}` 声明本就是全局,内联 onclick 可直接解析;不再需要 eval 强挂 window)
 window.addEventListener('hashchange',route);
 (async()=>{try{await refresh()}catch(e){}route()})();
 </script>
