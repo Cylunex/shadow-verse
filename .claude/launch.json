@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "shadowverse-web",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "sv.webapp", "--port", "8787"],
+      "runtimeExecutable": "/bin/sh",
+      "runtimeArgs": ["-c", "PYTHONUTF8=1 python3 -m sv.webapp --port 8787"],
       "port": 8787
     }
   ]

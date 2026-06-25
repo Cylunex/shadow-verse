@@ -531,6 +531,51 @@ def api_soul(sid: str) -> dict:
             "identity": [x.get("text", "") for x in read_jsonl(_identity_path(s.dir))]}
 
 
+# ---- 世界书(露出已建的 worldbook 引擎:读/存条目/删条目;引擎逻辑不动)----
+def api_worldbook(wid: str) -> dict:
+    from . import worldbook as wb
+    w = World.load(wid)
+    data = wb.load(w)
+    return {"world": wid, "name": w.meta().get("name", wid),
+            "entries": data.get("entries", []), "summary": wb.summary(w)}
+
+
+def post_worldbook_save(b: dict) -> dict:
+    """新增/更新一条世界书条目(按 uid upsert)。
+    编辑既有条目时只覆盖前端真正传来的字段,其余(secondary_keys/source/概率/时效/互斥组等)保留,
+    免把导入条目的高级配置抹平。"""
+    from . import worldbook as wb
+    w = World.load(b["world"]); data = wb.load(w)
+    raw = b.get("entry") or {}
+    uid = b.get("uid")
+    existing = next((x for x in data["entries"] if x.get("uid") == uid), None) if uid is not None else None
+    if existing is not None:
+        norm = wb.normalize_entry(raw, source=raw.get("source") or existing.get("source", "manual"))
+        merged = dict(existing)
+        for k in raw:                       # 只覆盖客户端显式发来的字段
+            if k in norm:
+                merged[k] = norm[k]
+        merged["uid"] = uid
+        data["entries"][data["entries"].index(existing)] = merged
+        out_uid = uid
+    else:
+        norm = wb.normalize_entry(raw, source=raw.get("source", "manual"))
+        norm["uid"] = max((x.get("uid", 0) for x in data["entries"]), default=0) + 1
+        data["entries"].append(norm)
+        out_uid = norm["uid"]
+    wb.save(w, data)
+    return {"ok": True, "uid": out_uid, "entries": data["entries"]}
+
+
+def post_worldbook_delete(b: dict) -> dict:
+    from . import worldbook as wb
+    w = World.load(b["world"]); data = wb.load(w)
+    before = len(data["entries"])
+    data["entries"] = [x for x in data["entries"] if x.get("uid") != b.get("uid")]
+    wb.save(w, data)
+    return {"ok": True, "removed": before - len(data["entries"]), "entries": data["entries"]}
+
+
 # ---- AIGC 生成(返回正文供人审后再 create/commit;需配 SV_PROVIDER)----
 def post_gen_world(b: dict) -> dict:
     return {"body": forge.generate_world_body(b.get("prompt", ""), genre=b.get("genre", ""),
@@ -577,6 +622,7 @@ GET_ROUTES = [
     (re.compile(r"^/api/entity/([\w-]+)/([\w-]+)$"), lambda m, q: api_entity(m.group(1), m.group(2))),
     (re.compile(r"^/api/nexus/([\w-]+)$"), lambda m, q: api_nexus_entity(m.group(1))),
     (re.compile(r"^/api/soul/([\w-]+)$"), lambda m, q: api_soul(m.group(1))),
+    (re.compile(r"^/api/worldbook/([\w-]+)$"), lambda m, q: api_worldbook(m.group(1))),
     (re.compile(r"^/api/codex$"), lambda m, q: api_codex()),
     (re.compile(r"^/api/export/thread/([\w-]+)/([\w-]+)$"), lambda m, q: api_export_thread(m.group(1), m.group(2))),
     (re.compile(r"^/api/config$"), lambda m, q: api_config()),
@@ -649,6 +695,8 @@ POST_ROUTES = [
     (re.compile(r"^/api/chat/delete$"), post_chat_delete),
     (re.compile(r"^/api/chat/author-note$"), post_author_note),
     (re.compile(r"^/api/quick-replies$"), post_quick_replies),
+    (re.compile(r"^/api/worldbook/save$"), post_worldbook_save),
+    (re.compile(r"^/api/worldbook/delete$"), post_worldbook_delete),
 ]
 
 
@@ -670,6 +718,10 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         if path in ("/", "/index.html"):
             return self._send(200, (WEB_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
+        if path in ("/legacy", "/legacy.html"):   # 旧版创作者控制台(完整功能,留作后台工具)
+            lp = WEB_DIR / "index.legacy.html"
+            if lp.exists():
+                return self._send(200, lp.read_bytes(), "text/html; charset=utf-8")
         if path.startswith("/img/"):   # 服务 universe 下的图(防目录穿越)
             from urllib.parse import unquote
             target = (UNIVERSE / unquote(path[len("/img/"):])).resolve()

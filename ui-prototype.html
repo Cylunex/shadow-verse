@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>暗宇宙 · ShadowVerse —— 前端重设计原型</title>
+<style>
+:root{
+  --bg:#08080f; --bg-glow1:#1c1640; --bg-glow2:#0c2330;
+  --surface:#13131f; --surface2:#191926; --surface3:#20203140;
+  --line:#262640; --line-soft:#1e1e30;
+  --ink:#edecf6; --dim:#a6a6cc; --faint:#6b6b8f;
+  --violet:#a98bff; --violet-d:#7a5cf0; --cyan:#5fe3d2; --gold:#ffce86; --rose:#ff8fb0;
+  --good:#62e6a4; --bad:#ff6f7d;
+  --radius:16px; --radius-sm:11px;
+  --shadow:0 18px 50px #00000066;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;color:var(--ink);
+  font:15px/1.7 -apple-system,system-ui,"Segoe UI","Noto Sans SC","Microsoft YaHei",sans-serif;
+  background:
+    radial-gradient(900px 600px at 82% -8%, var(--bg-glow1) 0%, transparent 60%),
+    radial-gradient(700px 520px at 8% 12%, var(--bg-glow2) 0%, transparent 55%),
+    var(--bg);
+  background-attachment:fixed;
+}
+a{color:inherit;text-decoration:none;cursor:pointer}
+button{font:inherit;cursor:pointer}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#2a2a44;border-radius:8px;border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#3a3a5c;background-clip:content-box}
+
+/* ---------- top bar ---------- */
+.topbar{
+  position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:6px;
+  padding:0 22px;height:58px;
+  background:#0a0a14cc;backdrop-filter:blur(14px);border-bottom:1px solid var(--line-soft);
+}
+.brand{display:flex;align-items:baseline;gap:9px;margin-right:18px;user-select:none}
+.brand .logo{font-size:19px;font-weight:800;letter-spacing:.5px;
+  background:linear-gradient(92deg,var(--violet),var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand .en{font-size:10px;letter-spacing:3px;color:var(--faint);text-transform:uppercase}
+.nav{display:flex;gap:2px}
+.nav a{display:flex;align-items:center;gap:6px;padding:7px 11px;border-radius:10px;color:var(--dim);font-size:14px;transition:.15s}
+.nav a .ic{width:16px;height:16px;opacity:.85}
+.nav a:hover{background:#ffffff0a;color:var(--ink)}
+.nav a.on{color:var(--ink);background:linear-gradient(180deg,#ffffff12,#ffffff06);box-shadow:inset 0 0 0 1px var(--line)}
+.spacer{flex:1}
+.iconbtn{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;color:var(--dim);background:transparent;border:none;transition:.15s}
+.iconbtn:hover{background:#ffffff0d;color:var(--ink)}
+.loginpill{margin-left:6px;display:flex;align-items:center;gap:7px;padding:6px 13px;border-radius:20px;border:1px solid var(--line);color:var(--dim);font-size:13px}
+.loginpill:hover{border-color:var(--violet);color:var(--ink)}
+
+.page{display:none;animation:fade .25s ease}
+.page.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.wrap{max-width:1280px;margin:0 auto;padding:30px 26px 80px}
+
+/* ---------- buttons / chips ---------- */
+.btn{display:inline-flex;align-items:center;gap:7px;border:none;border-radius:10px;padding:9px 16px;font-size:14px;font-weight:600;color:#fff;
+  background:linear-gradient(180deg,var(--violet),var(--violet-d));box-shadow:0 6px 18px #7a5cf044;transition:.15s}
+.btn:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.btn.ghost{background:transparent;color:var(--dim);border:1px solid var(--line);box-shadow:none;font-weight:500}
+.btn.ghost:hover{border-color:var(--violet);color:var(--ink)}
+.btn.sm{padding:6px 12px;font-size:13px}
+.btn.ai{background:linear-gradient(92deg,#6a4ad0,#2f9e9e)}
+.searchbar{flex:1;display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 14px;color:var(--faint)}
+.searchbar input{flex:1;background:transparent;border:none;outline:none;color:var(--ink);font:inherit}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 22px}
+.fchip{padding:6px 14px;border-radius:20px;font-size:13px;color:var(--dim);background:var(--surface);border:1px solid var(--line);transition:.15s}
+.fchip:hover{color:var(--ink);border-color:#3a3a5c}
+.fchip.on{color:#fff;background:linear-gradient(180deg,var(--violet),var(--violet-d));border-color:transparent}
+
+/* ---------- works gallery ---------- */
+.page-head{display:flex;align-items:center;gap:14px;margin-bottom:8px}
+.page-head h1{font-size:24px;margin:0;letter-spacing:.5px}
+.page-head .sub{color:var(--faint);font-size:13px}
+.toolrow{display:flex;align-items:center;gap:10px;margin:18px 0 4px}
+.works{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px}
+.work{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;cursor:pointer;transition:.18s;position:relative}
+.work:hover{transform:translateY(-4px);border-color:#3b3b62;box-shadow:var(--shadow)}
+.cover{height:168px;position:relative;overflow:hidden}
+.cover .sigil{position:absolute;right:14px;bottom:12px;font-size:30px;filter:drop-shadow(0 2px 6px #0008)}
+.cover .vig{position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,#0b0b13 100%)}
+.work .body{padding:14px 16px 16px}
+.work h3{margin:0 0 5px;font-size:17px;display:flex;align-items:center;gap:8px}
+.work .desc{color:var(--dim);font-size:13px;line-height:1.6;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:42px}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.tag{font-size:11px;padding:2px 9px;border-radius:20px;color:var(--dim);background:#ffffff08;border:1px solid var(--line)}
+.tag.v{color:var(--violet);border-color:#3a2a6a}.tag.c{color:var(--cyan);border-color:#1c4a45}.tag.g{color:var(--gold);border-color:#5a4a1a}
+.work .foot{display:flex;align-items:center;justify-content:space-between;margin-top:12px;color:var(--faint);font-size:12px}
+.work .menu{position:absolute;top:10px;right:10px;width:28px;height:28px;border-radius:8px;background:#0009;color:#fff;display:grid;place-items:center;opacity:0;transition:.15s}
+.work:hover .menu{opacity:1}
+.newcard{border:1px dashed var(--line);background:#ffffff04;display:grid;place-items:center;min-height:280px;color:var(--faint);text-align:center}
+.newcard:hover{border-color:var(--violet);color:var(--ink)}
+
+/* covers (gradient art placeholders) */
+.cv-night{background:
+  repeating-linear-gradient(115deg,#ffffff07 0 1px,transparent 1px 9px),
+  radial-gradient(120px 90px at 72% 60%, #ffb86322 0%, transparent 70%),
+  radial-gradient(60px 40px at 70% 56%, #ffcf8a55 0%, transparent 75%),
+  linear-gradient(180deg,#0e1430 0%,#161a3a 50%,#0b0d22 100%)}
+.cv-wuxia{background:
+  radial-gradient(200px 120px at 30% 20%, #ffffff14 0%, transparent 60%),
+  linear-gradient(180deg,#1b2230 0%,#2a3340 40%,#10151c 100%)}
+.cv-cyber{background:
+  repeating-linear-gradient(90deg,#ff4d9d10 0 2px,transparent 2px 14px),
+  radial-gradient(140px 100px at 60% 70%, #2fd6ff33 0%, transparent 70%),
+  linear-gradient(180deg,#170a26 0%,#241038 45%,#0a0716 100%)}
+.cv-heal{background:
+  radial-gradient(180px 120px at 70% 30%, #8be0c422 0%, transparent 65%),
+  linear-gradient(180deg,#16302e 0%,#244a3f 45%,#0e201c 100%)}
+
+/* ---------- chat / RP ---------- */
+.chatgrid{display:grid;grid-template-columns:248px 1fr 296px;gap:0;height:calc(100vh - 58px)}
+.convlist{border-right:1px solid var(--line-soft);padding:16px 12px;overflow:auto;background:#0b0b1366}
+.convlist .newconv{width:100%;justify-content:center;margin-bottom:12px}
+.convsearch{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:7px 11px;color:var(--faint);font-size:13px;margin-bottom:12px}
+.convsearch input{flex:1;background:transparent;border:none;outline:none;color:var(--ink);font:inherit;font-size:13px}
+.convgrp{font-size:11px;color:var(--faint);letter-spacing:1px;margin:14px 6px 6px}
+.conv{display:flex;gap:10px;padding:9px 10px;border-radius:11px;margin-bottom:3px;transition:.12s}
+.conv:hover{background:#ffffff0a}
+.conv.on{background:linear-gradient(180deg,#ffffff12,#ffffff05);box-shadow:inset 0 0 0 1px var(--line)}
+.conv .av{width:34px;height:34px;border-radius:9px;flex:0 0 auto;background-size:cover}
+.conv .t{min-width:0}
+.conv .t .nm{font-size:13.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conv .t .pv{font-size:12px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.chatmain{display:flex;flex-direction:column;min-width:0;background:radial-gradient(700px 400px at 50% -20%,#15102e 0%,transparent 60%)}
+.chathead{display:flex;align-items:center;gap:12px;padding:13px 22px;border-bottom:1px solid var(--line-soft);background:#0a0a1499}
+.chathead .av{width:38px;height:38px;border-radius:10px;background-size:cover}
+.chathead .nm{font-size:15px;font-weight:600}
+.chathead .meta{font-size:12px;color:var(--faint)}
+.scroll{flex:1;overflow:auto;padding:26px 0}
+.thread{max-width:760px;margin:0 auto;padding:0 22px}
+
+/* styled opening (作品 first message rendered) */
+.opening{background:linear-gradient(180deg,#14142480,#0e0e1a80);border:1px solid var(--line);border-radius:18px;padding:30px 30px 24px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.opening::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--violet),var(--cyan))}
+.opening .lead{color:var(--dim);line-height:2;font-size:15px}
+.opening .lead b{color:var(--ink)}
+.opening .div{display:flex;align-items:center;gap:12px;color:var(--gold);font-size:13px;letter-spacing:2px;margin:22px 0 14px;font-weight:600}
+.opening .div::before,.opening .div::after{content:"";height:1px;flex:1;background:linear-gradient(90deg,transparent,#4a3a1a)}
+.choice{display:flex;gap:13px;align-items:flex-start;padding:14px 16px;border-radius:12px;border:1px solid var(--line);background:#ffffff05;margin-bottom:10px;transition:.15s}
+.choice:hover{border-color:var(--violet);background:#a98bff12;transform:translateX(3px)}
+.choice .em{font-size:20px;line-height:1.4}
+.choice .ct .h{font-size:14.5px;color:var(--ink);font-weight:600}
+.choice .ct .d{font-size:12.5px;color:var(--faint);margin-top:2px}
+.opening .free{text-align:center;color:var(--faint);font-size:12.5px;margin-top:14px;font-style:italic}
+
+.brow{display:flex;gap:11px;margin:18px 0;align-items:flex-end}
+.brow.user{flex-direction:row-reverse}
+.brow .cav{width:34px;height:34px;border-radius:9px;flex:0 0 auto;background-size:cover}
+.bubble{padding:12px 16px;border-radius:15px;max-width:80%;line-height:1.85;white-space:pre-wrap}
+.bubble.char{background:var(--surface2);border:1px solid var(--line);border-bottom-left-radius:5px}
+.bubble.char em{color:var(--dim);font-style:normal;opacity:.85}
+.bubble.user{background:linear-gradient(180deg,var(--violet),var(--violet-d));color:#fff;border-bottom-right-radius:5px}
+
+.composer{padding:14px 22px 20px;border-top:1px solid var(--line-soft);background:#0a0a14cc}
+.composer .box{max-width:760px;margin:0 auto;display:flex;gap:10px;align-items:flex-end}
+.composer textarea{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:12px 15px;color:var(--ink);font:inherit;resize:none;height:46px;outline:none}
+.composer textarea:focus{border-color:var(--violet)}
+.sendbtn{width:46px;height:46px;border-radius:13px;border:none;display:grid;place-items:center;color:#fff;background:linear-gradient(180deg,var(--violet),var(--violet-d))}
+
+/* right panel */
+.rpanel{border-left:1px solid var(--line-soft);background:#0b0b1366;display:flex;flex-direction:column}
+.ptabs{display:flex;padding:10px 12px 0;gap:4px;border-bottom:1px solid var(--line-soft)}
+.ptab{flex:1;text-align:center;padding:9px 0;font-size:13px;color:var(--faint);border-bottom:2px solid transparent;transition:.15s}
+.ptab:hover{color:var(--dim)}
+.ptab.on{color:var(--ink);border-bottom-color:var(--violet)}
+.pbody{flex:1;overflow:auto;padding:16px 14px}
+.ptab-pane{display:none}.ptab-pane.on{display:block}
+.cardinfo .cov{height:120px;border-radius:12px;margin-bottom:12px}
+.cardinfo h3{margin:0 0 4px;font-size:16px}
+.cardinfo .by{color:var(--faint);font-size:12px;margin-bottom:10px}
+.cardinfo p{color:var(--dim);font-size:13px;line-height:1.7}
+
+.sw-grp{font-size:11px;letter-spacing:1px;color:var(--faint);margin:16px 2px 8px}
+.sw-grp:first-child{margin-top:0}
+.sw{display:flex;align-items:center;justify-content:space-between;padding:8px 4px;border-bottom:1px solid var(--line-soft)}
+.sw .l{font-size:13.5px;color:var(--dim)}
+.sw .l small{display:block;color:var(--faint);font-size:11px;margin-top:1px}
+.toggle{width:38px;height:22px;border-radius:20px;background:#33334e;position:relative;transition:.18s;flex:0 0 auto}
+.toggle::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#cfcfe6;transition:.18s}
+.toggle.on{background:linear-gradient(90deg,var(--violet),var(--violet-d))}
+.toggle.on::after{left:18px;background:#fff}
+.slider-row{margin:14px 2px}
+.slider-row .lab{display:flex;justify-content:space-between;font-size:13px;color:var(--dim);margin-bottom:6px}
+.slider-row .lab b{color:var(--cyan)}
+.track{height:6px;border-radius:6px;background:#2a2a44;position:relative}
+.track .fill{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:linear-gradient(90deg,var(--violet),var(--cyan))}
+.track .knob{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;background:#fff;transform:translate(-50%,-50%);box-shadow:0 1px 4px #0006}
+
+/* variable panel */
+.var{margin:12px 2px}
+.var .vh{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px}
+.var .vh .vn{color:var(--dim)}.var .vh .vv{color:var(--cyan);font-weight:600}
+.vtrack{height:8px;border-radius:6px;background:#2a2a44;overflow:hidden}
+.vtrack .vf{height:100%;border-radius:6px}
+
+/* ---------- worldbook ---------- */
+.wb{display:grid;grid-template-columns:260px 1fr;gap:18px;align-items:start}
+.wb .list{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:8px;max-height:70vh;overflow:auto}
+.wb .entry{padding:10px 12px;border-radius:10px;font-size:14px;color:var(--dim);transition:.12s;display:flex;justify-content:space-between;align-items:center}
+.wb .entry:hover{background:#ffffff08;color:var(--ink)}
+.wb .entry.on{background:linear-gradient(180deg,#ffffff12,#ffffff05);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+.wb .entry .badge{font-size:10px;padding:1px 7px;border-radius:20px;background:#a98bff22;color:var(--violet)}
+.wb .editor{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px 24px}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12px;color:var(--faint);margin-bottom:6px;letter-spacing:.5px}
+.field input,.field textarea,.field select{width:100%;background:#0d0d18;border:1px solid var(--line);border-radius:10px;padding:10px 13px;color:var(--ink);font:inherit;outline:none}
+.field textarea{resize:vertical;line-height:1.8}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--violet)}
+.kwrow{display:flex;gap:6px;flex-wrap:wrap}
+.kw{font-size:12px;padding:3px 10px;border-radius:20px;background:#a98bff18;border:1px solid #3a2a6a;color:var(--violet)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.swline{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line-soft);font-size:13.5px;color:var(--dim)}
+
+/* ---------- presets ---------- */
+.preset-head{display:flex;gap:10px;align-items:center;margin-bottom:18px}
+.preset-head select{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 13px;color:var(--ink);font:inherit;outline:none}
+.modlist{display:flex;flex-direction:column;gap:10px;max-width:760px}
+.mod{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;transition:.15s}
+.mod:hover{border-color:#3a3a5c}
+.mod .grip{color:var(--faint)}
+.mod .info{flex:1}
+.mod .info .h{font-size:14.5px;display:flex;align-items:center;gap:8px}
+.mod .info .d{font-size:12.5px;color:var(--faint);margin-top:2px}
+.pill{font-size:10px;padding:1px 8px;border-radius:20px;border:1px solid var(--line)}
+.pill.sys{color:var(--cyan);border-color:#1c4a45}.pill.style{color:var(--gold);border-color:#5a4a1a}.pill.guard{color:var(--rose);border-color:#5a2336}
+
+/* ---------- settings ---------- */
+.set-tabs{display:inline-flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:5px;margin-bottom:24px;flex-wrap:wrap}
+.set-tab{padding:8px 16px;border-radius:9px;font-size:13.5px;color:var(--dim);transition:.15s}
+.set-tab:hover{color:var(--ink)}
+.set-tab.on{color:#fff;background:linear-gradient(180deg,var(--violet),var(--violet-d))}
+.set-pane{display:none;max-width:640px}.set-pane.on{display:block}
+
+.note{color:var(--faint);font-size:12.5px;margin-top:6px;line-height:1.6}
+.banner{max-width:1280px;margin:0 auto;padding:10px 26px;display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--faint);
+  background:#a98bff0d;border-bottom:1px solid var(--line-soft)}
+.banner b{color:var(--violet)}
+.empty{color:var(--faint);text-align:center;padding:50px}
+
+/* ---------- companion (虚拟女友) ---------- */
+.comp{display:grid;grid-template-columns:300px 1fr;gap:22px;align-items:start}
+.her{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;position:sticky;top:78px}
+.her .portrait{height:340px;position:relative}
+.her .portrait .vig{position:absolute;inset:0;background:linear-gradient(180deg,transparent 45%,#0b0b13f2 100%)}
+.her .portrait .name{position:absolute;left:16px;bottom:14px}
+.her .portrait .name b{display:block;font-size:21px}
+.her .portrait .name span{font-size:12px;color:var(--dim)}
+.her .stat{padding:14px 16px}
+.her .stat .line{display:flex;align-items:center;gap:9px;color:var(--dim);font-size:13px;margin-bottom:7px}
+.her .stat .line i{color:var(--cyan);font-style:normal;width:14px;text-align:center}
+.compmain>section{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;margin-bottom:18px}
+.compmain h2{font-size:14px;margin:0 0 14px;color:var(--ink);display:flex;align-items:center;gap:10px}
+.compmain h2 small{color:var(--faint);font-weight:400;font-size:12px}
+.rel{display:grid;grid-template-columns:1fr 1fr;gap:14px 28px}
+.relrow .rt{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px}
+.relrow .rt .rn{color:var(--dim)}.relrow .rt .rv{color:var(--cyan);font-weight:600}
+.reltrack{height:7px;border-radius:6px;background:#2a2a44;overflow:hidden}
+.reltrack .rf{height:100%;border-radius:6px}
+.stage{display:inline-flex;align-items:center;gap:8px;background:#a98bff18;border:1px solid #3a2a6a;color:var(--violet);border-radius:20px;padding:5px 14px;font-size:13px}
+.mem{border-left:2px solid var(--gold);padding:6px 16px;color:var(--dim);font-style:italic;line-height:1.9;background:#ffce8608}
+.proactive{display:flex;gap:11px;align-items:flex-start;background:#0d0d18;border:1px solid var(--line);border-radius:12px;padding:13px 15px}
+.proactive .av{width:36px;height:36px;border-radius:9px;flex:0 0 auto;background-size:cover}
+.proactive .txt{font-size:14px;line-height:1.8}
+.proactive .when{color:var(--faint);font-size:11px;margin-top:5px}
+.miles{position:relative;border-left:2px solid var(--line);margin-left:6px;padding-left:18px}
+.mile{position:relative;margin-bottom:14px}
+.mile:last-child{margin-bottom:0}
+.mile::before{content:"";position:absolute;left:-25px;top:6px;width:9px;height:9px;border-radius:50%;background:var(--violet)}
+.mile .mt{font-size:11px;color:var(--faint)}
+.mile .md{font-size:13.5px;color:var(--dim);margin-top:2px;line-height:1.7}
+
+/* ---------- novel (小说创作) ---------- */
+.novel{display:grid;grid-template-columns:230px 1fr 252px;height:calc(100vh - 58px)}
+.nv-side{border-right:1px solid var(--line-soft);padding:16px 12px;overflow:auto;background:#0b0b1366}
+.nv-side .grp{font-size:11px;color:var(--faint);letter-spacing:1px;margin:6px 6px 8px}
+.nv-ch{padding:9px 11px;border-radius:9px;font-size:13.5px;color:var(--dim);transition:.12s;display:flex;justify-content:space-between;gap:8px}
+.nv-ch:hover{background:#ffffff0a;color:var(--ink)}
+.nv-ch.on{background:linear-gradient(180deg,#ffffff12,#ffffff05);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+.nv-ch .w{color:var(--faint);font-size:11px;flex:0 0 auto}
+.nv-read{overflow:auto;background:radial-gradient(700px 360px at 50% -20%,#15102e 0%,transparent 60%)}
+.reader2{max-width:660px;margin:0 auto;padding:42px 30px 70px}
+.reader2 .ch-t{font-size:12px;color:var(--faint);letter-spacing:6px;text-align:center;margin-bottom:8px}
+.reader2 h2{font-size:25px;text-align:center;margin:0 0 32px;font-weight:600;letter-spacing:1px}
+.reader2 .prose{font-family:Georgia,"Songti SC","Noto Serif SC",serif;font-size:17px;line-height:2.2;color:#dadaec}
+.reader2 .prose p{margin:0 0 18px;text-indent:2em}
+.contbar{max-width:660px;margin:26px auto 0;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;border-top:1px solid var(--line-soft);padding-top:24px}
+.nv-meta{border-left:1px solid var(--line-soft);padding:18px 16px;overflow:auto;background:#0b0b1366}
+.nv-meta h3{font-size:12px;color:var(--faint);letter-spacing:1px;margin:18px 0 10px}
+.nv-meta h3:first-child{margin-top:0}
+.metarow{display:flex;justify-content:space-between;font-size:13px;color:var(--dim);padding:6px 0;border-bottom:1px solid var(--line-soft)}
+.metarow b{color:var(--ink);font-weight:600}
+.hook{font-size:12.5px;color:var(--dim);padding:8px 0;border-bottom:1px solid var(--line-soft);display:flex;gap:9px;align-items:flex-start;line-height:1.5}
+.hdot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;margin-top:5px}
+.hdot.open{background:var(--gold)}.hdot.done{background:var(--good)}.hdot.alpha{background:var(--rose)}
+.pipe{display:flex;gap:6px;flex-wrap:wrap}
+.pipe .step{font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid var(--line);color:var(--faint)}
+.pipe .step.done{color:var(--good);border-color:#1c4a3a}
+.pipe .step.now{color:var(--violet);border-color:#3a2a6a}
+
+/* ---------- characters (角色) ---------- */
+.chars{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:18px}
+.charcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px 18px;text-align:center;cursor:pointer;transition:.18s;position:relative}
+.charcard:hover{transform:translateY(-4px);border-color:#3b3b62;box-shadow:var(--shadow)}
+.charcard .av{width:88px;height:88px;border-radius:50%;margin:0 auto 12px;border:2px solid var(--line);background-size:cover}
+.charcard h3{margin:0 0 3px;font-size:16px}
+.charcard .role{font-size:12px;color:var(--faint);margin-bottom:9px}
+.charcard .from{font-size:12px;color:var(--dim)}
+.charcard .xw{position:absolute;top:12px;right:12px;font-size:10px;color:var(--violet);background:#a98bff18;border:1px solid #3a2a6a;border-radius:20px;padding:2px 9px}
+.charcard.newcard{display:grid;place-items:center;min-height:220px}
+
+/* ---------- 悬浮看板娘（缩=小标 / 展=立绘）---------- */
+.kanban{position:fixed;right:24px;bottom:22px;z-index:80;display:flex;flex-direction:column;align-items:flex-end}
+@keyframes kpulse{0%,100%{box-shadow:0 0 0 0 #62e6a466}50%{box-shadow:0 0 0 6px #62e6a400}}
+.kb-mini{width:54px;height:54px;border-radius:50%;border:2px solid var(--violet);cursor:pointer;position:relative;overflow:hidden;
+  background:radial-gradient(50px 42px at 58% 30%,#ffcf8a55,transparent 70%),linear-gradient(160deg,#2a1c52,#13132a);
+  box-shadow:0 8px 24px #7a5cf055,0 0 0 5px #a98bff12;transition:.18s}
+.kb-mini:hover{transform:scale(1.08)}
+.kb-mini svg{position:absolute;left:50%;bottom:-2px;transform:translateX(-50%);height:52px;width:auto}
+.kb-mini .dot{position:absolute;top:3px;right:5px;width:10px;height:10px;border-radius:50%;background:var(--good);border:2px solid #0b0b13;animation:kpulse 2.2s infinite;z-index:2}
+.kb-stage{display:none;align-items:flex-end;gap:12px}
+.kb-stage.on{display:flex;animation:fade .25s}
+.kb-opts{display:flex;flex-direction:column;align-items:flex-end;gap:9px;margin-bottom:26px}
+.kb-say{max-width:210px;background:var(--surface2);border:1px solid var(--line);border-radius:14px;border-bottom-right-radius:4px;padding:10px 13px;font-size:12.5px;color:var(--dim);line-height:1.65;box-shadow:var(--shadow);margin-bottom:3px}
+.kb-say b{color:var(--ink)}
+.kb-opt{display:inline-flex;align-items:center;gap:8px;background:#15131fe6;backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:22px;padding:9px 16px;font-size:13px;color:var(--dim);cursor:pointer;box-shadow:var(--shadow);transition:.14s;white-space:nowrap}
+.kb-opt:hover{border-color:var(--violet);color:var(--ink);transform:translateX(-4px)}
+.kb-figure{position:relative;filter:drop-shadow(0 10px 16px #000a) drop-shadow(0 0 26px #7a5cf040)}
+.kb-figure svg{height:330px;width:auto;display:block}
+.kb-figure .kb-close{position:absolute;top:2px;right:2px;width:24px;height:24px;border-radius:50%;border:none;background:#0009;color:#fff;font-size:12px;cursor:pointer;z-index:3}
+.kb-figure .kb-close:hover{background:#000d}
+
+/* ---------- right-panel 角色 tab ---------- */
+.pchar{border:1px solid var(--line);border-radius:12px;background:#ffffff05;padding:11px 12px;margin-bottom:10px}
+.pchar .hd{display:flex;gap:10px;align-items:center}
+.pchar .hd .av{width:40px;height:40px;border-radius:10px;flex:0 0 auto;background-size:cover}
+.pchar .hd .t{flex:1;min-width:0}
+.pchar .hd .nm{font-size:13.5px;color:var(--ink)}
+.pchar .hd .rl{font-size:11px;color:var(--faint);margin-top:1px}
+.pchar .hd .toggle{flex:0 0 auto}
+.pchar .ops{display:flex;gap:6px;margin-top:10px}
+.pchar .op{flex:1;text-align:center;font-size:11.5px;color:var(--dim);border:1px solid var(--line);border-radius:8px;padding:5px 0;cursor:pointer;transition:.13s}
+.pchar .op:hover{border-color:var(--violet);color:var(--ink)}
+
+/* chat header 行内动作 */
+.ch-acts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+/* 角色卡 跨世界化身 */
+.charcard .incar{font-size:11px;color:var(--violet);margin-top:7px}
+/* ---------- 素材库 ---------- */
+.assetsec{margin-bottom:26px}
+.assetsec h2{font-size:13px;color:var(--faint);letter-spacing:1px;border-bottom:1px solid var(--line-soft);padding-bottom:8px;margin:0 0 14px;display:flex;justify-content:space-between;align-items:center}
+.assetsec h2 a{font-size:12px;color:var(--violet);cursor:pointer}
+.assetgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:14px}
+.asset{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;cursor:pointer;transition:.15s}
+.asset:hover{border-color:var(--violet);transform:translateY(-3px)}
+.asset .thumb{height:88px;border-radius:8px;margin-bottom:10px;position:relative;overflow:hidden}
+.asset .thumb .em{position:absolute;right:8px;bottom:6px;font-size:22px;filter:drop-shadow(0 2px 5px #0008)}
+.asset h4{margin:0 0 5px;font-size:14px;display:flex;align-items:center;gap:7px}
+.asset .d{font-size:12px;color:var(--faint);line-height:1.55}
+.asset .ty{font-size:10px;color:var(--violet);background:#a98bff18;border:1px solid #3a2a6a;border-radius:20px;padding:1px 8px;font-weight:400}
+
+/* 作品页:视图切换 / 模式带 / 星图 / 编年史 */
+.viewsw{margin-left:auto;display:inline-flex;gap:3px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px}
+.vbtn{padding:6px 13px;border-radius:8px;font-size:13px;color:var(--dim);cursor:pointer;transition:.13s}
+.vbtn:hover{color:var(--ink)}
+.vbtn.on{color:#fff;background:linear-gradient(180deg,var(--violet),var(--violet-d))}
+.wview{display:none}.wview.on{display:block;animation:fade .2s}
+.modebar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin-bottom:18px}
+.modebar .ml{font-size:13px;color:var(--faint)}
+.mchip{font-size:12.5px;padding:5px 12px;border-radius:20px;border:1px solid var(--line);color:var(--dim);background:#ffffff05;cursor:pointer;transition:.13s}
+.mchip:hover{border-color:var(--violet);color:var(--ink)}
+.mchip.core{color:var(--violet);border-color:#3a2a6a;background:#a98bff14}
+.nexusmap{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:10px}
+.nexusmap svg{width:100%;height:auto;display:block}
+.nx-edge{stroke:#5a4a9a;stroke-width:1.5;stroke-dasharray:5 5;opacity:.7}
+.nx-elabel{fill:var(--cyan);font-size:12px;text-anchor:middle}
+.nx-node circle{stroke-width:2;cursor:pointer;transition:.15s}
+.nx-node:hover circle{filter:brightness(1.25)}
+.nx-name{fill:var(--ink);font-size:13px;text-anchor:middle}
+.chron{border-left:2px solid var(--line);margin-left:8px;padding-left:20px}
+.cev{position:relative;margin-bottom:16px}
+.cev::before{content:"";position:absolute;left:-27px;top:5px;width:10px;height:10px;border-radius:50%;background:var(--violet);border:2px solid var(--bg)}
+.cev.star::before{background:var(--gold)}
+.cev.xw::before{background:var(--cyan)}
+.cev .w{font-size:11px;color:var(--faint)}
+.cev .h{font-size:14.5px;color:var(--ink);margin-top:2px}
+.cev .h .star{color:var(--gold);font-size:12px;margin-left:6px}
+.cev .d{font-size:12.5px;color:var(--dim);margin-top:3px;line-height:1.6}
+/* 对话页:swipe / 状态面板 HUD / 快速回复 */
+.swipe{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--faint);margin:3px 0 0 45px}
+.swipe a{cursor:pointer;color:var(--dim)}.swipe a:hover{color:var(--ink)}
+.hud{background:#0d0d18;border:1px solid var(--line);border-radius:13px;padding:12px 15px;max-width:80%}
+.hud .ht{color:var(--faint);font-size:11px;margin-bottom:9px;letter-spacing:.5px}
+.hud .hrow{display:flex;justify-content:space-between;font-size:12.5px;color:var(--dim);margin-bottom:6px}
+.hud .hrow b{color:var(--cyan);font-weight:600}
+.hud .hbar{height:6px;border-radius:5px;background:#2a2a44;overflow:hidden;margin-top:4px}
+.hud .hbar .f{height:100%;border-radius:5px}
+.qrbar{max-width:760px;margin:0 auto;display:flex;gap:7px;flex-wrap:wrap;padding:0 0 9px}
+.qr{font-size:12.5px;padding:5px 12px;border-radius:16px;border:1px solid var(--line);color:var(--dim);background:var(--surface);cursor:pointer;transition:.13s}
+.qr:hover{border-color:var(--violet);color:var(--ink)}
+/* 响应式适配 */
+@media(max-width:1024px){
+  .chatgrid{grid-template-columns:1fr;height:auto}
+  .convlist,.rpanel{display:none}
+  .novel{grid-template-columns:1fr;height:auto}
+  .nv-side,.nv-meta{display:none}
+  .comp{grid-template-columns:1fr}
+  .her{position:static}
+  .wb{grid-template-columns:1fr}
+}
+
+/* 导演指令 OOC 通道 */
+.oocbar{max-width:760px;margin:0 auto;display:flex;align-items:center;gap:10px;padding:0 0 8px}
+.ooc-toggle{font-size:12.5px;padding:5px 13px;border-radius:16px;border:1px solid var(--line);color:var(--dim);background:var(--surface);cursor:pointer;transition:.13s;white-space:nowrap}
+.ooc-toggle:hover{border-color:var(--gold);color:var(--ink)}
+.ooc-toggle.on{color:var(--gold);border-color:#5a4a1a;background:#ffce8614}
+.ooc-hint{font-size:11.5px;color:var(--faint)}
+.composer.director textarea{border-color:var(--gold)}
+.composer.director .sendbtn{background:linear-gradient(180deg,var(--gold),#d9a93f)}
+.qrbar.dir{display:none}
+.composer.director .qrbar:not(.dir){display:none}
+.composer.director .qrbar.dir{display:flex}
+.qrbar.dir .qr{border-style:dashed;color:var(--gold)}
+/* 消息悬停菜单 + 记忆溯源 */
+.bcol{display:flex;flex-direction:column;max-width:80%}
+.bcol .bubble{max-width:none}
+.mtools{display:none;gap:13px;font-size:11.5px;color:var(--faint);margin:5px 0 0 2px}
+.brow.msg:hover .mtools{display:flex}
+.mtools a{cursor:pointer}.mtools a:hover{color:var(--ink)}
+.trace{display:none;margin:8px 0 0 2px;background:#0d0d18;border:1px solid var(--line);border-radius:11px;padding:11px 13px;font-size:12px;color:var(--dim);max-width:520px}
+.trace.on{display:block;animation:fade .2s}
+.trace .tt{color:var(--faint);font-size:11px;letter-spacing:.5px;margin-bottom:9px}
+.trace .tr{display:flex;gap:8px;margin-bottom:7px;line-height:1.5}
+.trace .tk{color:var(--faint);flex:0 0 70px}
+.tag2{display:inline-block;font-size:11px;padding:1px 8px;border-radius:20px;border:1px solid #3a2a6a;color:var(--violet);background:#a98bff14;margin:0 4px 4px 0}
+/* 当前驱动 Active Drives */
+.drives{background:#0d0d18;border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:14px}
+.drives .dh{font-size:11px;color:var(--faint);letter-spacing:.5px;margin-bottom:10px}
+.drive{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.drive:last-child{margin-bottom:0}
+.drive .di{width:18px;height:18px;border-radius:50%;background:#a98bff22;color:var(--violet);font-size:11px;display:grid;place-items:center;flex:0 0 auto}
+.drive .dt{flex:1;font-size:13px;color:var(--dim)}
+.drive .db{width:46px;height:5px;border-radius:4px;background:#2a2a44;overflow:hidden;flex:0 0 auto}
+.drive .db .f{display:block;height:100%;background:linear-gradient(90deg,var(--violet),var(--cyan))}
+/* 看板娘控制台 */
+.kb-console{font-size:11px;color:var(--faint);background:#0d0d18cc;border:1px solid var(--line);border-radius:12px;padding:7px 11px;backdrop-filter:blur(6px);box-shadow:var(--shadow);white-space:nowrap}
+/* 导航:资源下拉 */
+.navdrop{position:relative}
+.navdrop>.dt{display:flex;align-items:center;gap:6px;padding:7px 11px;border-radius:10px;color:var(--dim);font-size:14px;cursor:pointer;transition:.15s}
+.navdrop:hover>.dt{background:#ffffff0a;color:var(--ink)}
+.navmenu{display:none;position:absolute;top:100%;left:0;margin-top:6px;background:var(--surface2);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:6px;min-width:148px;z-index:40}
+.navdrop:hover .navmenu{display:block}
+.navmenu a{display:block;padding:8px 12px;border-radius:8px;color:var(--dim);font-size:14px}
+.navmenu a:hover{background:#ffffff0a;color:var(--ink)}
+/* 回响:离别场景（产品里情感浓度最高的一刻） */
+.farewell{display:none;position:fixed;inset:0;z-index:100;background:radial-gradient(820px 620px at 50% 28%,#1a1338 0%,#06060c 72%);align-items:center;justify-content:center;padding:30px;animation:fade .3s}
+.farewell.on{display:flex}
+.fw-card{max-width:450px;text-align:center}
+.fw-portrait{width:118px;height:118px;border-radius:50%;margin:0 auto 22px;border:2px solid var(--violet);box-shadow:0 0 50px #7a5cf055;background-size:cover}
+.fw-k{font-size:12px;letter-spacing:4px;color:var(--gold);margin-bottom:14px}
+.fw-card h2{font-size:22px;margin:0 0 20px;font-weight:600}
+.fw-say{font-size:16px;color:var(--ink);line-height:2.1;font-style:italic;margin-bottom:14px}
+.fw-note{font-size:13px;color:var(--dim);line-height:1.85;margin-bottom:28px}
+.fw-acts{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand"><span class="logo">暗宇宙</span><span class="en">ShadowVerse</span></div>
+  <nav class="nav" id="nav">
+    <a data-p="chat" class="on">💬 对话</a>
+    <a data-p="companion">💗 陪伴</a>
+    <a data-p="novel">✍ 小说</a>
+    <a data-p="works">🎴 作品</a>
+    <a data-p="chars">👤 角色</a>
+    <div class="navdrop"><span class="dt">🗂 资源 ▾</span>
+      <div class="navmenu"><a data-p="worldbook">📜 世界书</a><a data-p="assets">🧩 素材</a><a data-p="presets">🎚 预设</a></div>
+    </div>
+    <a data-p="settings">⚙ 设置</a>
+  </nav>
+  <div class="spacer"></div>
+  <button class="iconbtn" title="帮助">？</button>
+  <button class="iconbtn" title="主题">🌙</button>
+  <a class="loginpill">⊹ 登录</a>
+</div>
+<div class="banner">⟡ <b>前端重设计原型</b>（假数据 · 纯演示）。三种玩法：对话 · 陪伴 · 小说，加暗宇宙的跨世界回响；世界 / 实体 / 魂 等工程概念藏在后台。</div>
+
+<!-- ================= 对话 / 扮演 ================= -->
+<div class="page on" id="page-chat">
+  <div class="chatgrid">
+    <!-- conversation list -->
+    <div class="convlist">
+      <button class="btn newconv">＋ 新建对话</button>
+      <div class="convsearch">🔍 <input placeholder="搜索对话…"></div>
+      <div class="convgrp">最近</div>
+      <div class="conv on">
+        <div class="av cv-night"></div>
+        <div class="t"><div class="nm">夜行动物</div><div class="pv">凌晨三点，便利店的窗边…</div></div>
+      </div>
+      <div class="conv">
+        <div class="av cv-heal"></div>
+        <div class="t"><div class="nm">海街有风</div><div class="pv">夏天的尾巴，电车驶过…</div></div>
+      </div>
+      <div class="conv">
+        <div class="av cv-cyber"></div>
+        <div class="t"><div class="nm">2099 霓虹</div><div class="pv">NIGHT CITY TERMINAL…</div></div>
+      </div>
+    </div>
+
+    <!-- chat main -->
+    <div class="chatmain">
+      <div class="chathead">
+        <div class="av cv-night"></div>
+        <div><div class="nm">夜行动物 · 苏屿</div><div class="meta">都市校园 · 命运初遇 · 第二人称沉浸</div></div>
+        <div class="ch-acts">
+          <button class="btn ghost sm">🖼 配图</button>
+          <button class="btn ghost sm">📖 沉淀成小说</button>
+          <button class="btn ghost sm" onclick="document.getElementById('farewell').classList.add('on')">✦ 带去别的世界</button>
+        </div>
+      </div>
+      <div class="scroll">
+        <div class="thread">
+          <!-- styled opening (作品 first message) -->
+          <div class="opening">
+            <div class="lead">
+              你有你的城市地图，和别人的不一样。<br>
+              白天那张你用不上。你熟的是另一张：哪家便利店的灯彻夜不灭，末班地铁停在几点，哪栋楼的天台没锁。<br>
+              你是这座城市的<b>夜行动物</b>，习惯了一个人。<br>
+              可最近这张地图上，开始反复出现同一个人——一个和你一样、不肯睡的人。
+            </div>
+            <div class="div">你们是怎么遇上的</div>
+            <div class="choice"><div class="em">🏪</div><div class="ct"><div class="h">便利店的窗边</div><div class="d">凌晨三点，靠窗的高脚凳，她面前那杯咖啡早凉透了，她盯着玻璃里自己的倒影发呆</div></div></div>
+            <div class="choice"><div class="em">🚇</div><div class="ct"><div class="h">末班地铁</div><div class="d">空车厢只有你们两个，到站提示音响了又响，她靠着扶杆睡着了</div></div></div>
+            <div class="choice"><div class="em">🌃</div><div class="ct"><div class="h">天台的风</div><div class="d">你上来透口气，发现栏杆边早站着一个人，风把她的话吹过来半句</div></div></div>
+            <div class="choice"><div class="em">☔</div><div class="ct"><div class="h">屋檐下的雨</div><div class="d">雨毫无预兆地砸下来，便利店屋檐下只剩你、她，和一把谁都没带的伞</div></div></div>
+            <div class="div">或者</div>
+            <div class="choice"><div class="em">🚶</div><div class="ct"><div class="h">你自己写</div><div class="d">直接告诉我，你们是在哪个失眠的夜里撞上的</div></div></div>
+            <div class="free">城市没睡。你也没有。</div>
+          </div>
+
+          <!-- a sample exchange -->
+          <div class="brow user"><div class="cav" style="background:linear-gradient(135deg,#2f9e9e,#6a4ad0)"></div>
+            <div class="bubble user">我拉开她隔壁的椅子坐下。"……这杯，凉了吧。"</div></div>
+          <div class="brow msg"><div class="cav cv-night"></div>
+            <div class="bcol">
+              <div class="bubble char"><em>她没回头，先笑了一下。</em>"……你也是。"<em>停了半秒，才转过来看你，眼角有点红，是困的那种红。她把吸管咬扁了一点。</em>"这个点还醒着的，都不是什么好人。放心，我也不是。"</div>
+              <div class="mtools"><a onclick="document.getElementById('trace1').classList.toggle('on')">🔍 溯源</a><a>＋ 提取为世界书</a><a>🖼 配图</a><a>✎ 编辑</a></div>
+              <div class="trace" id="trace1">
+                <div class="tt">⌖ 这句话从哪来</div>
+                <div class="tr"><span class="tk">触发世界书</span><span><span class="tag2">那家便利店</span><span class="tag2">苏屿 · 人设</span></span></div>
+                <div class="tr"><span class="tk">检索记忆</span><span>初遇 · 暂无历史可检索</span></div>
+                <div class="tr"><span class="tk">起作用锚点</span><span>"嘴硬心软" · "怕被看穿，又渴望被看穿"</span></div>
+              </div>
+            </div></div>
+          <div class="swipe">◀ <span>候选 2 / 3</span> ▶ <a>🔄 换一个</a> <a>↩ 撤回</a> <a>🎭 立绘表情</a></div>
+          <div class="brow"><div class="cav cv-night"></div>
+            <div class="hud">
+              <div class="ht">⌬ 状态面板 · 角色输出的 html 在沙箱里渲染</div>
+              <div class="hrow"><span>夜 23:47 · 便利店窗边</span><b>第 1 夜</b></div>
+              <div class="hrow"><span>好感</span><b>+2 → 14</b></div>
+              <div class="hbar"><div class="f" style="width:14%;background:linear-gradient(90deg,var(--rose),var(--gold))"></div></div>
+              <div class="hrow" style="margin-top:8px"><span>她的心防</span><b>71</b></div>
+              <div class="hbar"><div class="f" style="width:71%;background:linear-gradient(90deg,#4a4a6a,#7a5cf0)"></div></div>
+            </div></div>
+        </div>
+      </div>
+      <div class="composer" id="composer">
+        <div class="oocbar"><span class="ooc-toggle" id="ooctgl">🎬 导演指令</span><span class="ooc-hint" id="oochint">关：你在对她说话</span></div>
+        <div class="qrbar"><span class="qr">问她在等谁</span><span class="qr">"陪你坐一会儿"</span><span class="qr">起身要走</span><span class="qr">点两份关东煮</span></div>
+        <div class="qrbar dir"><span class="qr">[下一幕开始下雨]</span><span class="qr">[她更冷淡一点]</span><span class="qr">[跳到第二天清晨]</span><span class="qr">[加一段环境描写]</span></div>
+        <div class="box">
+          <textarea id="composerta" placeholder="对 苏屿 说点什么……"></textarea>
+          <button class="sendbtn" id="sendbtn">➤</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- right panel -->
+    <div class="rpanel">
+      <div class="ptabs" id="ptabs">
+        <div class="ptab on" data-pt="info">作品</div>
+        <div class="ptab" data-pt="sw">开关</div>
+        <div class="ptab" data-pt="param">参数</div>
+        <div class="ptab" data-pt="chars">角色</div>
+      </div>
+      <div class="pbody">
+        <div class="ptab-pane on" data-pt="info">
+          <div class="cardinfo">
+            <div class="cov cv-night"></div>
+            <h3>夜行动物</h3>
+            <div class="by">by 你 · 都市校园 / 命运初遇</div>
+            <p>这座城市有四百万人。凌晨三点，醒着的只有我们两个。<br><br>苏屿，大三。白天礼貌而疏离，夜里松弛、嘴利、偶尔说很真的话。你也是夜行动物——你们一次次"碰巧"再遇，都假装那是偶然。</p>
+            <div class="tags"><span class="tag v">都市</span><span class="tag c">校园</span><span class="tag g">治愈</span><span class="tag">命运初遇</span></div>
+          </div>
+        </div>
+        <div class="ptab-pane" data-pt="sw">
+          <div class="sw-grp">功能</div>
+          <div class="sw"><div class="l">活人感加强<small>压通用腔，让她像一个人</small></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+          <div class="sw"><div class="l">对白优化<small>口语化、有停顿、有潜台词</small></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+          <div class="sw"><div class="l">防超雄<small>不把你写成无敌主角</small></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+          <div class="sw"><div class="l">防抢话<small>绝不替你发言</small></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+          <div class="sw"><div class="l">内心话<small>显示她的内心独白</small></div><div class="toggle" onclick="this.classList.toggle('on')"></div></div>
+          <div class="sw-grp">文风</div>
+          <div class="sw"><div class="l">文风 · 五感<small>调动视听嗅触</small></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+          <div class="sw"><div class="l">白描基调<small>克制、不堆砌形容</small></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+          <div class="sw"><div class="l">文风 · 自然<small>去 AI 味</small></div><div class="toggle" onclick="this.classList.toggle('on')"></div></div>
+          <div class="sw-grp">人称</div>
+          <div class="sw"><div class="l">第二人称（你）</div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+          <div class="sw"><div class="l">第三人称</div><div class="toggle" onclick="this.classList.toggle('on')"></div></div>
+        </div>
+        <div class="ptab-pane" data-pt="param">
+          <div class="slider-row"><div class="lab"><span>温度 Temperature</span><b>0.9</b></div><div class="track"><div class="fill" style="width:60%"></div><div class="knob" style="left:60%"></div></div></div>
+          <div class="slider-row"><div class="lab"><span>上下文长度</span><b>128K</b></div><div class="track"><div class="fill" style="width:80%"></div><div class="knob" style="left:80%"></div></div></div>
+          <div class="slider-row"><div class="lab"><span>回复长度偏好</span><b>中</b></div><div class="track"><div class="fill" style="width:50%"></div><div class="knob" style="left:50%"></div></div></div>
+          <div class="var"><div class="vh"><span class="vn">好感</span><span class="vv">14</span></div><div class="vtrack"><div class="vf" style="width:14%;background:linear-gradient(90deg,var(--rose),var(--gold))"></div></div></div>
+          <div class="var"><div class="vh"><span class="vn">信任</span><span class="vv">22</span></div><div class="vtrack"><div class="vf" style="width:22%;background:linear-gradient(90deg,var(--violet),var(--cyan))"></div></div></div>
+          <div class="var"><div class="vh"><span class="vn">心防</span><span class="vv">71</span></div><div class="vtrack"><div class="vf" style="width:71%;background:linear-gradient(90deg,#4a4a6a,#7a5cf0)"></div></div></div>
+          <p class="note">变量面板由作品的「写卡器」自动识别该追踪什么，带护栏防模型乱写。</p>
+        </div>
+        <div class="ptab-pane" data-pt="chars">
+          <div class="drives">
+            <div class="dh">⚡ 当前驱动 · 苏屿此刻最想做的</div>
+            <div class="drive"><span class="di">1</span><span class="dt">弄清楚你到底是谁</span><span class="db"><span class="f" style="width:82%"></span></span></div>
+            <div class="drive"><span class="di">2</span><span class="dt">维持"我无所谓"的样子</span><span class="db"><span class="f" style="width:64%"></span></span></div>
+            <div class="drive"><span class="di">3</span><span class="dt">不想现在回那间空房子</span><span class="db"><span class="f" style="width:51%"></span></span></div>
+          </div>
+          <div class="pchar">
+            <div class="hd"><div class="av cv-night"></div><div class="t"><div class="nm">苏屿</div><div class="rl">主角 · ✦ 跨世界</div></div><div class="toggle on" title="在场" onclick="this.classList.toggle('on')"></div></div>
+            <div class="ops"><span class="op">资料</span><span class="op">编辑</span><span class="op">立绘</span><span class="op">记忆</span></div>
+            <button class="btn ghost sm" style="width:100%;justify-content:center;margin-top:9px">✦ 跨世界化身对照</button>
+          </div>
+          <div class="pchar">
+            <div class="hd"><div class="av cv-night"></div><div class="t"><div class="nm">深夜食堂的老板</div><div class="rl">配角</div></div><div class="toggle" title="在场" onclick="this.classList.toggle('on')"></div></div>
+            <div class="ops"><span class="op">资料</span><span class="op">编辑</span><span class="op">立绘</span><span class="op">记忆</span></div>
+          </div>
+          <button class="btn ghost sm" style="width:100%;justify-content:center;margin-top:2px">＋ 添加角色到本作品</button>
+          <p class="note">「在场」决定这一场谁会开口；多个在场即群聊。<a style="color:var(--violet)">你扮演谁 ›</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 作品库 ================= -->
+<div class="page" id="page-works">
+  <div class="wrap">
+    <div class="page-head"><h1>作品</h1><span class="sub">世界孕育故事，故事留下回响</span>
+      <div class="viewsw" id="worksview"><span class="vbtn on" data-v="gallery">▦ 画廊</span><span class="vbtn" data-v="nexus">✦ 星图</span><span class="vbtn" data-v="chron">📜 编年史</span></div>
+    </div>
+    <div class="wview on" data-v="gallery">
+    <div class="modebar"><span class="ml">用任意玩法开局：</span><span class="mchip core">💬 酒馆RP</span><span class="mchip core">✍ 小说</span><span class="mchip core">💗 陪伴</span><span class="mchip">🎮 CYOA</span><span class="mchip">🎬 剧本</span><span class="mchip">🖼 漫画</span><span class="mchip">🎲 跑团</span><span class="mchip">🎵 音乐</span><span class="mchip">📚 教育</span><span class="mchip">🌙 梦境</span><span class="mchip">🧭 世界探索</span></div>
+    <div class="toolrow">
+      <div class="searchbar">🔍 <input placeholder="搜索作品…"></div>
+      <button class="btn ghost sm">⤓ 导入</button>
+      <button class="btn sm">＋ 新建作品</button>
+      <button class="btn ai sm">✨ AI 制作</button>
+    </div>
+    <div class="chips">
+      <span class="fchip on">全部</span><span class="fchip">都市</span><span class="fchip">校园</span><span class="fchip">治愈</span>
+      <span class="fchip">武侠</span><span class="fchip">赛博朋克</span><span class="fchip">日式</span><span class="fchip">角色扮演</span>
+    </div>
+    <div class="works">
+      <div class="work">
+        <div class="cover cv-night"><div class="vig"></div><div class="sigil">🌃</div></div>
+        <div class="body">
+          <h3>夜行动物</h3>
+          <div class="desc">这座城市有四百万人。凌晨三点，醒着的只有我们两个。苏屿，大三，白天礼貌疏离，夜里嘴利又温柔。</div>
+          <div class="tags"><span class="tag v">都市</span><span class="tag c">校园</span><span class="tag g">治愈</span></div>
+          <div class="foot"><span>by 你</span><span>💬 1</span></div>
+        </div>
+        <div class="menu">⋯</div>
+      </div>
+      <div class="work">
+        <div class="cover cv-heal"><div class="vig"></div><div class="sigil">⛩️</div></div>
+        <div class="body">
+          <h3>海街有风</h3>
+          <div class="desc">父母离婚后，你搬到临海的小镇。新的夏天，从一班慢悠悠的电车开始。</div>
+          <div class="tags"><span class="tag c">日式</span><span class="tag g">治愈</span><span class="tag">青春</span></div>
+          <div class="foot"><span>by 你</span><span>💬 0</span></div>
+        </div>
+        <div class="menu">⋯</div>
+      </div>
+      <div class="work">
+        <div class="cover cv-cyber"><div class="vig"></div><div class="sigil">🌧️</div></div>
+        <div class="body">
+          <h3>2099 霓虹</h3>
+          <div class="desc">夜之城的数据终端，认证已通过。流浪者、街头小子、公司员工——选一条人生道路。</div>
+          <div class="tags"><span class="tag v">赛博朋克</span><span class="tag">开放世界</span><span class="tag">角色扮演</span></div>
+          <div class="foot"><span>by 你</span><span>💬 3</span></div>
+        </div>
+        <div class="menu">⋯</div>
+      </div>
+      <div class="work">
+        <div class="cover cv-wuxia"><div class="vig"></div><div class="sigil">⚔️</div></div>
+        <div class="body">
+          <h3>长夜将尽</h3>
+          <div class="desc">江湖夜雨十年灯。一柄刀，一壶酒，和一个你以为再也不会重逢的人。</div>
+          <div class="tags"><span class="tag g">武侠</span><span class="tag">宿命</span><span class="tag">并肩</span></div>
+          <div class="foot"><span>by 你</span><span>💬 0</span></div>
+        </div>
+        <div class="menu">⋯</div>
+      </div>
+      <div class="work newcard">
+        <div><div style="font-size:34px">＋</div><div style="margin-top:8px">新建作品</div><div style="font-size:12px;margin-top:4px">手写 · 导入卡 · ✨ AI 制作</div></div>
+      </div>
+    </div>
+    </div>
+    <div class="wview" data-v="nexus">
+      <p class="lead" style="margin:6px 0 14px">你创造的世界与角色如何彼此相连 —— 连线上标的是在两个世界间穿行的角色（✦ 跨世界）。</p>
+      <div class="nexusmap"><svg viewBox="0 0 800 380" xmlns="http://www.w3.org/2000/svg">
+        <line class="nx-edge" x1="170" y1="130" x2="470" y2="100"/><text class="nx-elabel" x="320" y="103">苏屿 ✦</text>
+        <line class="nx-edge" x1="470" y1="100" x2="620" y2="250"/><text class="nx-elabel" x="560" y="168">V ✦</text>
+        <line class="nx-edge" x1="170" y1="130" x2="240" y2="290"/><text class="nx-elabel" x="178" y="216">同源</text>
+        <g class="nx-node"><circle cx="170" cy="130" r="34" fill="#1a1730" stroke="#a98bff"/><text class="nx-name" x="170" y="187">夜行动物</text></g>
+        <g class="nx-node"><circle cx="470" cy="100" r="34" fill="#0f2030" stroke="#5fe3d2"/><text class="nx-name" x="470" y="157">2099 霓虹</text></g>
+        <g class="nx-node"><circle cx="620" cy="250" r="34" fill="#241d10" stroke="#ffce86"/><text class="nx-name" x="620" y="307">长夜将尽</text></g>
+        <g class="nx-node"><circle cx="240" cy="290" r="34" fill="#16241a" stroke="#97c459"/><text class="nx-name" x="240" y="347">海街有风</text></g>
+      </svg></div>
+    </div>
+    <div class="wview" data-v="chron">
+      <p class="lead" style="margin:6px 0 16px">《夜行动物》编年史 —— 跨所有故事线的事件与 ★ 成长时刻，跨世界的去向也标在这里。</p>
+      <div class="chron">
+        <div class="cev"><div class="w">第 1 天 · 便利店</div><div class="h">初遇</div><div class="d">凌晨三点坐到她隔壁。"这个点还醒着的，都不是什么好人。"</div></div>
+        <div class="cev star"><div class="w">第 9 天 · 天台</div><div class="h">她第一次松口 <span class="star">★ 成长</span></div><div class="d">说起那个不会响的手机，"心防"第一次降了一格。</div></div>
+        <div class="cev"><div class="w">第 18 天 · 末班地铁</div><div class="h">并肩坐过站</div><div class="d">两个人一起坐到终点，谁都没提要下车。</div></div>
+        <div class="cev star"><div class="w">第 27 天 · 便利店</div><div class="h">她第一次主动叫你 <span class="star">★ 成长</span></div><div class="d">"……要不，老地方？"——关系推进到"暧昧"。</div></div>
+        <div class="cev xw"><div class="w">— · 跨世界</div><div class="h">苏屿被带入《2099 霓虹》</div><div class="d">她带着这 27 天的记忆，走进了另一个世界。</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 陪伴 / 虚拟女友 ================= -->
+<div class="page" id="page-companion">
+  <div class="wrap">
+    <div class="page-head"><h1>陪伴</h1><span class="sub">一个一直在的人</span></div>
+    <div class="comp" style="margin-top:18px">
+      <div class="her">
+        <div class="portrait cv-night"><div class="vig"></div><div class="name"><b>苏屿</b><span>大三 · 你们认识 27 天</span></div></div>
+        <div class="stat">
+          <div class="line"><i>◷</i> 此刻：便利店窗边，又没睡</div>
+          <div class="line"><i>♡</i> 心情：困，但好像在等谁</div>
+          <div class="line"><i>✎</i> 在忙：交不出去的设计作业</div>
+        </div>
+      </div>
+      <div class="compmain">
+        <section>
+          <h2>关系 <small>你们之间发生过的事的总和</small></h2>
+          <div class="stage">暧昧 · 第三阶段：她开始等你的消息</div>
+          <div class="rel" style="margin-top:16px">
+            <div class="relrow"><div class="rt"><span class="rn">好感</span><span class="rv">62</span></div><div class="reltrack"><div class="rf" style="width:62%;background:linear-gradient(90deg,var(--rose),var(--gold))"></div></div></div>
+            <div class="relrow"><div class="rt"><span class="rn">心动</span><span class="rv">48</span></div><div class="reltrack"><div class="rf" style="width:48%;background:linear-gradient(90deg,var(--rose),var(--violet))"></div></div></div>
+            <div class="relrow"><div class="rt"><span class="rn">信任</span><span class="rv">55</span></div><div class="reltrack"><div class="rf" style="width:55%;background:linear-gradient(90deg,var(--violet),var(--cyan))"></div></div></div>
+            <div class="relrow"><div class="rt"><span class="rn">心防</span><span class="rv">41</span></div><div class="reltrack"><div class="rf" style="width:41%;background:linear-gradient(90deg,#4a4a6a,#7a5cf0)"></div></div></div>
+          </div>
+        </section>
+        <section>
+          <h2>她是谁 <small>不会变的内核 · 锚点</small></h2>
+          <div class="kwrow"><span class="kw">习惯独处</span><span class="kw">夜里才真实</span><span class="kw">怕被看穿，又渴望被看穿</span><span class="kw">嘴硬心软</span></div>
+        </section>
+        <section>
+          <h2>她给你发了条消息 <small>2 分钟前</small></h2>
+          <div class="proactive">
+            <div class="av cv-night"></div>
+            <div><div class="txt">"又是这个点……你也没睡吧。我赌五块钱，你现在也盯着天花板。"<br>"……要不，老地方？"</div><div class="when">凌晨 3:14</div></div>
+          </div>
+        </section>
+        <section>
+          <h2>她记得 <small>从你们的共同经历里被唤起的一刻</small></h2>
+          <div class="mem">"上次你说，便利店太亮，亮得没人会注意一个发呆的人。我后来想了很久——其实，我注意到你了。"</div>
+        </section>
+        <section>
+          <h2>你们的重要时刻</h2>
+          <div class="miles">
+            <div class="mile"><div class="mt">第 1 天 · 便利店</div><div class="md">第一次坐到她隔壁。"这个点还醒着的，都不是什么好人。"</div></div>
+            <div class="mile"><div class="mt">第 9 天 · 天台</div><div class="md">她第一次说起那个不会响的手机。你没追问，她记住了这一点。</div></div>
+            <div class="mile"><div class="mt">第 27 天 · 今夜</div><div class="md">她第一次，主动叫你出来。</div></div>
+          </div>
+        </section>
+        <section>
+          <h2>✦ 回响 <small>把她带出这个世界</small></h2>
+          <p style="color:var(--dim);font-size:13px;line-height:1.75;margin:0 0 13px">她已经走过 27 天的星凪夜。你可以把她从《夜行动物》里带出来——她会带着这些记忆，走进别的世界继续陪你。原来的世界照常运转，而你手里这个，是带着这段经历的她。</p>
+          <button class="btn ghost sm" onclick="document.getElementById('farewell').classList.add('on')">✦ 带苏屿离开这个世界</button>
+        </section>
+        <div class="composer" style="border:none;padding:0;background:none">
+          <div class="box" style="max-width:none"><textarea placeholder="回她……"></textarea><button class="sendbtn">➤</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 小说创作 ================= -->
+<div class="page" id="page-novel">
+  <div class="novel">
+    <div class="nv-side">
+      <div class="grp">长夜将尽 · 目录</div>
+      <div class="nv-ch on">第一章 · 雨夜归人 <span class="w">2.4k</span></div>
+      <div class="nv-ch">第二章 · 旧刀 <span class="w">2.7k</span></div>
+      <div class="nv-ch">第三章 · 酒肆相逢 <span class="w">3.1k</span></div>
+      <div class="nv-ch">第四章 · 十年灯 <span class="w">2.9k</span></div>
+      <div class="grp" style="margin-top:18px">大纲</div>
+      <div class="nv-ch">立意 · 江湖夜雨十年灯</div>
+      <div class="nv-ch">主线 · 重逢与未了的诺言</div>
+      <div class="grp" style="margin-top:18px">分支 · 蝴蝶效应</div>
+      <div class="nv-ch">⑂ 若沈砚先出刀 <span class="w">从①</span></div>
+      <div class="nv-ch">⑂ 若蓑衣人未现身 <span class="w">从①</span></div>
+    </div>
+    <div class="nv-read">
+      <div class="reader2">
+        <div class="ch-t">第 一 章</div>
+        <h2>雨夜归人</h2>
+        <div class="prose">
+          <p>雨是子时下起来的。沈砚把刀横在膝上，听檐角的水一滴一滴砸进青石的凹处，像是谁在数着什么。</p>
+          <p>客栈的灯只剩一盏，照着空荡的堂屋。他要了一壶最劣的酒，却迟迟没有喝——他在等一个人，一个他以为这辈子都不会再等的人。</p>
+          <p>门被风推开半扇，雨声忽然大了。一个披着蓑衣的身影立在门口，水顺着斗笠的边沿往下淌，看不清脸。可沈砚的手，已经先一步按在了刀柄上。</p>
+          <p>"十年了。"那人开口，声音比雨还冷，"你的刀，还是这么急。"</p>
+        </div>
+        <div class="contbar">
+          <button class="btn ghost sm">⬇ 取写作包</button>
+          <button class="btn ai sm">✨ AI 写下一章</button>
+          <button class="btn ghost sm">✓ 审校</button>
+          <button class="btn ghost sm">🖼 配图</button>
+          <button class="btn ghost sm">⤓ 导出全书</button>
+        </div>
+      </div>
+    </div>
+    <div class="nv-meta">
+      <h3>本书</h3>
+      <div class="metarow"><span>题材</span><b>武侠</b></div>
+      <div class="metarow"><span>章数</span><b>4</b></div>
+      <div class="metarow"><span>字数</span><b>11.1k</b></div>
+      <div class="metarow"><span>节奏</span><b>每章一钩</b></div>
+      <h3>产线 · 写→审→改→落</h3>
+      <div class="pipe"><span class="step done">写手</span><span class="step done">审校</span><span class="step now">修订</span><span class="step">落章</span></div>
+      <p class="note">一键跑产线，自动质检 + 反思校验全局自洽。</p>
+      <h3>钩子台账</h3>
+      <div class="hook"><span class="hdot alpha"></span>α 悬念：那个未了的诺言，究竟是什么</div>
+      <div class="hook"><span class="hdot open"></span>沈砚的旧刀为何不肯出鞘（待回收）</div>
+      <div class="hook"><span class="hdot done"></span>蓑衣人的身份（已揭 · 第一章）</div>
+      <h3>角色</h3>
+      <div class="metarow"><span>沈砚</span><b>主角</b></div>
+      <div class="metarow"><span>蓑衣人</span><b>主角</b></div>
+      <h3>质检 · 反思</h3>
+      <div class="metarow"><span>句式复读</span><b style="color:var(--good)">无</b></div>
+      <div class="metarow"><span>节奏红线</span><b style="color:var(--good)">达标</b></div>
+      <div class="metarow"><span>全局自洽</span><b style="color:var(--gold)">1 处待查</b></div>
+      <h3>一稿多吃</h3>
+      <div class="pipe"><span class="step">→ CYOA</span><span class="step">→ 剧本</span><span class="step">→ 漫画</span><span class="step">→ 跑团</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 角色 ================= -->
+<div class="page" id="page-chars">
+  <div class="wrap">
+    <div class="page-head"><h1>角色</h1><span class="sub">住在你世界里的人 —— 有的，能走出原来的世界</span></div>
+    <div class="toolrow"><div class="searchbar">🔍 <input placeholder="搜索角色…"></div><button class="btn sm">＋ 新建角色</button><button class="btn ai sm">✨ 一句话造角色</button></div>
+    <div class="chips"><span class="fchip on">全部</span><span class="fchip">主角</span><span class="fchip">✦ 跨世界</span><span class="fchip">配角</span></div>
+    <div class="chars">
+      <div class="charcard"><span class="xw">✦ 跨世界</span><div class="av cv-night"></div><h3>苏屿</h3><div class="role">主角</div><div class="from">出自《夜行动物》</div><div class="incar">✦ 现身于 夜行动物 · 2099霓虹</div></div>
+      <div class="charcard"><div class="av cv-wuxia"></div><h3>沈砚</h3><div class="role">主角</div><div class="from">出自《长夜将尽》</div></div>
+      <div class="charcard"><div class="av cv-wuxia"></div><h3>蓑衣人</h3><div class="role">主角</div><div class="from">出自《长夜将尽》</div></div>
+      <div class="charcard"><span class="xw">✦ 跨世界</span><div class="av cv-cyber"></div><h3>V</h3><div class="role">主角</div><div class="from">出自《2099 霓虹》</div><div class="incar">✦ 现身于 2099霓虹 · 长夜将尽</div></div>
+      <div class="charcard"><div class="av cv-heal"></div><h3>店长</h3><div class="role">配角</div><div class="from">出自《海街有风》</div></div>
+      <div class="charcard newcard"><div><div style="font-size:32px">＋</div><div style="margin-top:8px;color:var(--faint)">新建角色</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 素材库 ================= -->
+<div class="page" id="page-assets">
+  <div class="wrap">
+    <div class="page-head"><h1>素材库</h1><span class="sub">造世界的原料 —— 取之即用、可复用</span></div>
+    <div class="toolrow"><div class="searchbar">🔍 <input placeholder="搜索素材…"></div><button class="btn ghost sm">⤓ 导入</button><button class="btn sm">＋ 新建</button><button class="btn ai sm">✨ AI 生成素材</button></div>
+    <div class="chips"><span class="fchip on">全部</span><span class="fchip">灵感元件</span><span class="fchip">立绘 / 图片</span><span class="fchip">封面</span><span class="fchip">文风 · 技巧</span><span class="fchip">开局模板</span><span class="fchip">世界书片段</span><span class="fchip">音乐</span></div>
+
+    <div class="assetsec" style="margin-top:20px">
+      <h2>灵感元件 <a>全部 ›</a></h2>
+      <div class="assetgrid">
+        <div class="asset"><h4>失眠的城市 <span class="ty">场景</span></h4><div class="d">四百万人，凌晨醒着的只有两个。都市孤独的底色。</div></div>
+        <div class="asset"><h4>不会响的手机 <span class="ty">意象</span></h4><div class="d">在等一个不会来的消息——藏在角色心里的钩子。</div></div>
+        <div class="asset"><h4>霓虹与酸雨 <span class="ty">氛围</span></h4><div class="d">赛博夜之城的视觉与体感打底。</div></div>
+        <div class="asset"><h4>未了的诺言 <span class="ty">冲突</span></h4><div class="d">十年前埋下、此刻索债——武侠/宿命常用。</div></div>
+      </div>
+    </div>
+
+    <div class="assetsec">
+      <h2>立绘 / 图片 <a>全部 ›</a></h2>
+      <div class="assetgrid">
+        <div class="asset"><div class="thumb cv-night"><span class="em">🌃</span></div><h4>苏屿 · 夜</h4><div class="d">锁脸立绘 · 4 种表情</div></div>
+        <div class="asset"><div class="thumb cv-wuxia"><span class="em">⚔️</span></div><h4>沈砚 · 雨夜</h4><div class="d">场景图 · 1280×720</div></div>
+        <div class="asset"><div class="thumb cv-cyber"><span class="em">🌧️</span></div><h4>夜之城 · 街景</h4><div class="d">封面候选 · 3 张</div></div>
+        <div class="asset"><div class="thumb cv-heal"><span class="em">⛩️</span></div><h4>星凪町 · 铁道</h4><div class="d">封面 · 已用于《海街有风》</div></div>
+      </div>
+    </div>
+
+    <div class="assetsec">
+      <h2>文风 · 写作技巧 <a>全部 ›</a></h2>
+      <div class="assetgrid">
+        <div class="asset"><h4>五感白描 <span class="ty">文风</span></h4><div class="d">用视听嗅触建氛围，不堆形容词。</div></div>
+        <div class="asset"><h4>去 AI 味 <span class="ty">文风</span></h4><div class="d">破套话、破工整，让句子有呼吸。</div></div>
+        <div class="asset"><h4>悬念钩 13 式 <span class="ty">技巧</span></h4><div class="d">章末留钩、埋伏笔的成套写法。</div></div>
+        <div class="asset"><h4>角色嗓音锁定 <span class="ty">技巧</span></h4><div class="d">从首次开口提取语料指纹，防跑调。</div></div>
+      </div>
+    </div>
+
+    <div class="assetsec">
+      <h2>开局模板 <a>全部 ›</a></h2>
+      <div class="assetgrid">
+        <div class="asset"><h4>LIFEPATH 人生道路 <span class="ty">模板</span></h4><div class="d">多选开局 + 一句钩子，像游戏选人生。</div></div>
+        <div class="asset"><h4>深夜邂逅 <span class="ty">模板</span></h4><div class="d">命运初遇式开场，自带氛围引子。</div></div>
+        <div class="asset"><h4>转学生 <span class="ty">模板</span></h4><div class="d">校园日常的经典切入。</div></div>
+        <div class="asset"><h4>终端启动 <span class="ty">模板</span></h4><div class="d">科幻/赛博的系统面板式开场。</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 世界书 ================= -->
+<div class="page" id="page-worldbook">
+  <div class="wrap">
+    <div class="page-head"><h1>世界书 <span class="sub">· 夜行动物</span></h1></div>
+    <div class="toolrow"><div class="searchbar">🔍 <input placeholder="搜索条目…"></div><button class="btn sm">＋ 新建条目</button></div>
+    <div class="wb" style="margin-top:18px">
+      <div class="list" id="wblist">
+        <div class="entry on">那家便利店 <span class="badge">常驻</span></div>
+        <div class="entry">末班地铁</div>
+        <div class="entry">楼顶天台</div>
+        <div class="entry">苏屿的秘密</div>
+        <div class="entry">深夜食堂的老板</div>
+        <div class="entry">大学城地图</div>
+        <div class="entry">那个不会响的手机</div>
+        <div class="entry">雨</div>
+      </div>
+      <div class="editor">
+        <div class="field"><label>条目名</label><input value="那家便利店"></div>
+        <div class="field"><label>关键词（命中即注入）</label>
+          <div class="kwrow"><span class="kw">便利店 ✕</span><span class="kw">7-11 ✕</span><span class="kw">关东煮 ✕</span><span class="kw">收银台 ✕</span><span class="kw">＋</span></div>
+        </div>
+        <div class="field"><label>内容</label>
+          <textarea rows="5">校门口那家彻夜不灭的便利店，是苏屿的固定坐标。靠窗一排高脚凳，最尽头那个位子永远是她的。冷气很足，关东煮的味道，整间店亮得让人无处可藏——她说，正因为太亮，反而没人会注意到一个发呆的人。</textarea>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>注入位置</label><select><option>作品描述之前</option><option>对话最近处 @D4</option></select></div>
+          <div class="field"><label>排序优先级</label><input value="10"></div>
+        </div>
+        <div class="swline">常驻（始终注入）<div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="swline">递归触发<div class="toggle" onclick="this.classList.toggle('on')"></div></div>
+        <div class="swline">区分大小写<div class="toggle" onclick="this.classList.toggle('on')"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 预设 ================= -->
+<div class="page" id="page-presets">
+  <div class="wrap">
+    <div class="page-head"><h1>预设 <span class="sub">· 文风与行为开关</span></h1></div>
+    <div class="preset-head" style="margin-top:18px">
+      <select><option>Claude / Gemini 推荐预设</option><option>极简预设</option><option>夜行动物 · 专用</option></select>
+      <span class="note" style="margin:0">启用一个预设 → 它的模块会叠加进对话；右侧"开关"里逐个开合。</span>
+      <div class="spacer" style="flex:1"></div>
+      <button class="btn sm">＋ 添加模块</button>
+    </div>
+    <div class="modlist">
+      <div class="mod"><span class="grip">⠿</span><div class="info"><div class="h">活人感加强 <span class="pill sys">系统</span></div><div class="d">注入"她是一个有身体、有疲惫、有走神的人"的约束，压住模型的通用助手腔。</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+      <div class="mod"><span class="grip">⠿</span><div class="info"><div class="h">对白优化 <span class="pill style">文风</span></div><div class="d">口语化、允许停顿与沉默、给潜台词留白，不每句都把话说满。</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+      <div class="mod"><span class="grip">⠿</span><div class="info"><div class="h">文风 · 五感 <span class="pill style">文风</span></div><div class="d">场景调动视觉/听觉/嗅觉/触觉，建立氛围而非罗列事实。</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+      <div class="mod"><span class="grip">⠿</span><div class="info"><div class="h">防超雄 <span class="pill guard">护栏</span></div><div class="d">不把玩家写成无所不能的主角，世界对你有阻力。</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+      <div class="mod"><span class="grip">⠿</span><div class="info"><div class="h">防抢话 <span class="pill guard">护栏</span></div><div class="d">只写角色言行，绝不替玩家说话或决定。</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+      <div class="mod"><span class="grip">⠿</span><div class="info"><div class="h">思维链折叠 <span class="pill sys">输出</span></div><div class="d">把模型的推理过程折叠隐藏，只显示正文。</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+      <div class="mod"><span class="grip">⠿</span><div class="info"><div class="h">行动选项 <span class="pill sys">输出</span></div><div class="d">每段结尾给 2–4 个可点的下一步选择，像视觉小说。</div></div><div class="toggle" onclick="this.classList.toggle('on')"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 设置 ================= -->
+<div class="page" id="page-settings">
+  <div class="wrap">
+    <div class="page-head"><h1>设置</h1></div>
+    <div class="set-tabs" id="settabs" style="margin-top:18px">
+      <div class="set-tab on" data-st="api">API</div>
+      <div class="set-tab" data-st="chat">对话</div>
+      <div class="set-tab" data-st="display">显示</div>
+      <div class="set-tab" data-st="memory">记忆</div>
+      <div class="set-tab" data-st="vars">变量</div>
+      <div class="set-tab" data-st="data">数据</div>
+    </div>
+    <div class="set-pane on" data-st="api">
+      <div class="field"><label>模型提供方</label><select><option>Anthropic（Claude）</option><option>OpenAI / 兼容端</option><option>Ollama（本地）</option></select></div>
+      <div class="field"><label>API Key</label><input type="password" placeholder="sk-… （只存本机，不入库）"></div>
+      <div class="field"><label>模型</label><input value="claude-sonnet-4-6"></div>
+      <p class="note">独立运行时在这里配自己的 LLM，保存即时生效。作为 skill 嵌入时走宿主模型，无需配置。</p>
+    </div>
+    <div class="set-pane" data-st="chat">
+      <div class="field"><label>你的名字（{{user}}）</label><input value="我"></div>
+      <div class="field"><label>你的人设（角色描述）</label><textarea rows="3" placeholder="可选：你在故事里是谁、性格、背景…"></textarea></div>
+      <div class="swline">流式输出（逐字显示）<div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+      <div class="swline">语音朗读 TTS（让她开口）<div class="toggle" onclick="this.classList.toggle('on')"></div></div>
+      <div class="swline">允许她主动找你（陪伴推送）<div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+      <div class="swline" style="border:none">世界自演化（你不在时世界继续走）<div class="toggle" onclick="this.classList.toggle('on')"></div></div>
+    </div>
+    <div class="set-pane" data-st="display"><p class="empty">主题 / 字号 / 气泡样式 …</p></div>
+    <div class="set-pane" data-st="memory"><p class="empty">长期记忆 / 自动总结 / 检索深度 …</p></div>
+    <div class="set-pane" data-st="vars"><p class="empty">全局变量与默认数值卡 …</p></div>
+    <div class="set-pane" data-st="data"><p class="empty">导入 / 导出 / 备份 universe 数据 …</p></div>
+  </div>
+</div>
+
+<!-- 回响:离别场景 -->
+<div class="farewell" id="farewell">
+  <div class="fw-card">
+    <div class="fw-portrait cv-night"></div>
+    <div class="fw-k">✦ 回 响 ✦</div>
+    <h2>把苏屿带出《夜行动物》</h2>
+    <div class="fw-say">"……要走了？"<br>"那个世界的我，大概会继续在便利店等下去吧。"<br>"没关系。这一段，我带着走。"</div>
+    <div class="fw-note">原来的世界会照常运转，那里的她会走向别的结局。<br>而你带走的，是带着这 27 天的她——一段不会被改写的回响。</div>
+    <div class="fw-acts">
+      <button class="btn ghost" onclick="document.getElementById('farewell').classList.remove('on')">再陪她一会儿</button>
+      <button class="btn" onclick="document.getElementById('farewell').classList.remove('on')">带她走，去新的世界 ✦</button>
+    </div>
+  </div>
+</div>
+
+<!-- 悬浮看板娘:缩=小标 / 展=抠图立绘 + 悬浮选项 -->
+<div class="kanban">
+  <div class="kb-stage" id="kbstage">
+    <div class="kb-opts">
+      <div class="kb-console">⌬ Token 8.2k · 上下文 41% · 世界书 6 条在场</div>
+      <div class="kb-say">凌晨好。<b>要做点什么？</b></div>
+      <div class="kb-opt">✨ 造个新作品</div>
+      <div class="kb-opt">💗 继续陪伴苏屿</div>
+      <div class="kb-opt">✍ 写下一章</div>
+      <div class="kb-opt">🎴 逛作品库</div>
+    </div>
+    <div class="kb-figure">
+      <button class="kb-close" id="kbclose">✕</button>
+      <svg class="figure" viewBox="0 0 180 446" xmlns="http://www.w3.org/2000/svg">
+        <g fill="#ffcf8a"><circle cx="30" cy="58" r="2"/><circle cx="150" cy="44" r="1.7"/><circle cx="142" cy="120" r="1.3"/><circle cx="26" cy="150" r="1.5"/><circle cx="156" cy="232" r="1.5"/></g>
+        <path d="M52 110 Q36 50 90 40 Q144 50 128 110 L138 252 Q124 272 110 250 L108 150 L72 150 L70 250 Q56 272 42 252 Z" fill="#241a44"/>
+        <path d="M76 298 L74 406 Q74 412 81 412 L86 412 L88 302 Z" fill="#1b1730"/>
+        <path d="M92 302 L94 412 L99 412 Q106 412 106 406 L104 298 Z" fill="#1b1730"/>
+        <rect x="74" y="298" width="14" height="10" fill="#3a2c66"/><rect x="92" y="298" width="14" height="10" fill="#3a2c66"/>
+        <path d="M68 412 L88 412 L90 426 Q90 430 84 430 L66 430 Q63 430 64 425 Z" fill="#15121f"/>
+        <path d="M92 412 L110 412 L116 425 Q117 430 114 430 L96 430 Q90 430 90 426 Z" fill="#15121f"/>
+        <path d="M66 200 L114 200 L134 302 Q90 316 46 302 Z" fill="#1c1640"/>
+        <path d="M46 302 Q90 316 134 302 L131 294 Q90 307 49 294 Z" fill="#3a2c66"/>
+        <g fill="#ffce86"><circle cx="70" cy="252" r="1.6"/><circle cx="96" cy="268" r="1.6"/><circle cx="112" cy="246" r="1.4"/><circle cx="84" cy="234" r="1.3"/></g>
+        <path d="M66 122 Q50 162 56 212 L64 212 Q60 166 74 128 Z" fill="#2a2150"/>
+        <path d="M114 122 Q130 162 124 212 L116 212 Q120 166 106 128 Z" fill="#2a2150"/>
+        <circle cx="60" cy="216" r="6" fill="#f2ddd0"/><circle cx="120" cy="216" r="6" fill="#f2ddd0"/>
+        <path d="M66 118 Q90 108 114 118 L114 200 L66 200 Z" fill="#2a2150"/>
+        <path d="M78 116 L90 132 L102 116 L98 124 L90 138 L82 124 Z" fill="#5fe3d2" opacity=".85"/>
+        <rect x="66" y="196" width="48" height="8" fill="#ffce86" opacity=".85"/>
+        <g fill="#ffce86"><circle cx="90" cy="150" r="2"/><circle cx="90" cy="166" r="2"/><circle cx="90" cy="182" r="2"/></g>
+        <rect x="82" y="96" width="16" height="22" rx="6" fill="#e9cbb9"/>
+        <ellipse cx="90" cy="72" rx="26" ry="30" fill="#f2ddd0"/>
+        <circle cx="66" cy="75" r="5" fill="#f2ddd0"/><circle cx="114" cy="75" r="5" fill="#f2ddd0"/>
+        <ellipse cx="74" cy="83" rx="5.5" ry="3.2" fill="#ff9bb0" opacity=".4"/><ellipse cx="106" cy="83" rx="5.5" ry="3.2" fill="#ff9bb0" opacity=".4"/>
+        <ellipse cx="78" cy="73" rx="6.5" ry="8.5" fill="#fff"/><ellipse cx="102" cy="73" rx="6.5" ry="8.5" fill="#fff"/>
+        <circle cx="79" cy="74" r="5" fill="#7a5cf0"/><circle cx="101" cy="74" r="5" fill="#7a5cf0"/>
+        <circle cx="79" cy="74" r="2.4" fill="#1a1335"/><circle cx="101" cy="74" r="2.4" fill="#1a1335"/>
+        <circle cx="80.5" cy="71.5" r="1.4" fill="#fff"/><circle cx="102.5" cy="71.5" r="1.4" fill="#fff"/>
+        <path d="M72 62 Q78 59 85 62" stroke="#3a2a5a" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+        <path d="M95 62 Q102 59 108 62" stroke="#3a2a5a" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+        <path d="M84 90 Q90 94 96 90" stroke="#c96a73" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+        <path d="M60 76 Q54 30 90 24 Q126 30 120 76 Q108 54 98 64 Q94 40 90 40 Q86 40 82 64 Q72 54 60 76 Z" fill="#2e2156"/>
+        <path d="M90 24 Q110 30 114 60 Q106 46 98 54 Q96 34 90 33 Z" fill="#3c2c70" opacity=".7"/>
+        <path d="M60 76 Q55 130 62 170 L70 166 Q64 124 67 78 Z" fill="#2a1e4e"/>
+        <path d="M120 76 Q125 130 118 170 L110 166 Q116 124 113 78 Z" fill="#2a1e4e"/>
+        <path d="M116 40 a8 8 0 1 0 3.5 10.5 a6 6 0 1 1 -3.5 -10.5 z" fill="#ffce86"/>
+      </svg>
+    </div>
+  </div>
+  <div class="kb-mini" id="kbmini" title="星瞳 · 看板娘">
+    <svg viewBox="0 0 100 110" xmlns="http://www.w3.org/2000/svg">
+      <path d="M26 70 Q18 30 50 24 Q82 30 74 70 L76 110 L24 110 Z" fill="#241a44"/>
+      <ellipse cx="50" cy="64" rx="20" ry="22" fill="#f2ddd0"/>
+      <ellipse cx="36" cy="74" rx="4" ry="2.4" fill="#ff9bb0" opacity=".4"/><ellipse cx="64" cy="74" rx="4" ry="2.4" fill="#ff9bb0" opacity=".4"/>
+      <ellipse cx="42" cy="66" rx="5" ry="6.5" fill="#fff"/><ellipse cx="58" cy="66" rx="5" ry="6.5" fill="#fff"/>
+      <circle cx="42.5" cy="67" r="4" fill="#7a5cf0"/><circle cx="57.5" cy="67" r="4" fill="#7a5cf0"/>
+      <circle cx="42.5" cy="67" r="2" fill="#1a1335"/><circle cx="57.5" cy="67" r="2" fill="#1a1335"/>
+      <path d="M30 62 Q22 28 50 22 Q78 28 70 62 Q60 46 54 54 Q52 36 50 36 Q48 36 46 54 Q40 46 30 62 Z" fill="#2e2156"/>
+      <path d="M68 36 a6 6 0 1 0 2.5 8 a4.6 4.6 0 1 1 -2.5 -8 z" fill="#ffce86"/>
+    </svg>
+    <span class="dot"></span>
+  </div>
+</div>
+
+<script>
+// 顶部导航切换
+const pages={chat:'page-chat',companion:'page-companion',novel:'page-novel',works:'page-works',chars:'page-chars',worldbook:'page-worldbook',assets:'page-assets',presets:'page-presets',settings:'page-settings'};
+document.querySelectorAll('#nav a').forEach(a=>a.onclick=()=>{
+  document.querySelectorAll('#nav a').forEach(x=>x.classList.remove('on'));a.classList.add('on');
+  Object.values(pages).forEach(id=>document.getElementById(id).classList.remove('on'));
+  document.getElementById(pages[a.dataset.p]).classList.add('on');
+  window.scrollTo(0,0);
+});
+// 右侧面板 tab
+document.querySelectorAll('#ptabs .ptab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('#ptabs .ptab').forEach(x=>x.classList.remove('on'));t.classList.add('on');
+  document.querySelectorAll('.ptab-pane').forEach(p=>p.classList.toggle('on',p.dataset.pt===t.dataset.pt));
+});
+// 设置 tab
+document.querySelectorAll('#settabs .set-tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('#settabs .set-tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');
+  document.querySelectorAll('.set-pane').forEach(p=>p.classList.toggle('on',p.dataset.st===t.dataset.st));
+});
+// 世界书条目
+document.querySelectorAll('#wblist .entry').forEach(e=>e.onclick=()=>{
+  document.querySelectorAll('#wblist .entry').forEach(x=>x.classList.remove('on'));e.classList.add('on');
+});
+// 筛选 chip
+document.querySelectorAll('.chips .fchip').forEach(c=>c.onclick=()=>{
+  document.querySelectorAll('.chips .fchip').forEach(x=>x.classList.remove('on'));c.classList.add('on');
+});
+// 作品卡 → 跳对话
+document.querySelectorAll('#page-works .work:not(.newcard)').forEach(w=>w.onclick=()=>{
+  document.querySelector('#nav a[data-p="chat"]').click();
+});
+// 角色卡 → 进陪伴
+document.querySelectorAll('#page-chars .charcard:not(.newcard)').forEach(c=>c.onclick=()=>{
+  document.querySelector('#nav a[data-p="companion"]').click();
+});
+// 小说章节切换
+document.querySelectorAll('#page-novel .nv-ch').forEach(c=>c.onclick=()=>{
+  document.querySelectorAll('#page-novel .nv-ch').forEach(x=>x.classList.remove('on'));c.classList.add('on');
+});
+// 会话切换
+document.querySelectorAll('.convlist .conv').forEach(c=>c.onclick=()=>{
+  document.querySelectorAll('.convlist .conv').forEach(x=>x.classList.remove('on'));c.classList.add('on');
+});
+// 悬浮看板娘:小标 ↔ 抠图立绘 + 悬浮选项
+const _mini=document.getElementById('kbmini'),_stage=document.getElementById('kbstage'),_close=document.getElementById('kbclose');
+_mini.onclick=()=>{_stage.classList.add('on');_mini.style.display='none'};
+_close.onclick=()=>{_stage.classList.remove('on');_mini.style.display=''};
+document.querySelectorAll('.kb-opt').forEach((a,i)=>a.onclick=()=>{const m=['works','companion','novel','works'];
+  document.querySelector('#nav a[data-p="'+m[i]+'"]').click();_stage.classList.remove('on');_mini.style.display=''});
+// 作品页 视图切换:画廊/星图/编年史
+document.querySelectorAll('#worksview .vbtn').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#worksview .vbtn').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  document.querySelectorAll('#page-works .wview').forEach(v=>v.classList.toggle('on',v.dataset.v===b.dataset.v));
+});
+// 导演指令 OOC 通道
+const _ooc=document.getElementById('ooctgl'),_comp=document.getElementById('composer'),_ta=document.getElementById('composerta'),_oh=document.getElementById('oochint');
+if(_ooc)_ooc.onclick=()=>{const on=_comp.classList.toggle('director');_ooc.classList.toggle('on',on);
+  _ta.placeholder=on?'导演指令：如 [下一幕下雨] [她更冷淡些] [跳到第二天]':'对 苏屿 说点什么……';
+  _oh.textContent=on?'开：你在给系统下指令':'关：你在对她说话'};
+</script>
+</body>
+</html>
