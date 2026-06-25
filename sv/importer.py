@@ -302,6 +302,8 @@ def assemble_preset(preset: dict, slots: dict | None = None) -> str:
     slots = slots or {}
     parts = []
     for m in preset.get("modules", []):
+        if m.get("enabled", True) is False:   # 逐模块开关(默认开;关掉的模块不进系统提示)
+            continue
         if m.get("marker") or not m.get("content"):
             s = slots.get(m["identifier"])
             if s:
@@ -309,6 +311,16 @@ def assemble_preset(preset: dict, slots: dict | None = None) -> str:
         else:
             parts.append(m["content"])
     return "\n\n".join(p for p in parts if p)
+
+
+def update_preset_module(pid: str, identifier: str, enabled: bool) -> dict:
+    """开/关预设里的某个模块(按 identifier)。回写并返回完整预设。"""
+    pre = load_preset(pid)
+    for m in pre.get("modules", []):
+        if m.get("identifier") == identifier:
+            m["enabled"] = bool(enabled)
+    save_json(_presets_dir() / f"{pid}.json", pre)
+    return pre
 
 
 # ========== ST 正则脚本(消息渲染/HUD 改写)==========

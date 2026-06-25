@@ -471,6 +471,22 @@ def api_presets() -> dict:
             "active_preset": config.PRESET}
 
 
+def api_preset(pid: str) -> dict:
+    """单个预设的完整详情:有序模块(含逐模块开关 enabled)+ 采样参数 + 组装后的系统提示预览。"""
+    pre = importer.load_preset(pid)
+    return {"id": pid, "name": pre.get("name", pid), "active": config.PRESET == pid,
+            "sampling": pre.get("sampling", {}), "modules": pre.get("modules", []),
+            "module_count": pre.get("module_count"), "custom_count": pre.get("custom_count"),
+            "assembled": importer.assemble_preset(pre, slots={})}
+
+
+def post_preset_module(b: dict) -> dict:
+    """开/关预设里的某个模块(把手艺做成可勾的开关)。"""
+    pre = importer.update_preset_module(b["preset"], b["identifier"], bool(b.get("enabled", True)))
+    return {"ok": True, "modules": pre.get("modules", []),
+            "assembled": importer.assemble_preset(pre, slots={})}
+
+
 def post_import_undo(b: dict) -> dict:
     return {"ok": True, **importer.undo_import(World.load(b["world"]), b["entity"])}
 
@@ -695,6 +711,7 @@ GET_ROUTES = [
     (re.compile(r"^/api/prep/world$"), lambda m, q: api_world_prep(q)),
     (re.compile(r"^/api/recipe$"), lambda m, q: api_recipe(q)),
     (re.compile(r"^/api/presets$"), lambda m, q: api_presets()),
+    (re.compile(r"^/api/preset/([\w-]+)$"), lambda m, q: api_preset(m.group(1))),
 ]
 POST_ROUTES = [
     (re.compile(r"^/api/world/create$"), post_world_create),
@@ -760,6 +777,7 @@ POST_ROUTES = [
     (re.compile(r"^/api/checks$"), post_checks),
     (re.compile(r"^/api/convert$"), post_convert),
     (re.compile(r"^/api/branch$"), post_branch),
+    (re.compile(r"^/api/preset/module$"), post_preset_module),
 ]
 
 
