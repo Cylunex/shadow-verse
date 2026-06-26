@@ -1,6 +1,6 @@
 # 混沌酒馆 · 重设计蓝图与交接(Chaos Tavern)
 
-> 本文是 shadow-verse「大重设计」的**单一事实源 + 续作交接**。新会话从这里冷启动:读本文 + 项目记忆,跑 `python -m sim.run_tests`(现 **39/39 全绿**),起 `python -m sv.webapp`(→ http://127.0.0.1:8787)。
+> 本文是 shadow-verse「大重设计」的**单一事实源 + 续作交接**。新会话从这里冷启动:读本文 + 项目记忆,跑 `python -m sim.run_tests`(全绿),起 `python -m sv.webapp`(→ http://127.0.0.1:8787)。
 > 缘起:用户 2026-06-22「感觉项目不对了,挖本质重新设计」+「前端太普通没感觉」;后定调为下方愿景。
 
 ---
@@ -60,7 +60,7 @@
 
 ---
 
-## 四、已落地(全绿 39/39,逐步 commit,CLI/浏览器端到端实测)
+## 四、已落地(全绿,逐步 commit,CLI/浏览器端到端实测)
 
 | 阶段 | 内容 | 关键文件 |
 |---|---|---|
@@ -94,7 +94,7 @@
 - **dormant / gated 迁移**:每步可回退、绝不重写绿底层;新行为默认关(`SV_RP_COMMIT` 等)→ 旧测试字节等价。
 - **求同存异**:`Lens` 契约保持最小,别把各镜头思想强行统一。
 - **环境坑**:Windows 上 `pkill -f` 杀不掉 webapp(WindowsApps python 启动壳);用 `Get-CimInstance ... sv.webapp | Stop-Process`。preview 基建会抓 8601(aiagents-stock),要 eval 跳到 8787。LF→CRLF 警告无害。
-- **运行**:`PYTHONUTF8=1 python -m sim.run_tests`(39/39)· `PYTHONUTF8=1 python -m sv.webapp` · CLI `python -m sv.skill_api extract <world> <entity>` / `create-soul` / `summon-soul`。
+- **运行**:`PYTHONUTF8=1 python -m sim.run_tests`(全绿)· `PYTHONUTF8=1 python -m sv.webapp` · CLI `python -m sv.skill_api extract <world> <entity>` / `create-soul` / `summon-soul`。
 
 ---
 

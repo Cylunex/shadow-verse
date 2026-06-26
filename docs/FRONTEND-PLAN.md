@@ -1,12 +1,12 @@
 # 前端落地·收尾工单（交付 code 实施 / 审查依据）
 
-> 依据：对 P5–P8 落地的审查。新前端质量高、测试 39/39 全绿、安全过关；本工单只补**缺口**与**结构债**，不改引擎、不做魅力验证。
+> 依据：对 P5–P8 落地的审查。新前端质量高、测试全绿、安全过关；本工单只补**缺口**与**结构债**，不改引擎、不做魅力验证。
 > 配套：`REDESIGN.md`（产品方向）、`docs/ui-prototype.html`（视觉参照）、`sv/web/index.html`（现状）。
 
 ## 全局硬约束（每个任务都必须守）
 
 1. **不改引擎逻辑**：只在 `sv/webapp.py`（薄路由）和 `sv/web/*` 动；`world/entity/thread/memory/nexus/...` 等核心模块不动。
-2. **测试常绿**：`python -m sim.run_tests` 必须保持 39/39（动了后端就补/跑测试）。
+2. **测试常绿**：`python -m sim.run_tests` 必须保持全绿（套数以实际输出为准；动了后端就补/跑测试）。
 3. **零依赖、零构建**：不引入任何 npm/CDN/打包工具。允许用浏览器原生 ES module。
 4. **安全不退步**：所有插值过 `esc()`；模型 HTML 只进 `sandbox="allow-scripts"`（不带 same-origin）的 iframe；新静态服务要防目录穿越。
 5. **`/legacy` 必须始终可用**（旧控制台是兜底，不能弄坏）。
@@ -113,7 +113,7 @@
 
 ## 总验收（Definition of Done）
 
-- `python -m sim.run_tests` = 39/39 全绿。
+- `python -m sim.run_tests` = 全绿（套数见输出）。
 - 新前端外观/交互无回归；`/legacy` 仍可用。
 - 无新依赖、无构建步骤；新增静态服务防穿越。
 - 常规创作闭环可在新 UI 内完成（Phase 2 后）。

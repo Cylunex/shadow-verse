@@ -551,8 +551,14 @@ def cmd_config(a):
 
 
 def cmd_doctor(a):
+    from pathlib import Path
+
+    from . import mcp_server
     from .config import RENDER, SIMULATE_ENABLED, EMBED_PROVIDER, PROVIDER, MODEL
     print("ShadowVerse 暗宇宙引擎 · 自检")
+    _sv = Path(__file__).resolve().parent
+    nmod = len([p for p in _sv.glob("*.py") if p.stem != "__init__"])
+    print(f"  规模:引擎模块 {nmod} ｜ MCP 工具 {len(mcp_server.TOOLS)} ｜ 测试套数见 `python -m sim.run_tests`(权威计数,文档勿写死)")
     print(f"  universe:{UNIVERSE}  ({'存在' if UNIVERSE.exists() else '将自动创建'})")
     print(f"  世界 {len(World.list_all())} ｜ 跨世界实体 {len(nexus.kept_entities())} ｜ 连接 {len(nexus.links())} ｜ 元件 {len(codex.all_elements())}")
     print(f"  透镜:narrate ✓ ｜ play ✓ ｜ simulate {'ON' if SIMULATE_ENABLED else 'OFF(留接口)'} ｜ render {RENDER}")
