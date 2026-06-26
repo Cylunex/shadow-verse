@@ -106,6 +106,31 @@ def api_entity(wid: str, eid: str) -> dict:
             "experiences": memory.all_experiences(e.dir)}
 
 
+def api_drives(wid: str, eid: str) -> dict:
+    """Desire 层只读投影:据『此刻目标 + 最近经历』拼出她此刻最想做的事;锚点(Identity Core)作不变基线另列。
+    是投影不是新存储,不调模型(0 token);信号源同 lenses.simulate_prep 的 desire_hint(rebuild)。"""
+    w = World.load(wid); e = LocalEntity.load(w, eid)
+    rb = e.rebuild()
+    st = rb.get("state") or {}
+    drives = []
+    goal = (st.get("goal") or "").strip()
+    if goal:
+        drives.append({"text": goal, "kind": "此刻想", "source": "目标"})
+    seen = 0
+    for x in reversed(rb.get("recent") or []):     # 最近经历:新→旧,取前 2
+        t = (x.get("text") or "").strip()
+        if not t:
+            continue
+        drives.append({"text": t, "kind": "放不下", "source": "最近经历"})
+        seen += 1
+        if seen >= 2:
+            break
+    return {"world": wid, "entity": eid, "name": e.card().get("name", eid),
+            "mood": st.get("mood", ""), "location": st.get("location", ""), "goal": goal,
+            "drives": drives, "anchors": rb.get("anchors") or [], "projected": True,
+            "note": "据她此刻的目标 + 最近经历投影(不调模型,0 token);锚点是跨世界不变基线。"}
+
+
 def api_nexus_entity(nid: str) -> dict:
     ne = NexusEntity.load(nid); m = ne.meta()
     incs = [{"world": wid, "state": memory.read_state(ne.incarnation_dir(wid)),
@@ -752,6 +777,7 @@ GET_ROUTES = [
     (re.compile(r"^/api/world/([\w-]+)$"), lambda m, q: api_world(m.group(1))),
     (re.compile(r"^/api/thread/([\w-]+)/([\w-]+)$"), lambda m, q: api_thread(m.group(1), m.group(2))),
     (re.compile(r"^/api/entity/([\w-]+)/([\w-]+)$"), lambda m, q: api_entity(m.group(1), m.group(2))),
+    (re.compile(r"^/api/drives/([\w-]+)/([\w-]+)$"), lambda m, q: api_drives(m.group(1), m.group(2))),
     (re.compile(r"^/api/nexus/([\w-]+)$"), lambda m, q: api_nexus_entity(m.group(1))),
     (re.compile(r"^/api/soul/([\w-]+)/incarnations$"), lambda m, q: api_soul_incarnations(m.group(1))),
     (re.compile(r"^/api/soul/([\w-]+)$"), lambda m, q: api_soul(m.group(1))),

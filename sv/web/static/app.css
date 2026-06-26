@@ -243,6 +243,8 @@ iframe.hud{padding:0}
 .drive{display:flex;align-items:center;gap:9px;margin-bottom:9px}
 .drive:last-child{margin-bottom:0}
 .drive .di{padding:2px 8px;border-radius:20px;background:#a98bff18;color:var(--violet);font-size:11px;flex:0 0 auto}
+.drive .di.now{background:#ffce8618;color:var(--gold)}
+.drive .di.recent{background:#5fe3d218;color:var(--cyan)}
 .drive .dt{flex:1;font-size:13px;color:var(--dim)}
 .pchar{border:1px solid var(--line);border-radius:12px;background:#ffffff05;padding:11px 12px;margin-bottom:10px}
 .pchar .hd{display:flex;gap:10px;align-items:center}

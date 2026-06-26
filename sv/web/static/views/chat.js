@@ -93,8 +93,8 @@ async function viewChat(wid,eid){
   if(!wid){wid=(OV.worlds[0]||{}).id;}
   if(!wid){app().innerHTML='<div class="wrap"><div class="empty">还没有作品。去 <a style="color:var(--violet)" href="#/works">作品库</a> 新建或导入一个。</div></div>';return;}
   if(!eid){eid=await firstEntity(wid);if(!eid){app().innerHTML=`<div class="wrap"><div class="empty">《${esc(wid)}》还没有角色。<a style="color:var(--violet);cursor:pointer" onclick="actNewEntity('${jsq(wid)}')">＋ 新建角色</a></div></div>`;return;}}
-  let d,ent;
-  try{[d,ent]=await Promise.all([api('/chat/'+wid+'/'+eid),api('/entity/'+wid+'/'+eid).catch(()=>({}))]);}
+  let d,ent,drv;
+  try{[d,ent,drv]=await Promise.all([api('/chat/'+wid+'/'+eid),api('/entity/'+wid+'/'+eid).catch(()=>({})),api('/drives/'+wid+'/'+eid).catch(()=>({drives:[]}))]);}
   catch(e){app().innerHTML=`<div class="wrap"><div class="empty">${esc(e.message)}</div></div>`;return;}
   const world=OV.worlds.find(w=>w.id===wid)||{};
   window.CHAT={wid,eid,avatar:d.avatar,genre:world.genre,varmeta:{},anchors:(ent.anchors||[]),
@@ -174,7 +174,8 @@ async function viewChat(wid,eid){
         <div class="ptab-pane" data-pt="chars">
           <div class="drives"><div class="dh">🜂 她的内核 · 锚点（跨世界不变量）</div>
             ${(ent.anchors&&ent.anchors.length)?ent.anchors.map((a,i)=>`<div class="drive"><span class="di">${i+1}</span><span class="dt">${esc(a)}</span></div>`).join(''):'<p class="note" style="margin:0">这个角色还没有锚点。提取为魂后会沉淀出跨世界不变量。</p>'}
-            <p class="note" style="margin-top:8px">⚡ 当前驱动（Desire 层）—— 引擎已具三层认知，实时驱动接口待接入。</p>
+            <div class="dh" style="margin-top:13px">⚡ 当前驱动 · Desire 层 <span style="text-transform:none;letter-spacing:0">据目标/最近经历投影</span></div>
+            ${(drv&&drv.drives&&drv.drives.length)?drv.drives.map(x=>`<div class="drive"><span class="di ${x.source==='目标'?'now':'recent'}">${esc(x.kind)}</span><span class="dt">${esc(x.text)}</span></div>`).join(''):'<p class="note" style="margin:0">此刻没有明确的近期驱动 —— 她的行动由上面的锚点支撑。</p>'}
           </div>
           <div class="pchar"><div class="hd">${headAv}<div class="t"><div class="nm">${esc(d.name)}</div><div class="rl">${ent.card?esc(ent.card.role||''):''}${ent.card&&ent.card.soul_id?' · ✦ 跨世界':''}</div></div></div>
             <div class="ops"><span class="op" onclick="location.hash='#/companion/${wid}/${eid}'">陪伴</span><span class="op" onclick="actEntityCard('${jsq(wid)}','${jsq(eid)}')">资料</span><span class="op" onclick="actExtract('${jsq(wid)}','${jsq(eid)}','${jsq(d.name)}')">提取为魂</span></div>

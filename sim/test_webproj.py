@@ -13,7 +13,7 @@ from sv import clock  # noqa: E402
 
 clock.use_virtual()
 
-from sv import ascension, nexus, webapp  # noqa: E402
+from sv import ascension, memory, nexus, webapp  # noqa: E402
 from sv.entity import LocalEntity  # noqa: E402
 from sv.world import World  # noqa: E402
 
@@ -54,6 +54,19 @@ t = by_world["tower"]
 ok(t.get("world_name") == "无限之塔" and t.get("genre") == "无限流", "incarnations:带世界名/题材")
 ok("state" in t and "experiences" in t and "exp_count" in t, "incarnations:带 state/experiences/exp_count")
 ok(t.get("exp_count", 0) >= 1, "incarnations:起源化身保留本地经历(持久级)")
+
+# ---------- api_drives(Desire 层只读投影:目标 + 最近经历)----------
+memory.write_state(e.dir, {"goal": "继续登塔", "mood": "戒备", "location": "塔·第三层"})
+dr = webapp.api_drives("tower", "suzhi")
+ok(dr["goal"] == "继续登塔" and dr["mood"] == "戒备", "drives:带此刻 state(目标/心情)")
+ok(bool(dr["drives"]) and dr["drives"][0]["source"] == "目标" and dr["drives"][0]["text"] == "继续登塔",
+   "drives:目标列为『此刻想』且居首")
+ok(any(x["source"] == "最近经历" and "第一层" in x["text"] for x in dr["drives"]), "drives:最近经历列为『放不下』")
+ok(dr["anchors"] == ["绷紧护人", "不伤无辜"] and dr.get("projected") is True,
+   "drives:锚点作不变基线 + projected 标记")
+eb = LocalEntity.create(w1, "blank", "白", role="secondary")
+drb = webapp.api_drives("tower", "blank")
+ok(drb["drives"] == [], "drives:无目标无经历 → 空列表(前端优雅兜底)")
 
 # ---------- 化身所在世界被删 → 优雅标记 missing,不抛错 ----------
 shutil.rmtree(World("linjiang").dir)

@@ -7,8 +7,8 @@ async function viewCompanion(wid,eid){
   if(!wid){app().innerHTML='<div class="wrap"><div class="empty">还没有角色。去 <a style="color:var(--violet)" href="#/works">作品库</a> 开始。</div></div>';return;}
   if(!eid){eid=await firstEntity(wid);}
   if(!eid){app().innerHTML='<div class="wrap"><div class="empty">这个世界还没有角色。</div></div>';return;}
-  let ent,chat;
-  try{[ent,chat]=await Promise.all([api('/entity/'+wid+'/'+eid),api('/chat/'+wid+'/'+eid).catch(()=>({}))]);}
+  let ent,chat,drv;
+  try{[ent,chat,drv]=await Promise.all([api('/entity/'+wid+'/'+eid),api('/chat/'+wid+'/'+eid).catch(()=>({})),api('/drives/'+wid+'/'+eid).catch(()=>({drives:[]}))]);}
   catch(e){app().innerHTML=`<div class="wrap"><div class="empty">${esc(e.message)}</div></div>`;return;}
   const c=ent.card||{},st=ent.state||{};const name=c.name||eid;
   const world=OV.worlds.find(w=>w.id===wid)||{};
@@ -37,6 +37,8 @@ async function viewCompanion(wid,eid){
   const exps=ent.experiences||[];
   const miles=exps.length?exps.slice(-8).map(x=>`<div class="mile ${x.level==='身份'?'star':''}"><div class="mt">${esc(x.where||'')}${x.level==='身份'?' · ★成长':''}</div><div class="md">${esc(x.text)}</div></div>`).join(''):'<p class="note">还没有共同经历。聊起来，重要的瞬间会沉淀在这里。</p>';
   const remembered=exps.length?exps[exps.length-1].text:'';
+  // Desire 层投影:此处去掉与下方「她记得」重复的那条(最近经历),免同屏重复
+  const drvList=((drv&&drv.drives)||[]).filter(x=>x.text!==remembered);
   const soulId=c.soul_id;
   const fwBtn=`<button class="btn ghost sm" onclick="location.hash='#/farewell/${wid}/${eid}'">✦ 带 ${esc(name)} 去别的世界</button>`
     +(soulId?` <button class="btn ghost sm" onclick="location.hash='#/incarnations/${jsq(soulId)}'">✦ 看各世界里的她</button>`:'');
@@ -59,6 +61,8 @@ async function viewCompanion(wid,eid){
       </div>
       <div class="compmain">
         <section><h2>关系 <small>你们之间发生过的事的总和</small></h2>${stageHtml}${relHtml}</section>
+        <section><h2>⚡ 她此刻想 <small>Desire 层 · 据目标与最近经历投影</small></h2>
+          ${drvList.length?`<div class="drives" style="background:none;border:none;padding:0;margin:0">`+drvList.map(x=>`<div class="drive"><span class="di ${x.source==='目标'?'now':'recent'}">${esc(x.kind)}</span><span class="dt">${esc(x.text)}</span></div>`).join('')+`</div>`:'<p class="note" style="margin:0">此刻没有明确的近期驱动 —— 由她的锚点（见下）支撑。</p>'}</section>
         <section><h2>她是谁 <small>不会变的内核 · 锚点</small></h2>
           <div class="kwrow">${(ent.anchors&&ent.anchors.length)?ent.anchors.map(a=>`<span class="kw">${esc(a)}</span>`).join(''):'<span class="note">还没有锚点 —— 提取为魂后会沉淀出来。</span>'}</div></section>
         ${remembered?`<section><h2>她记得 <small>从共同经历里被唤起的一刻</small></h2><div class="mem">${esc(remembered)}</div></section>`:''}
