@@ -15,10 +15,29 @@ async function viewAssets(){
       <button class="btn ghost sm" onclick="actImportPreset()">⤓ 导入预设</button></div>
     ${secs||'<p class="empty">元件库空。点「填充起始库」灌入一批抽象创世素材。</p>'}</div>`;
 }
-function assetView(cat,id){const e=null;openModal(`<h3>${esc(id)}</h3><p class="lead">分类：${esc(cat)}</p>
-  <p class="note">元件详情与编辑在<a href="/legacy" target="_blank" style="color:var(--violet)"> 控制台 </a>更完整。</p>
-  <div class="modal-actions"><button class="btn ghost" onclick="actDelCodex('${jsq(cat)}','${jsq(id)}')">🗑 删除</button><button class="btn" onclick="closeModal()">好</button></div>`);}
+function _codexBody(mdText){let b=(String(mdText||'').split('## 拆解')[1]||'').replace(/^[^\n]*\n/,'').trim();
+  return /^<!--[\s\S]*-->$/.test(b)?'':b;}
+async function assetView(cat,id){
+  let e;try{e=await api('/codex/'+cat+'/'+id);}catch(err){return toast('✗ '+err.message,true);}
+  const body=_codexBody(e.md);
+  openModal(`<h3>${esc(id)} <span style="color:var(--faint);font-size:13px;font-weight:400">${esc(cat)}</span></h3>
+    ${(e.tags&&e.tags.length)?`<div class="chips" style="margin:2px 0 8px">${e.tags.map(t=>`<span class="fchip">${esc(t)}</span>`).join('')}</div>`:''}
+    <p class="lead" style="margin-top:0">${esc(e.summary||'')}</p>
+    ${body?`<div class="packet" style="max-height:42vh;overflow:auto">${md(body)}</div>`:'<p class="note">还没有拆解正文。点「编辑」补上。</p>'}
+    <div class="modal-actions"><button class="btn ghost" onclick="actDelCodex('${jsq(cat)}','${jsq(id)}')">🗑 删除</button><button class="btn ghost" onclick="actEditCodex('${jsq(cat)}','${jsq(id)}')">✎ 编辑</button><button class="btn" onclick="closeModal()">好</button></div>`);
+}
+async function actEditCodex(cat,id){
+  let e;try{e=await api('/codex/'+cat+'/'+id);}catch(err){return toast('✗ '+err.message,true);}
+  formModal(`编辑元件 · ${esc(id)}`,[
+    {n:'summary',label:'一句话（AI摘要 / 食材说明）',type:'textarea',rows:2,value:e.summary||''},
+    {n:'tags',label:'标签（逗号分隔）',value:(e.tags||[]).join(', ')},
+    {n:'body',label:'拆解（为什么有效 / 结构 / 可变体）',type:'textarea',rows:8,value:_codexBody(e.md)},
+  ],'保存',async v=>{
+    await post('/codex/create',{category:cat,id,summary:v.summary,tags:v.tags,body:v.body});
+    closeModal();route();toast('✓ 已保存元件');
+  });
+}
 
 
 /* —— 暴露到全局命名空间（内联 onclick + 跨模块裸引用）—— */
-Object.assign(window, { viewAssets, assetView });
+Object.assign(window, { viewAssets, assetView, actEditCodex, _codexBody });

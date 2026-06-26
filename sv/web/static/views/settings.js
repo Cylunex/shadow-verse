@@ -47,7 +47,17 @@ async function viewSettings(){
         <tr><td>自演化</td><td>${c.simulate?'on':'off'}</td></tr>
         ${(c.env_overrides&&c.env_overrides.length)?`<tr><td>环境覆盖</td><td>${esc(c.env_overrides.join(', '))}</td></tr>`:''}
       </table>
-      <p class="lead" style="margin-top:14px">完整数据管理（导入/导出/合并/枢纽/反思报告）在 <a href="/legacy" target="_blank" style="color:var(--violet)">创作者控制台</a>。密钥仅存本机，网页只绑 127.0.0.1。</p>
+      <h3 style="margin-top:18px">数据管理</h3>
+      <div class="toolrow">
+        <button class="btn ghost sm" onclick="actImportCard()">⤓ 导入角色卡</button>
+        <button class="btn ghost sm" onclick="actImportPreset()">⤓ 导入预设</button>
+        <button class="btn ghost sm" onclick="actImportRegex()">⤓ 导入正则</button>
+        <button class="btn ghost sm" onclick="actMergeWorld()">⛙ 融合世界</button>
+        <button class="btn ghost sm" onclick="actUndoImport()">⮌ 撤销导入</button>
+      </div>
+      <p class="note" style="margin-top:8px">导出整本到 <a style="color:var(--violet)" href="#/novel">小说页</a> 点「⤓ 导出」（按世界线 md）；反思 / 质检报告也在小说页右栏。全部数据在本机 <code>universe/</code> 目录，备份 = 拷贝该目录。密钥仅存本机，网页只绑 127.0.0.1。</p>
+      <h3 style="margin-top:18px">开发者</h3>
+      <p class="note"><a href="/legacy" target="_blank" style="color:var(--violet)">🛠 底层控制台（legacy）</a> —— 组件试验台 / 调试 / 原语，普通创作无需进入。</p>
     </div></div>`;
 }
 function settab(t){document.querySelectorAll('#settabs .set-tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');

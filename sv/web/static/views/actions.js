@@ -73,8 +73,25 @@ async function actSummonSoul(soul,name){const ids=OV.worlds.map(w=>w.id);if(!ids
     {n:'entry',label:'进入方式',type:'select',options:['本体进','换皮进']},
   ],'召唤 ✦',async v=>{const r=await post('/summon-soul',{soul,world:v.world,entry:v.entry});closeModal();await refresh();
     toast(`✦ ${name} 已降临《${v.world}》——带着记忆。`);location.hash='#/companion/'+v.world+'/'+(r.incarnation||r.as||r.entity||'');});}
+async function actImportRegex(){formModal('导入 SillyTavern 正则',[
+  {n:'name',label:'名字'},
+  {n:'data',label:'正则 JSON（单条或数组）',type:'textarea',rows:6,ph:'[{"scriptName":"...","findRegex":"/.../","replaceString":"..."}]'},
+],'导入',async v=>{if(!v.data)throw new Error('粘贴正则 JSON');await post('/import/regex',{name:v.name,data:v.data});closeModal();toast('✓ 已导入正则');});}
+async function actMergeWorld(){const ids=OV.worlds.map(w=>w.id);if(ids.length<2)return toast('至少两个世界才能融合',true);
+  formModal('世界融合（把「源」并入「目标」）',[
+    {n:'src',label:'源世界（被并入）',type:'select',options:ids},
+    {n:'dst',label:'目标世界（保留）',type:'select',options:ids},
+    {n:'delete_src',label:'融合后删除源世界',type:'select',options:['是','否'],value:'是'},
+  ],'融合',async v=>{if(v.src===v.dst)throw new Error('源 / 目标不能相同');
+    await post('/world/merge',{src:v.src,dst:v.dst,delete_src:v.delete_src!=='否'});
+    closeModal();await refresh();toast('✓ 已融合《'+v.src+'》→《'+v.dst+'》');location.hash='#/works';});}
+async function actUndoImport(){const ids=OV.worlds.map(w=>w.id);if(!ids.length)return toast('还没有世界',true);
+  formModal('撤销导入（把某角色回退到导入前）',[
+    {n:'world',label:'世界',type:'select',options:ids},
+    {n:'entity',label:'角色 id'},
+  ],'撤销',async v=>{if(!v.entity)throw new Error('填角色 id');await post('/import/undo',{world:v.world,entity:v.entity});closeModal();await refresh();toast('✓ 已撤销该角色的导入');});}
 function openFarewell(wid,eid){ /* reserved for direct link */ route(); }
 
 
 /* —— 暴露到全局命名空间（内联 onclick + 跨模块裸引用）—— */
-Object.assign(window, { slug, asciiSlug, isId, actNewWorld, actNewEntity, actEntityCard, actImportCard, actNewCodex, actSeedCodex, actDelCodex, actImportPreset, actDelWorld, actExtract, actSummonSoul, openFarewell });
+Object.assign(window, { slug, asciiSlug, isId, actNewWorld, actNewEntity, actEntityCard, actImportCard, actNewCodex, actSeedCodex, actDelCodex, actImportPreset, actImportRegex, actMergeWorld, actUndoImport, actDelWorld, actExtract, actSummonSoul, openFarewell });

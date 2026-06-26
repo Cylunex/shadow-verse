@@ -108,6 +108,15 @@ def api_codex() -> dict:
     return {"elements": codex.all_elements(), "categories": list(codex.CATEGORIES)}
 
 
+def api_codex_element(cat: str, eid: str) -> dict:
+    """单个元件:索引元数据 + 完整 md(供站内查看/编辑)。"""
+    from .config import CODEX_DIR
+    el = next((e for e in codex.all_elements() if e["category"] == cat and e["id"] == eid), None)
+    if not el:
+        raise FileNotFoundError(f"元件不存在:{cat}/{eid}")
+    return {**el, "md": util.read_md(CODEX_DIR / cat / f"{eid}.md")}
+
+
 def api_export_thread(wid: str, tid: str) -> dict:
     w = World.load(wid)
     return export.compile_thread_book(w, Thread.load(w, tid))
@@ -715,6 +724,7 @@ GET_ROUTES = [
     (re.compile(r"^/api/trace$"), lambda m, q: api_trace(q)),
     (re.compile(r"^/api/branches/([\w-]+)/([\w-]+)$"), lambda m, q: api_branches(m.group(1), m.group(2))),
     (re.compile(r"^/api/codex$"), lambda m, q: api_codex()),
+    (re.compile(r"^/api/codex/([\w-]+)/([\w-]+)$"), lambda m, q: api_codex_element(m.group(1), m.group(2))),
     (re.compile(r"^/api/export/thread/([\w-]+)/([\w-]+)$"), lambda m, q: api_export_thread(m.group(1), m.group(2))),
     (re.compile(r"^/api/config$"), lambda m, q: api_config()),
     (re.compile(r"^/api/timeline/([\w-]+)$"), lambda m, q: api_timeline(m.group(1))),
