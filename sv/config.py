@@ -60,6 +60,7 @@ SECRET_KEYS = {"ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GITEE_API_KEY"}
 # ---- 数据真相目录(L2 基质)。可用 SV_UNIVERSE_DIR 覆盖,便于代码/数据分离 ----
 UNIVERSE = Path(_get("SV_UNIVERSE_DIR", str(ROOT / "universe")))
 CODEX_DIR = UNIVERSE / "codex"        # L0 元件库
+COMPONENTS_DIR = UNIVERSE / "components"   # 创作组件库(工艺/配方,全局可复用;缺省回退内置种子=字节等价)
 WORLDS_DIR = UNIVERSE / "worlds"      # L2 世界
 NEXUS_DIR = UNIVERSE / "nexus"        # L4 枢纽(跨世界实体 + 世界互联)
 GROUPS_DIR = UNIVERSE / "groups"      # 群聊(多角色同场)

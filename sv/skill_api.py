@@ -54,6 +54,12 @@ def cmd_codex_seed(a):
     print(f"✓ 起始元件库:新增 {r['added']},跳过 {r['skipped']}(已存在),现共 {r['total']} 个")
 
 
+def cmd_components_seed(a):
+    from . import components
+    r = components.seed_all()
+    print(f"✓ 创作组件库:新增 {r['added']} 组,共 {r['total']} 组 → universe/components/(工艺/配方,缺省回退种子)")
+
+
 def cmd_codex_list(a):
     els = codex.all_elements()
     print(f"元件库 · {len(els)} 个:")
@@ -574,6 +580,7 @@ def build_parser():
 
     add("codex-add", cmd_codex_add, ["category", "id"], [("summary", {"default": ""}), ("tags", {"default": ""}), ("body", {"default": ""})])
     add("codex-seed", cmd_codex_seed)
+    add("components-seed", cmd_components_seed)
     add("codex-list", cmd_codex_list)
     add("codex-pick", cmd_codex_pick, ["query"], [("category", {"default": ""}), ("tags", {"default": ""})])
 

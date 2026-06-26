@@ -16,7 +16,7 @@ from pathlib import Path
 import base64
 
 from . import chat as chatmod
-from . import codex, config, export, forge, importer, lenses, llm, memory, nexus, recipes, util, varstate
+from . import codex, components, config, export, forge, importer, lenses, llm, memory, nexus, recipes, util, varstate
 from .config import UNIVERSE, read_jsonl
 from .entity import ROLES, LocalEntity
 from .nexus import NexusEntity
@@ -143,6 +143,27 @@ def api_nexus_entity(nid: str) -> dict:
 
 def api_codex() -> dict:
     return {"elements": codex.all_elements(), "categories": list(codex.CATEGORIES)}
+
+
+# ---- 创作组件库(C1:工艺/配方外化;CRUD 镜像 codex,组 family/group 走已注册闭集)----
+def api_components() -> dict:
+    return {"groups": components.list_groups()}
+
+
+def api_component_group(family: str, group: str) -> dict:
+    return components.get_group(family, group)
+
+
+def post_components_upsert(b: dict) -> dict:
+    return {"ok": True, **components.upsert(b["family"], b["group"], b.get("entry") or {})}
+
+
+def post_components_delete(b: dict) -> dict:
+    return {"ok": True, **components.delete(b["family"], b["group"], b.get("key") or b.get("id"))}
+
+
+def post_components_seed(b: dict) -> dict:
+    return {"ok": True, **components.seed_all()}
 
 
 def api_codex_element(cat: str, eid: str) -> dict:
@@ -802,6 +823,8 @@ GET_ROUTES = [
     (re.compile(r"^/api/branches/([\w-]+)/([\w-]+)$"), lambda m, q: api_branches(m.group(1), m.group(2))),
     (re.compile(r"^/api/codex$"), lambda m, q: api_codex()),
     (re.compile(r"^/api/codex/([\w-]+)/([\w-]+)$"), lambda m, q: api_codex_element(m.group(1), m.group(2))),
+    (re.compile(r"^/api/components$"), lambda m, q: api_components()),
+    (re.compile(r"^/api/components/([\w-]+)/([\w-]+)$"), lambda m, q: api_component_group(m.group(1), m.group(2))),
     (re.compile(r"^/api/export/thread/([\w-]+)/([\w-]+)$"), lambda m, q: api_export_thread(m.group(1), m.group(2))),
     (re.compile(r"^/api/config$"), lambda m, q: api_config()),
     (re.compile(r"^/api/timeline/([\w-]+)$"), lambda m, q: api_timeline(m.group(1))),
@@ -824,6 +847,9 @@ POST_ROUTES = [
     (re.compile(r"^/api/thread/create$"), post_thread_create),
     (re.compile(r"^/api/codex/create$"), post_codex_create),
     (re.compile(r"^/api/codex/seed$"), post_codex_seed),
+    (re.compile(r"^/api/components/upsert$"), post_components_upsert),
+    (re.compile(r"^/api/components/delete$"), post_components_delete),
+    (re.compile(r"^/api/components/seed$"), post_components_seed),
     (re.compile(r"^/api/narrate/commit$"), post_narrate_commit),
     (re.compile(r"^/api/play/commit$"), post_play_commit),
     (re.compile(r"^/api/ascend$"), post_ascend),

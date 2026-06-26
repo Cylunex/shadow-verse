@@ -124,7 +124,7 @@ PLAY_PROTOCOL = [
 
 def hook_menu() -> str:
     """钩子技法名录(精炼注入生成包,省 token;要细节查 HOOK_TECHNIQUES)。"""
-    return "、".join(HOOK_TECHNIQUES.keys())
+    return "、".join(_live("HOOK_TECHNIQUES").keys())
 
 
 # ========== play/扮演的输出前自检 + 一致性校验(吸收 interactive-novel)==========
@@ -151,3 +151,44 @@ CONSISTENCY_CHECKS = [
 VAR_UPDATE_PROTOCOL = (
     "变量结算只发『变化的字段』(增量 UPDATE),未出现的字段保持不变;"
     "绝不每轮重写整张状态卡(避免过时旧值残留成幽灵状态)。")
+
+
+# ========== 组件化外化(C1):把上面的常量登记为可编辑组件,缺数据时原样回退种子(字节等价)==========
+# (attr 大写常量名, group, kind, title)。上面的常量值不动——这里抓为种子,再删模块属性,
+# 让 craft.UPPER 透明走数据层(__getattr__ / PEP 562);无 universe/components/ 时与今天逐字节一致。
+_DEFS = [
+    ("HOOK_TECHNIQUES", "hook_techniques", "menu", "悬念钩十三式"),
+    ("CHAPTER_OPENERS", "chapter_openers", "menu", "章首引子七式"),
+    ("WRITER_CHECKLIST", "writer_checklist", "list", "写手注入清单"),
+    ("REVIEWER_RUBRIC", "reviewer_rubric", "list", "审校 rubric"),
+    ("REFLECTOR_FOCUS", "reflector_focus", "list", "反思全局自检"),
+    ("EXPANSION_TECHNIQUES", "expansion", "list", "内容扩充六技法"),
+    ("DIALOGUE_CRAFT", "dialogue", "list", "对话工艺"),
+    ("ANTI_WATER", "anti_water", "list", "防注水四问"),
+    ("HOOK_ARCS", "hook_arcs", "list", "跨章悬念三层弧"),
+    ("PLAY_PROTOCOL", "play_protocol", "list", "扮演协议"),
+    ("OUTPUT_SELF_CHECK", "output_self_check", "list", "输出前自检"),
+    ("CONSISTENCY_CHECKS", "consistency_checks", "list", "一致性五校验"),
+    ("REVIEWER_DISCIPLINE", "reviewer_discipline", "note", "审校纪律"),
+    ("GROWTH_TRIGGERS", "growth_triggers", "note", "成长时刻判据"),
+    ("SUSPENSE_CURVE", "suspense_curve", "note", "悬念强度曲线"),
+    ("VAR_UPDATE_PROTOCOL", "var_update_protocol", "note", "变量增量协议"),
+]
+_SEED = {attr: globals()[attr] for (attr, _g, _k, _t) in _DEFS}        # 抓种子(常量原值)
+_GROUP_DEFS = [(g, k, t, _SEED[a]) for (a, g, k, t) in _DEFS]          # 供 components 注册表
+_BY_ATTR = {a: (g, k) for (a, g, k, _t) in _DEFS}                      # UPPER → (group, kind)
+for _a in _SEED:                                                       # 删模块属性 → __getattr__ 接管
+    del globals()[_a]
+
+
+def _live(name: str):
+    """取一个工艺组件的当前值:有组件数据用数据,否则回退内置种子(字节等价)。"""
+    from . import components
+    group, kind = _BY_ATTR[name]
+    return components.load_group("craft", group, kind, _SEED[name])
+
+
+def __getattr__(name):   # PEP 562:craft.WRITER_CHECKLIST 等透明走数据层,消费点零改动
+    if name in _BY_ATTR:
+        return _live(name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

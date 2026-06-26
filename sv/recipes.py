@@ -81,22 +81,25 @@ AUDIT_DIMS: dict[str, list[str]] = {
 }
 
 
-def _match_key(genre: str) -> str:
+def _match_key(genre: str, keys=None) -> str:
+    if keys is None:
+        keys = [k for k in _genres() if k != "_default"]
     if not genre:
         return "_default"
-    if genre in RECIPES:
+    if genre in keys:
         return genre
-    for g in RECIPES:
+    for g in keys:
         if g in genre or genre in g:
             return g
     return "_default"
 
 
 def get(genre: str) -> dict:
-    """按题材取配方(子串匹配,如'都市黑道'→都市;未知→DEFAULT)+ 附题材审校维度。"""
-    k = _match_key(genre)
-    base = RECIPES[k] if k in RECIPES else DEFAULT
-    return {**base, "audit_dimensions": AUDIT_DIMS.get(k, AUDIT_DIMS["_default"])}
+    """按题材取配方(子串匹配,如'都市黑道'→都市;未知→DEFAULT)+ 附题材审校维度。
+    走组件数据(缺则原样回退内置种子=字节等价);配方与审校维度合一存于 recipes/genres。"""
+    g = _genres()
+    k = _match_key(genre, [x for x in g if x != "_default"])
+    return dict(g.get(k) or g.get("_default") or _GENRES_SEED["_default"])   # 末位兜底:即便有人删了数据里的 _default 也不崩
 
 
 def forbidden_words(genre: str) -> list[str]:
@@ -104,7 +107,7 @@ def forbidden_words(genre: str) -> list[str]:
 
 
 def genres() -> list[str]:
-    return list(RECIPES.keys())
+    return [k for k in _genres() if k != "_default"]
 
 
 # ========== 题材配方字段化(吸收 webnovel-writer genre-profiles)==========
@@ -133,6 +136,46 @@ HOOK_TAXONOMY: dict[str, dict] = {
 
 
 def get_profile(genre: str) -> dict:
-    """题材量化配方(节奏红线 + 钩子/爽点基线)。子串匹配,未知→默认。"""
-    k = _match_key(genre)
-    return PROFILES.get(k, PROFILE_DEFAULT) if k in PROFILES else PROFILE_DEFAULT
+    """题材量化配方(节奏红线 + 钩子/爽点基线)。子串匹配,未知→默认。走组件数据,缺则回退种子。"""
+    p = _profiles()
+    k = _match_key(genre, [x for x in _genres() if x != "_default"])
+    return dict(p.get(k) or p.get("_default") or _PROFILES_SEED["_default"])
+
+
+# ===== 组件化外化(C1):配方/量化档/钩型登记为可编辑组件,缺数据回退内置种子(字节等价)=====
+# 上面 RECIPES/AUDIT_DIMS/DEFAULT/PROFILES/PROFILE_DEFAULT/HOOK_TAXONOMY 保留为种子(也供旧测试直接引用)。
+# genres 把「配方 + 审校维度」合一(含 _default 兜底条);profiles 含 _default。
+_GENRES_SEED = {k: {**v, "audit_dimensions": AUDIT_DIMS.get(k, AUDIT_DIMS["_default"])}
+                for k, v in RECIPES.items()}
+_GENRES_SEED["_default"] = {**DEFAULT, "audit_dimensions": AUDIT_DIMS["_default"]}
+_PROFILES_SEED = {**PROFILES, "_default": PROFILE_DEFAULT}
+_HOOK_TAXONOMY_SEED = HOOK_TAXONOMY                  # 捕获种子后下面 del,让 recipes.HOOK_TAXONOMY 透明走数据层
+_GROUP_DEFS = [
+    ("genres", "record", "题材配方(pacing/爽点/疲劳词/套路/侧重/审校维度)", _GENRES_SEED),
+    ("profiles", "record", "题材量化档(钩子/爽点/停滞红线)", _PROFILES_SEED),
+    ("hook_taxonomy", "record", "追读力钩型", _HOOK_TAXONOMY_SEED),
+]
+
+
+def _genres() -> dict:
+    from . import components
+    return components.load_group("recipes", "genres", "record", _GENRES_SEED)
+
+
+def _profiles() -> dict:
+    from . import components
+    return components.load_group("recipes", "profiles", "record", _PROFILES_SEED)
+
+
+def _hook_taxonomy() -> dict:
+    from . import components
+    return components.load_group("recipes", "hook_taxonomy", "record", _HOOK_TAXONOMY_SEED)
+
+
+del HOOK_TAXONOMY   # 改走 __getattr__:recipes.HOOK_TAXONOMY 反映组件编辑(缺数据=种子,字节等价)
+
+
+def __getattr__(name):   # PEP 562:仅 HOOK_TAXONOMY 走数据层(RECIPES/AUDIT_DIMS/... 仍是常量,旧测试照读)
+    if name == "HOOK_TAXONOMY":
+        return _hook_taxonomy()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
