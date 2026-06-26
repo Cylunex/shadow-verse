@@ -951,6 +951,10 @@ class Handler(BaseHTTPRequestHandler):
             lp = WEB_DIR / "index.legacy.html"
             if lp.exists():
                 return self._send(200, lp.read_bytes(), "text/html; charset=utf-8")
+        if path in ("/components", "/components.html"):   # 创作组件库管理台(开发者向:工艺/配方/名词库/大纲)
+            cp = WEB_DIR / "components.html"
+            if cp.exists():
+                return self._send(200, cp.read_bytes(), "text/html; charset=utf-8")
         if path.startswith("/img/"):   # 服务 universe 下的图(防目录穿越)
             from urllib.parse import unquote
             target = (UNIVERSE / unquote(path[len("/img/"):])).resolve()

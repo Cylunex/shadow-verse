@@ -57,7 +57,8 @@ async function viewSettings(){
       </div>
       <p class="note" style="margin-top:8px">导出整本到 <a style="color:var(--violet)" href="#/novel">小说页</a> 点「⤓ 导出」（按世界线 md）；反思 / 质检报告也在小说页右栏。全部数据在本机 <code>universe/</code> 目录，备份 = 拷贝该目录。密钥仅存本机，网页只绑 127.0.0.1。</p>
       <h3 style="margin-top:18px">开发者</h3>
-      <p class="note"><a href="/legacy" target="_blank" style="color:var(--violet)">🛠 底层控制台（legacy）</a> —— 组件试验台 / 调试 / 原语，普通创作无需进入。</p>
+      <p class="note"><a href="/components" target="_blank" style="color:var(--violet)">🧱 创作组件库</a> —— 工艺 / 配方 / 名词库 / 大纲，定义可复用的创作原料（缺数据时引擎回退内置种子）。</p>
+      <p class="note" style="margin-top:6px"><a href="/legacy" target="_blank" style="color:var(--violet)">🛠 底层控制台（legacy）</a> —— 调试 / 原语 / 组件试验台，普通创作无需进入。</p>
     </div></div>`;
 }
 function settab(t){document.querySelectorAll('#settabs .set-tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');

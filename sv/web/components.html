@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>创作组件库 · ShadowVerse</title>
+<link rel="stylesheet" href="/static/app.css">
+<style>
+/* 组件库管理台（开发者向）—— 复用 app.css 暗色 token，左族导航 + 右卡片列表 + 结构化表单 */
+body{margin:0}
+.clib-top{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid var(--line-soft);background:#0a0a14cc;position:sticky;top:0;z-index:10;backdrop-filter:blur(12px)}
+.clib-top .logo{font-size:18px;font-weight:700;background:linear-gradient(92deg,var(--violet),var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
+.clib-top .sub{color:var(--faint);font-size:12.5px}
+.clib-top a{margin-left:auto;color:var(--dim);font-size:13px}
+.clib{display:grid;grid-template-columns:248px 1fr;gap:0;min-height:calc(100vh - 52px)}
+.clib-side{border-right:1px solid var(--line-soft);padding:16px 12px;overflow:auto}
+.clib-fam{font-size:11px;letter-spacing:1px;color:var(--faint);margin:16px 8px 6px}
+.clib-fam:first-child{margin-top:0}
+.clib-nav{display:flex;align-items:center;gap:8px;padding:8px 11px;border-radius:9px;color:var(--dim);font-size:13.5px;cursor:pointer;transition:.13s}
+.clib-nav:hover{background:#ffffff0a;color:var(--ink)}
+.clib-nav.on{color:var(--ink);background:linear-gradient(180deg,#ffffff12,#ffffff06);box-shadow:inset 0 0 0 1px var(--line)}
+.clib-nav .ct{margin-left:auto;font-size:11px;color:var(--faint);background:#ffffff10;border-radius:20px;padding:1px 8px}
+.clib-main{padding:22px 26px;overflow:auto}
+.clib-head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.clib-head h1{font-size:20px;margin:0}
+.clib-head .k{font-size:11px;color:var(--gold);border:1px solid #5a4a1a;border-radius:20px;padding:2px 9px}
+.clib-head .sp{flex:1}
+.clib-lead{color:var(--dim);font-size:13px;line-height:1.7;margin:0 0 16px}
+.clib-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.ccard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 15px;position:relative;transition:.15s}
+.ccard:hover{border-color:#3b3b62}
+.ccard.off{opacity:.5}
+.ccard h3{margin:0 0 6px;font-size:14.5px;display:flex;align-items:center;gap:8px}
+.ccard .tag{font-size:10px;color:var(--violet);background:#a98bff18;border:1px solid #3a2a6a;border-radius:20px;padding:1px 8px}
+.ccard .tag.b{color:var(--faint);background:#ffffff08;border-color:var(--line)}
+.ccard .body{color:var(--dim);font-size:13px;line-height:1.65;white-space:pre-wrap;word-break:break-word}
+.ccard .fld{font-size:12.5px;color:var(--dim);margin-top:5px}
+.ccard .fld b{color:var(--faint);font-weight:500}
+.ccard .ops{display:flex;gap:7px;margin-top:11px}
+.ccard .op{font-size:12px;color:var(--dim);cursor:pointer;border:1px solid var(--line);border-radius:7px;padding:3px 10px}
+.ccard .op:hover{border-color:var(--violet);color:var(--ink)}
+.ccard .op.del:hover{border-color:var(--bad);color:var(--bad)}
+.clib-empty{color:var(--faint);text-align:center;padding:60px 20px}
+.clib-sel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:7px 11px;color:var(--ink);font:inherit}
+.clib-section{margin:22px 0 10px;font-size:14px;color:var(--ink);display:flex;align-items:center;gap:10px}
+.clib-section small{color:var(--faint);font-weight:400;font-size:12px}
+/* modal (standalone, mirrors新 UI 风格) */
+.ov{position:fixed;inset:0;background:#06060caa;backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+.mo{background:var(--surface2);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);width:min(560px,94vw);max-height:88vh;overflow:auto;padding:20px 22px}
+.mo h3{margin:0 0 14px;font-size:16px}
+.mo .field{margin-bottom:12px}
+.mo .field label{display:block;font-size:12.5px;color:var(--dim);margin-bottom:5px}
+.mo .field input,.mo .field textarea,.mo .field select{width:100%;background:#0d0d18;border:1px solid var(--line);border-radius:9px;padding:9px 11px;color:var(--ink);font:inherit;font-size:13.5px;box-sizing:border-box}
+.mo .field textarea{resize:vertical;min-height:64px}
+.mo .field .hint{font-size:11px;color:var(--faint);margin-top:4px}
+.mo-acts{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
+.mo .err{color:var(--bad);font-size:12.5px;min-height:16px;margin:4px 0}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--line);border-left:3px solid var(--good);border-radius:10px;padding:11px 18px;color:var(--ink);font-size:13.5px;box-shadow:var(--shadow);z-index:99;animation:fade .2s}
+.toast.bad{border-left-color:var(--bad)}
+</style>
+</head>
+<body>
+<div class="clib-top">
+  <span class="logo">创作组件库</span>
+  <span class="sub">开发者 · 工艺 / 配方 / 名词库 / 大纲 —— 定义可复用的创作原料（缺数据时引擎回退内置种子）</span>
+  <a href="/">← 回作品</a>
+</div>
+<div class="clib">
+  <div class="clib-side" id="side"></div>
+  <div class="clib-main" id="main"><div class="clib-empty">载入中…</div></div>
+</div>
+
+<script>
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const el=id=>document.getElementById(id);
+async function api(p){const r=await fetch('/api'+p);if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||r.status);return r.json();}
+async function post(p,b){const r=await fetch('/api'+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})});const j=await r.json().catch(()=>({}));if(!r.ok||j.ok===false)throw new Error(j.error||r.status);return j;}
+function toast(m,bad){const t=document.createElement('div');t.className='toast'+(bad?' bad':'');t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2600);}
+const META=['key','id','order','enabled','builtin'];
+const KIND_LABEL={menu:'名录(键+释义)',list:'清单(逐条)',note:'单条说明',record:'记录(多字段)'};
+
+let GROUPS=[], OV={worlds:[]}, ST={fam:null,group:null,kind:null,title:null,world:null,thread:null};
+
+async function boot(){
+  try{[GROUPS,OV]=await Promise.all([api('/components').then(d=>d.groups),api('/overview').catch(()=>({worlds:[]}))]);}
+  catch(e){el('main').innerHTML=`<div class="clib-empty">✗ 无法连接后端：${esc(e.message)}</div>`;return;}
+  renderSide();
+  const g=GROUPS[0];if(g)selectGroup(g.family,g.group);
+}
+function renderSide(){
+  const byFam={};GROUPS.forEach(g=>{(byFam[g.family]=byFam[g.family]||[]).push(g);});
+  const famName={craft:'工艺 craft',recipes:'配方 recipes'};
+  let h='';
+  for(const fam of Object.keys(byFam)){
+    h+=`<div class="clib-fam">${esc(famName[fam]||fam)}</div>`;
+    h+=byFam[fam].map(g=>`<div class="clib-nav ${ST.fam===g.family&&ST.group===g.group?'on':''}" onclick="selectGroup('${esc(g.family)}','${esc(g.group)}')">${esc(g.title)}<span class="ct">${g.count}</span></div>`).join('');
+  }
+  h+=`<div class="clib-fam">内容（按作品/线）</div>`;
+  h+=`<div class="clib-nav ${ST.fam==='glossary'?'on':''}" onclick="selectGlossary()">📖 名词库 glossary</div>`;
+  h+=`<div class="clib-nav ${ST.fam==='outline'?'on':''}" onclick="selectOutline()">🗂 大纲 outline</div>`;
+  h+=`<div class="clib-fam">其它族（各有专页）</div>`;
+  h+=`<a class="clib-nav" href="/#/assets" target="_blank">🧩 元件 codex →</a>`;
+  h+=`<a class="clib-nav" href="/#/presets" target="_blank">🎚 预设 preset →</a>`;
+  el('side').innerHTML=h;
+}
+
+/* ============ 工艺 / 配方（统一 components，4 kind 各一渲染）============ */
+async function selectGroup(fam,group){
+  ST={fam,group,kind:null,title:null,world:null,thread:null};renderSide();
+  el('main').innerHTML='<div class="clib-empty">载入中…</div>';
+  let doc;try{doc=await api('/components/'+fam+'/'+group);}catch(e){el('main').innerHTML=`<div class="clib-empty">✗ ${esc(e.message)}</div>`;return;}
+  ST.kind=doc.kind;ST.title=doc.title;
+  const cards=(doc.entries||[]).map(e=>compCard(doc.kind,e)).join('')||'<div class="clib-empty">这组还没有条目。点「＋ 新增」加一条。</div>';
+  el('main').innerHTML=`<div class="clib-head"><h1>${esc(doc.title)}</h1><span class="k">${esc(KIND_LABEL[doc.kind]||doc.kind)}</span><span class="sp"></span>
+      <button class="btn ghost sm" onclick="seedAll()">⤓ 灌种全部</button>
+      <button class="btn sm" onclick="compForm(null)">＋ 新增</button></div>
+    <p class="clib-lead">改了这里，下次写章 / 审校的注入随之变；不灌种时引擎用内置种子（与今日逐字节一致）。</p>
+    <div class="clib-cards">${cards}</div>`;
+}
+function compCard(kind,e){
+  const idv=e.key!=null?e.key:e.id;
+  const off=e.enabled===false?' off':'';
+  const bi=e.builtin?'<span class="tag b">种子</span>':'';
+  let title='',body='';
+  if(kind==='menu'){title=esc(e.key);body=esc(e.desc);}
+  else if(kind==='list'){title='条目';body=esc(e.text);}
+  else if(kind==='note'){title='说明';body=esc(e.text);}
+  else if(kind==='record'){title=esc(e.key);body=Object.keys(e).filter(k=>!META.includes(k)).map(k=>`<div class="fld"><b>${esc(k)}：</b>${esc(Array.isArray(e[k])?e[k].join('、'):e[k])}</div>`).join('');}
+  return `<div class="ccard${off}"><h3>${title||'(空)'} ${bi}</h3><div class="body">${body||''}</div>
+    <div class="ops"><span class="op" onclick='compForm(${JSON.stringify(idv)})'>编辑</span>
+      <span class="op del" onclick='compDel(${JSON.stringify(idv)})'>删除</span></div></div>`;
+}
+async function compForm(idv){
+  const doc=await api('/components/'+ST.fam+'/'+ST.group);
+  const kind=doc.kind, entries=doc.entries||[];
+  const cur=idv!=null?entries.find(e=>(e.key!=null?e.key:e.id)===idv):null;
+  let fields=[];
+  if(kind==='menu')fields=[['key','规范名 / 键',cur?cur.key:'','input'],['desc','释义',cur?cur.desc:'','textarea']];
+  else if(kind==='list'||kind==='note')fields=[['text','内容',cur?cur.text:'','textarea']];
+  else if(kind==='record'){
+    const tpl=cur||entries.find(e=>e.key!=='_default')||entries[0]||{};
+    fields=[['key','键（题材 / 名）',cur?cur.key:'','input']];
+    Object.keys(tpl).filter(k=>!META.includes(k)).forEach(k=>{
+      const v=cur?cur[k]:(Array.isArray(tpl[k])?[]:'');
+      fields.push([k,k,Array.isArray(tpl[k])?(Array.isArray(v)?v.join('\n'):''):v,Array.isArray(tpl[k])?'textarea':'input','arr:'+(Array.isArray(tpl[k]))]);
+    });
+  }
+  openForm((idv!=null?'编辑':'新增')+' · '+esc(ST.title),fields,async vals=>{
+    const entry={};
+    fields.forEach(f=>{const[n,,,ty,meta]=f;let v=vals[n];if((meta||'').startsWith('arr:true'))v=v.split('\n').map(s=>s.trim()).filter(Boolean);entry[n]=v;});
+    if(kind==='list'||kind==='note'){if(cur&&cur.id!=null)entry.id=cur.id;}
+    await post('/components/upsert',{family:ST.fam,group:ST.group,entry});
+    closeForm();toast('✓ 已保存');selectGroup(ST.fam,ST.group);
+  });
+}
+async function compDel(idv){if(!confirm('删除这条？'))return;try{await post('/components/delete',{family:ST.fam,group:ST.group,key:idv});toast('✓ 已删');selectGroup(ST.fam,ST.group);}catch(e){toast('✗ '+e.message,true);}}
+async function seedAll(){try{const r=await post('/components/seed',{});toast(`✓ 灌种：新增 ${r.added} 组 / 共 ${r.total}`);GROUPS=(await api('/components')).groups;selectGroup(ST.fam,ST.group);}catch(e){toast('✗ '+e.message,true);}}
+
+/* ============ 名词库 glossary（按世界）============ */
+function worldSel(cur,onchange){return `<select class="clib-sel" onchange="${onchange}">`+
+  `<option value="">选一个作品…</option>`+OV.worlds.map(w=>`<option value="${esc(w.id)}" ${w.id===cur?'selected':''}>${esc(w.name)}</option>`).join('')+`</select>`;}
+async function selectGlossary(){ST={fam:'glossary',group:null,kind:null,title:null,world:ST.world,thread:null};renderSide();renderGlossary();}
+async function renderGlossary(){
+  let terms=[];
+  if(ST.world){try{terms=(await api('/world/'+ST.world)).glossary.terms||[];}catch(e){}}
+  const cards=ST.world?(terms.length?terms.map((t,i)=>glossCard(t,i)).join(''):'<div class="clib-empty">这个作品还没有名词。点「＋ 新增名词」加人名 / 地名 / 技能 / 组织 + 别名。</div>'):'<div class="clib-empty">先选一个作品。</div>';
+  el('main').innerHTML=`<div class="clib-head"><h1>名词库</h1><span class="k">命名一致</span><span class="sp"></span>
+      ${worldSel(ST.world,'pickWorld(this.value)')} ${ST.world?'<button class="btn sm" onclick="glossForm(-1)">＋ 新增名词</button>':''}</div>
+    <p class="clib-lead">规范名 + 别名：写章 / 审校时注入，反思能查「同一对象别名混用」。属作品级内容，按作品分别维护。</p>
+    <div class="clib-cards">${cards}</div>`;
+  window._terms=terms;
+}
+function pickWorld(w){ST.world=w;renderGlossary();}
+function glossCard(t,i){
+  return `<div class="ccard${t.enabled===false?' off':''}"><h3>${esc(t.name)} <span class="tag">${esc(t.category||'名词')}</span></h3>
+    ${t.aliases&&t.aliases.length?`<div class="fld"><b>别名：</b>${t.aliases.map(esc).join('、')}</div>`:''}
+    ${t.note?`<div class="body" style="margin-top:6px">${esc(t.note)}</div>`:''}
+    <div class="ops"><span class="op" onclick="glossForm(${i})">编辑</span><span class="op del" onclick="glossDel(${i})">删除</span></div></div>`;
+}
+function glossForm(i){
+  const t=i>=0?window._terms[i]:{name:'',category:'人名',aliases:[],note:'',enabled:true};
+  openForm((i>=0?'编辑':'新增')+'名词',[
+    ['name','规范名',t.name,'input'],
+    ['category','类别',t.category||'人名','select','opt:人名,地名,技能,组织,其它'],
+    ['aliases','别名（每行一个）',(t.aliases||[]).join('\n'),'textarea','arr:true'],
+    ['note','备注（可空）',t.note||'','textarea'],
+  ],async vals=>{
+    const term={name:vals.name.trim(),category:vals.category,aliases:vals.aliases.split('\n').map(s=>s.trim()).filter(Boolean),note:vals.note.trim(),enabled:true};
+    if(!term.name)throw new Error('填规范名');
+    const terms=(window._terms||[]).slice();if(i>=0)terms[i]=term;else terms.push(term);
+    await post('/glossary/save',{world:ST.world,terms});closeForm();toast('✓ 已保存名词库');renderGlossary();
+  });
+}
+async function glossDel(i){if(!confirm('删除「'+window._terms[i].name+'」？'))return;const terms=window._terms.slice();terms.splice(i,1);await post('/glossary/save',{world:ST.world,terms});toast('✓ 已删');renderGlossary();}
+
+/* ============ 大纲 outline（按线）============ */
+async function selectOutline(){ST={fam:'outline',group:null,kind:null,title:null,world:ST.world,thread:null};renderSide();renderOutline();}
+function threadSel(){if(!ST.world)return '';const w=OV.worlds.find(x=>x.id===ST.world);return `<select class="clib-sel" onchange="pickThread(this.value)"><option value="">选世界线…</option>${(window._threads||[]).map(t=>`<option value="${esc(t.id)}" ${t.id===ST.thread?'selected':''}>${esc(t.title)}</option>`).join('')}</select>`;}
+async function renderOutline(){
+  // load threads of selected world
+  if(ST.world){try{window._threads=(await api('/world/'+ST.world)).threads||[];}catch(e){window._threads=[];}}
+  let ol=null;
+  if(ST.world&&ST.thread){try{ol=(await api('/thread/'+ST.world+'/'+ST.thread)).outline;}catch(e){}}
+  let bodyHtml='';
+  if(!ST.world)bodyHtml='<div class="clib-empty">先选一个作品。</div>';
+  else if(!ST.thread)bodyHtml='<div class="clib-empty">再选一条世界线。</div>';
+  else{
+    ol=ol||{volumes:[],beats:[],chapters:{}};window._ol=ol;
+    const vol=(ol.volumes||[]).map((v,i)=>`<div class="ccard"><h3>${esc(v.title||'卷')}</h3><div class="body">${esc(v.summary||'')}</div><div class="ops"><span class="op" onclick="volForm(${i})">编辑</span><span class="op del" onclick="olDel('volumes',${i})">删除</span></div></div>`).join('')||'<div class="clib-empty" style="padding:20px">还没有卷。</div>';
+    const bts=(ol.beats||[]).map((b,i)=>`<div class="ccard"><h3>${esc(b.title||'节点')} <span class="tag">${esc(b.kind||'')}</span></h3><div class="body">${esc(b.note||'')}</div><div class="ops"><span class="op" onclick="beatForm(${i})">编辑</span><span class="op del" onclick="olDel('beats',${i})">删除</span></div></div>`).join('')||'<div class="clib-empty" style="padding:20px">还没有节点。</div>';
+    const chs=Object.keys(ol.chapters||{}).sort((a,b)=>a-b).map(no=>{const c=ol.chapters[no];return `<div class="ccard"><h3>第 ${esc(no)} 章</h3>
+        ${['goal','conflict','hook','reveal'].filter(k=>c[k]).map(k=>`<div class="fld"><b>${({goal:'目标',conflict:'冲突',hook:'钩子',reveal:'信息披露'})[k]}：</b>${esc(c[k])}</div>`).join('')}
+        ${c.cast&&c.cast.length?`<div class="fld"><b>出场：</b>${c.cast.map(esc).join('、')}</div>`:''}
+        ${c.target_hanzi?`<div class="fld"><b>目标字数：</b>${esc(c.target_hanzi)}</div>`:''}
+        <div class="ops"><span class="op" onclick="chapForm('${esc(no)}')">编辑</span><span class="op del" onclick="olDelChap('${esc(no)}')">删除</span></div></div>`;}).join('')||'<div class="clib-empty" style="padding:20px">还没有章节细纲。</div>';
+    bodyHtml=`<div class="clib-section">① 卷大纲 <small>宏观分卷</small> <button class="btn ghost sm" style="margin-left:auto" onclick="volForm(-1)">＋ 卷</button></div><div class="clib-cards">${vol}</div>
+      <div class="clib-section">② 节点 beats <small>转折 / 爆点 / 信息点</small> <button class="btn ghost sm" style="margin-left:auto" onclick="beatForm(-1)">＋ 节点</button></div><div class="clib-cards">${bts}</div>
+      <div class="clib-section">③ 章节细纲 <small>目标 / 冲突 / 钩子 / 披露 / 出场 / 目标字数</small> <button class="btn ghost sm" style="margin-left:auto" onclick="chapForm('')">＋ 章</button></div><div class="clib-cards">${chs}</div>`;
+  }
+  el('main').innerHTML=`<div class="clib-head"><h1>三级大纲</h1><span class="k">写章注入 + 偏离诊断</span><span class="sp"></span>
+      ${worldSel(ST.world,'pickWorldOL(this.value)')} ${threadSel()}</div>
+    <p class="clib-lead">卷 → 节点 → 章节六元细纲。写章时注入本章细纲，审校 / 反思据此查「偏离细纲（字数 / 出场）」。属世界线内容。</p>
+    ${bodyHtml}`;
+}
+function pickWorldOL(w){ST.world=w;ST.thread=null;renderOutline();}
+function pickThread(t){ST.thread=t;renderOutline();}
+async function saveOL(){await post('/outline/save',{world:ST.world,thread:ST.thread,outline:window._ol});toast('✓ 已保存大纲');renderOutline();}
+function olDel(key,i){if(!confirm('删除这条？'))return;window._ol[key].splice(i,1);saveOL();}
+function olDelChap(no){if(!confirm('删除第 '+no+' 章细纲？'))return;delete window._ol.chapters[no];saveOL();}
+function volForm(i){const v=i>=0?window._ol.volumes[i]:{title:'',summary:''};openForm((i>=0?'编辑':'新增')+'卷',[['title','卷名',v.title,'input'],['summary','一句话',v.summary,'textarea']],async vals=>{const item={title:vals.title.trim(),summary:vals.summary.trim()};if(i>=0)window._ol.volumes[i]=item;else (window._ol.volumes=window._ol.volumes||[]).push(item);closeForm();await saveOL();});}
+function beatForm(i){const b=i>=0?window._ol.beats[i]:{title:'',kind:'转折',note:''};openForm((i>=0?'编辑':'新增')+'节点',[['title','节点名',b.title,'input'],['kind','类型',b.kind||'转折','select','opt:转折,爆点,信息点'],['note','说明',b.note,'textarea']],async vals=>{const item={title:vals.title.trim(),kind:vals.kind,note:vals.note.trim()};if(i>=0)window._ol.beats[i]=item;else (window._ol.beats=window._ol.beats||[]).push(item);closeForm();await saveOL();});}
+function chapForm(no){const c=(no&&window._ol.chapters[no])?window._ol.chapters[no]:{goal:'',conflict:'',hook:'',reveal:'',cast:[],target_hanzi:''};
+  openForm((no?'编辑第'+no+'章':'新增章节')+'细纲',[
+    ['no','章号',no||'','input'],['goal','目标',c.goal,'input'],['conflict','冲突',c.conflict,'input'],
+    ['hook','钩子',c.hook,'input'],['reveal','信息披露',c.reveal,'input'],
+    ['cast','出场角色（每行一个）',(c.cast||[]).join('\n'),'textarea','arr:true'],
+    ['target_hanzi','目标字数','target_hanzi'in c?c.target_hanzi:'','input'],
+  ],async vals=>{const n=String(vals.no).trim();if(!/^\d+$/.test(n))throw new Error('章号填数字');
+    window._ol.chapters=window._ol.chapters||{};
+    if(no&&no!==n)delete window._ol.chapters[no];
+    window._ol.chapters[n]={goal:vals.goal.trim(),conflict:vals.conflict.trim(),hook:vals.hook.trim(),reveal:vals.reveal.trim(),
+      cast:vals.cast.split('\n').map(s=>s.trim()).filter(Boolean),target_hanzi:vals.target_hanzi?parseInt(vals.target_hanzi,10)||0:0};
+    closeForm();await saveOL();});}
+
+/* ============ 通用结构化表单 modal ============ */
+function openForm(title,fields,onSubmit){
+  closeForm();
+  const body=fields.map(f=>{const[n,label,val,ty,meta]=f;
+    if(ty==='textarea')return `<div class="field"><label>${esc(label)}</label><textarea id="ff_${n}">${esc(val)}</textarea>${(meta||'').startsWith('arr')?'<div class="hint">每行一条</div>':''}</div>`;
+    if(ty==='select'){const opts=((meta||'').startsWith('opt:')?meta.slice(4).split(','):[]);return `<div class="field"><label>${esc(label)}</label><select id="ff_${n}">${opts.map(o=>`<option ${o===val?'selected':''}>${esc(o)}</option>`).join('')}</select></div>`;}
+    return `<div class="field"><label>${esc(label)}</label><input id="ff_${n}" value="${esc(val)}"></div>`;
+  }).join('');
+  const ov=document.createElement('div');ov.className='ov';ov.id='ov';
+  ov.onclick=e=>{if(e.target===ov)closeForm();};
+  ov.innerHTML=`<div class="mo"><h3>${esc(title)}</h3>${body}<div class="err" id="fferr"></div><div class="mo-acts"><button class="btn ghost" onclick="closeForm()">取消</button><button class="btn" id="ffok">保存</button></div></div>`;
+  document.body.appendChild(ov);
+  el('ffok').onclick=async()=>{const vals={};fields.forEach(f=>{const e=el('ff_'+f[0]);vals[f[0]]=e?e.value:'';});
+    try{await onSubmit(vals);}catch(e){el('fferr').textContent='✗ '+e.message;}};
+}
+function closeForm(){const o=el('ov');if(o)o.remove();}
+
+boot();
+</script>
+</body>
+</html>
