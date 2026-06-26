@@ -96,16 +96,22 @@ def _call(name, args):
     for k in opt:
         if k in args and args[k] not in (None, ""):
             argv += [f"--{k}", str(args[k])]
-    old_o, old_i = sys.stdout, sys.stdin
-    sys.stdout = io.StringIO()
+    old_o, old_i, old_e = sys.stdout, sys.stdin, sys.stderr
+    sys.stdout = io.StringIO(); sys.stderr = io.StringIO()
     if reads:
         sys.stdin = io.StringIO(json.dumps(args.get("payload", {}), ensure_ascii=False))
+    code, extra = 1, ""
     try:
         code = skill_api.main(argv)
-        text = sys.stdout.getvalue()
+    except SystemExit as e:        # argparse 缺必填/坏参:转退出码,不让 server 崩
+        code = e.code if isinstance(e.code, int) else 1
+    except Exception as e:         # 引擎抛错(世界不存在等):转结构化 isError(弱模型乱传也不崩)
+        code, extra = 1, f"{type(e).__name__}: {e}"
     finally:
-        sys.stdout, sys.stdin = old_o, old_i
-    return {"isError": code != 0, "content": [{"type": "text", "text": text or "(无输出)"}]}
+        text, errtext = sys.stdout.getvalue(), sys.stderr.getvalue()
+        sys.stdout, sys.stdin, sys.stderr = old_o, old_i, old_e
+    body = "\n".join(s for s in (text.strip(), errtext.strip(), extra) if s) or "(无输出)"
+    return {"isError": code != 0, "content": [{"type": "text", "text": body}]}
 
 
 def _handle(req):
