@@ -74,5 +74,17 @@ d2 = webapp.api_soul_incarnations("suzhi")
 miss = [i for i in d2["incarnations"] if i.get("missing")]
 ok(len(miss) == 1 and miss[0]["world"] == "linjiang", "化身世界缺失 → 标记 missing 不报错")
 
+# ---------- T3.2 真封面 / 头像投影 + render/cover 休眠回退 ----------
+ovc = webapp.api_overview()
+tw = next((w for w in ovc["worlds"] if w["id"] == "tower"), None)
+ok(tw is not None and tw.get("cover") == "", "overview.world.cover:无封面时为空串(前端回退渐变)")
+(World("tower").dir / "cover.png").write_bytes(b"\x89PNG\r\n\x1a\n")   # 占位字节,只验存在
+tw2 = next((w for w in webapp.api_overview()["worlds"] if w["id"] == "tower"), None)
+ok(tw2.get("cover") == "worlds/tower/cover.png", "overview.world.cover:有 cover.png 时给 /img 相对路径")
+aw = webapp.api_world("tower")
+ok(all("avatar" in e for e in aw["entities"]), "api_world 实体带 avatar 字段(角色封面用)")
+rc = webapp.post_render_cover({"world": "tower"})
+ok(rc.get("enabled") is False, "render/cover:未配 SV_RENDER 时休眠回退(不报错)")
+
 print(f"\n{len(P)} 通过 / {len(F)} 失败")
 sys.exit(1 if F else 0)

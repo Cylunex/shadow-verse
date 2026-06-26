@@ -15,9 +15,10 @@ async function viewChars(){
   }
   const html=cards.map(c=>{
     const cmp=c.soul?` onclick="event.stopPropagation();location.hash='#/incarnations/${jsq(c.id)}'" style="cursor:pointer" title="看她在各世界的化身"`:'';
+    const av=c.avatar?`style="background-image:url('/img/${esc(c.avatar)}')"`:'';
     return `<div class="charcard" onclick="location.hash='#/companion/${c.wid}/${c.id}'">
     ${c.cross?`<span class="xw"${cmp}>✦ 跨世界</span>`:''}
-    <div class="av ${coverClass(c.genre)}"></div>
+    <div class="av ${c.avatar?'':coverClass(c.genre)}" ${av}></div>
     <h3>${esc(c.name)}</h3><div class="role">${esc(c.role||'')}</div>
     <div class="from">出自《${esc(c.wname)}》</div>
     ${c.cross&&c.inc.length>1?`<div class="incar"${cmp}>✦ 现身于 ${c.inc.map(esc).join(' · ')}</div>`:''}</div>`;}).join('');

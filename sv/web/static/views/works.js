@@ -25,8 +25,9 @@ async function viewWorks(sub,arg){
     const cc=coverClass(w.genre);
     const tags=(w.genre||'').split(/[\s/·,，]+/).filter(Boolean).slice(0,3)
       .map((t,i)=>`<span class="tag ${['v','c','g'][i]||''}">${esc(t)}</span>`).join('');
+    const coverStyle=w.cover?`style="background-image:url('/img/${esc(w.cover)}')"`:'';
     return `<div class="work" onclick="openWork('${w.id}')">
-      <div class="cover ${cc}"><div class="vig"></div><div class="sigil">${sigil(w.genre)}</div></div>
+      <div class="cover ${w.cover?'':cc}" ${coverStyle}><div class="vig"></div>${w.cover?'':`<div class="sigil">${sigil(w.genre)}</div>`}</div>
       <div class="body"><h3>${esc(w.name)}</h3>
         <div class="desc">${esc(w.genre||'')} · ${w.threads} 条世界线 · ${w.entities} 个角色${w.provenance==='forge'?' · AIGC 锻造':''}</div>
         <div class="tags">${tags}</div>
@@ -45,6 +46,10 @@ async function viewWorks(sub,arg){
       c.style.display=(!q||((w.name+w.genre).toLowerCase().includes(q)))?'':'none';});};
 }
 function openWork(wid){location.hash='#/chat/'+wid;}
+async function actRenderCover(wid){closeModal();toast('生成封面中…（需配出图后端）');
+  try{const r=await post('/render/cover',{world:wid});
+    if(r&&(r.enabled===false||r.error)){toast(r.note||'未配出图后端 —— 设置 › 渲染',true);return;}
+    await refresh();route();toast('✓ 封面已生成');}catch(e){toast('✗ '+e.message,true)}}
 function worldMenu(wid,name){
   openModal(`<h3>${esc(name)}</h3>
     <div class="modal-actions" style="flex-wrap:wrap;justify-content:flex-start;gap:8px">
@@ -52,6 +57,7 @@ function worldMenu(wid,name){
       <button class="btn ghost sm" onclick="closeModal();location.hash='#/novel/${wid}'">✍ 小说</button>
       <button class="btn ghost sm" onclick="closeModal();location.hash='#/worldbook/${wid}'">📜 世界书</button>
       <button class="btn ghost sm" onclick="closeModal();location.hash='#/works/chron/${wid}'">📜 编年史</button>
+      <button class="btn ghost sm" onclick="actRenderCover('${jsq(wid)}')">🖼 生成封面</button>
       <button class="btn ghost sm" style="border-color:#5a2336;color:var(--bad)" onclick="actDelWorld('${jsq(wid)}','${jsq(name)}')">🗑 删除</button>
     </div>`);
 }
@@ -122,4 +128,4 @@ async function worksChron(head,wid){
 
 
 /* —— 暴露到全局命名空间（内联 onclick + 跨模块裸引用）—— */
-Object.assign(window, { viewWorks, openWork, worldMenu, worksNexus, worksChron, actLinkWorlds, actUnlinkWorlds });
+Object.assign(window, { viewWorks, openWork, actRenderCover, worldMenu, worksNexus, worksChron, actLinkWorlds, actUnlinkWorlds });

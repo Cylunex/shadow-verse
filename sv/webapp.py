@@ -34,6 +34,7 @@ def api_overview() -> dict:
         worlds.append({"id": wid, "name": m.get("name", wid), "genre": m.get("genre", ""),
                        "scale": m.get("scale", ""), "threads": len(w.list_threads()),
                        "entities": len(w.list_entities()), "links": m.get("links", []),
+                       "cover": f"worlds/{wid}/cover.png" if (w.dir / "cover.png").exists() else "",
                        "provenance": m.get("provenance", {}).get("source", "")})
     nx = {"entities": [], "links": nexus.links()}
     for k in nexus.kept_entities():
@@ -62,6 +63,7 @@ def api_world(wid: str) -> dict:
     w = World.load(wid); m = w.meta()
     ents = [{"id": eid, "name": LocalEntity(w, eid).card().get("name", eid),
              "role": LocalEntity(w, eid).card().get("role", ""),
+             "avatar": LocalEntity(w, eid).avatar_rel() or "",
              "provenance": LocalEntity(w, eid).card().get("provenance", {}).get("source", "")}
             for eid in w.list_entities()]
     threads = []
@@ -319,6 +321,20 @@ def post_render_entity(b: dict) -> dict:
 def post_render_scene(b: dict) -> dict:
     w = World.load(b["world"]); t = Thread.load(w, b["thread"])
     return lenses.render_scene(w, t, b.get("subject", ""), appearance=b.get("appearance", ""))
+
+
+def post_render_cover(b: dict) -> dict:
+    """作品封面:据世界名/题材出一张 key visual 存到 worlds/<wid>/cover.png。
+    复用 render 管线;未配 SV_RENDER=gitee 则休眠回退(页面继续用渐变占位,不报错)。"""
+    w = World.load(b["world"])
+    if not lenses.render_available():
+        return {"enabled": False, "note": "未配出图后端 —— 在 设置 › 渲染 设 SV_RENDER=gitee + GITEE_API_KEY 后可生成封面。"}
+    m = w.meta()
+    subject = ", ".join(x for x in [m.get("name", ""), m.get("genre", ""),
+                                    "key visual cover art, atmospheric cinematic lighting, no text"] if x)
+    raw = lenses._gen_image(subject)
+    (w.dir / "cover.png").write_bytes(raw)
+    return {"enabled": True, "rel": f"worlds/{w.id}/cover.png", "bytes": len(raw)}
 
 
 def post_config(b: dict) -> dict:
@@ -829,6 +845,7 @@ POST_ROUTES = [
     (re.compile(r"^/api/unlink$"), post_unlink),
     (re.compile(r"^/api/render/entity$"), post_render_entity),
     (re.compile(r"^/api/render/scene$"), post_render_scene),
+    (re.compile(r"^/api/render/cover$"), post_render_cover),
     (re.compile(r"^/api/config$"), post_config),
     (re.compile(r"^/api/llm-test$"), post_llm_test),
     (re.compile(r"^/api/hook/add$"), post_hook_add),
