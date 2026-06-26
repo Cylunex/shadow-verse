@@ -67,5 +67,21 @@ ok(r["isError"] is True, "缺必填参数 → isError 不崩(接住 argparse Sys
 r = call("narrate_prep", {"world": "不存在", "thread": "x"})   # 引擎抛 FileNotFoundError
 ok(r["isError"] is True, "引擎抛错(世界不存在) → isError 不崩")
 
+# ---------- ④ 工具分层(OPENCLAW A1):SV_MCP_TIER 收敛 tools/list ----------
+def listed():
+    return [t["name"] for t in M._handle({"jsonrpc": "2.0", "id": 3, "method": "tools/list"})["result"]["tools"]]
+alln = listed()
+ok(len(alln) == len(M.TOOLS), "缺省 SV_MCP_TIER:全暴露(向后兼容)")
+os.environ["SV_MCP_TIER"] = "1"
+t1 = listed()
+ok(t1 and all(M._tier(n) == 1 for n in t1) and "play_prep" in t1 and "gen_world" not in t1,
+   "SV_MCP_TIER=1 只暴露 Tier1(含 play_prep,不含 gen_world)")
+os.environ["SV_MCP_TIER"] = "2"
+t2 = listed()
+ok(len(t1) < len(t2) < len(alln) and "narrate_prep" in t2, "SV_MCP_TIER=2 含创作工具,介于 Tier1 与全量之间")
+ok(M._call("codex_seed", {})["isError"] is False, "分层只收敛 tools/list,未广告的工具仍可 tools/call")
+del os.environ["SV_MCP_TIER"]
+ok(len(listed()) == len(M.TOOLS), "清掉 env 恢复全暴露")
+
 print(f"\n{len(P)} 通过 / {len(F)} 失败")
 sys.exit(1 if F else 0)

@@ -13,10 +13,11 @@
      "command": "python",
      "args": ["-m", "sv.mcp_server"],
      "cwd": "<$SV_HOME 的绝对路径>",
-     "env": { "PYTHONUTF8": "1" }
+     "env": { "PYTHONUTF8": "1", "SV_MCP_TIER": "1" }
    }
    ```
    工具以 `mcp_shadowverse_*` 前缀出现。也可直接跑 CLI:`cd $SV_HOME && python -m sv.skill_api <cmd>`。
+   - **工具分层(`SV_MCP_TIER`,看板娘强烈建议)**:全量 typed 工具 ~60 个,一股脑进 agent loop 会工具过载。设 `SV_MCP_TIER=1` 只暴露**主回路 Tier1**(陪伴/RP `play_*`、群聊 `group_*`、`status`/`nexus`/`summon`/`ascend`/`link`/`expr_classify`/`doctor`);`=2` 再含创作/质量工具;缺省或 `=3` 全暴露。分层只收敛 `tools/list` 的"广告面",任何工具仍可被 `tools/call` 直接调(工具语义不变)。
 
 ## 两个最常踩的坑
 
@@ -30,4 +31,4 @@ cd $SV_HOME && PYTHONUTF8=1 python -m sv.skill_api doctor
 PYTHONUTF8=1 python -m sim.smoke      # 端到端 21 项(五层贯通)
 ```
 
-具体注册命令以运行时为准(`hermes mcp --help` / OpenClaw 的 MCP 配置)。22 个 typed 工具,语义同 CLI。
+具体注册命令以运行时为准(`hermes mcp --help` / OpenClaw 的 MCP 配置)。typed 工具数以 `python -m sv.mcp_server`(=`mcp_server.TOOLS` 长度)/ `sv doctor` 实际为准(现 ~60,分 Tier1/2/3),语义同 CLI。

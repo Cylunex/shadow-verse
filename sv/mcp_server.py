@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import sys
 
 from . import skill_api
@@ -81,6 +82,27 @@ TOOLS = [
 ]
 _BY = {t[0]: t for t in TOOLS}
 
+# 工具分层(OPENCLAW A1):看板娘主回路只需 Tier1,免 ~60 工具一股脑塞进 agent loop。
+# tools/list 暴露层级由环境变量 SV_MCP_TIER 控制(1=只主回路 / 2=含创作质量 / 缺省或 3=全暴露,向后兼容);
+# 工具语义/可调用性不变——分层只收敛"广告面",任何工具仍可被 tools/call 直接调。
+_TIER1 = {"play_prep", "play_commit", "group_new", "group_chat", "status",
+          "nexus", "summon", "ascend", "link", "expr_classify", "doctor"}   # RP/陪伴 + 切角色 + 导航/暗宇宙
+_TIER3 = {"gen_world", "gen_entity", "gen_thread", "gen_chapter", "gen_card",  # 单机一键/休眠/调试
+          "render_prep", "render_commit", "render_entity", "expr_gen",
+          "simulate_prep", "simulate_commit", "codex_add", "codex_seed", "presets"}
+
+
+def _tier(name: str) -> int:
+    return 1 if name in _TIER1 else (3 if name in _TIER3 else 2)   # 其余=Tier2(创作/质量,按需)
+
+
+def _exposed_tools():
+    cap = os.environ.get("SV_MCP_TIER", "").strip()
+    if cap in ("1", "2"):
+        lim = int(cap)
+        return [t for t in TOOLS if _tier(t[0]) <= lim]
+    return TOOLS
+
 
 def _schema(props, required):
     tm = {"str": "string", "int": "integer", "object": "object"}
@@ -119,7 +141,7 @@ def _handle(req):
     if method == "initialize":
         return {"jsonrpc": "2.0", "id": mid, "result": {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "shadowverse", "version": "0.2.0"}}}
     if method == "tools/list":
-        return {"jsonrpc": "2.0", "id": mid, "result": {"tools": [{"name": n, "description": d, "inputSchema": _schema(p, pos)} for n, d, p, pos, _, _ in TOOLS]}}
+        return {"jsonrpc": "2.0", "id": mid, "result": {"tools": [{"name": n, "description": d, "inputSchema": _schema(p, pos)} for n, d, p, pos, _, _ in _exposed_tools()]}}
     if method == "tools/call":
         pr = req.get("params", {})
         return {"jsonrpc": "2.0", "id": mid, "result": _call(pr.get("name", ""), pr.get("arguments", {}))}
