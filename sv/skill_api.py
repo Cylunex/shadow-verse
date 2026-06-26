@@ -421,8 +421,9 @@ def cmd_export_thread(a):
 def cmd_delete_world(a):
     World.load(a.id)  # 校验存在
     nexus.purge_world(a.id)
+    nexus.purge_orphan_souls(a.id)   # 新魂模型:摘该世界化身 + 清孤儿魂(免泄漏)
     World(a.id).delete()
-    print(f"✓ 已删世界 {a.id}(及枢纽残留连接/化身)")
+    print(f"✓ 已删世界 {a.id}(及枢纽残留连接/化身、孤儿魂)")
 
 
 def cmd_delete_thread(a):

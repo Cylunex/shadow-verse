@@ -409,7 +409,7 @@ def post_codex_seed(b: dict) -> dict:
 
 # ---- 删除 / 管理 ----
 def post_delete_world(b: dict) -> dict:
-    World.load(b["id"]); nexus.purge_world(b["id"]); World(b["id"]).delete()
+    World.load(b["id"]); nexus.purge_world(b["id"]); nexus.purge_orphan_souls(b["id"]); World(b["id"]).delete()
     return {"ok": True}
 
 

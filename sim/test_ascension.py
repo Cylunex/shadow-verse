@@ -66,5 +66,17 @@ le = LocalEntity.load(w1, "linshen")
 ok(le.card().get("soul_id") == "linshen" and le.anchors() == ["沉默寡言", "守约"], "创造即魂:绑定 + 锚点走魂")
 ok("体魄" in varstate.load(le)["data"], "创造的魂也落数值攻略卡")
 
+# ---------- H3:删世界清孤儿魂(新魂模型不泄漏)----------
+incs0 = Soul("chuyao").incarnations()
+ok(len(incs0) >= 2, "前置:chuyao 有多个化身世界")
+nexus.purge_orphan_souls("hospital")
+ok(Soul("chuyao").exists(), "删一个化身世界:魂仍在(尚有别处化身,不误删)")
+left = Soul("chuyao").incarnations()
+ok(all(not r.startswith("hospital/") for r in left) and any(r.startswith("tower/") for r in left),
+   "只摘被删世界的化身指针,其余保留")
+nexus.purge_orphan_souls("tower")
+nexus.purge_orphan_souls("oasis")
+ok(not Soul("chuyao").exists(), "删尽全部化身世界:孤儿魂被清理(SOULS_DIR 无残留泄漏)")
+
 print(f"\n{len(P)} 通过 / {len(F)} 失败")
 sys.exit(1 if F else 0)

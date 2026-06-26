@@ -195,6 +195,29 @@ def purge_world(wid: str) -> None:
     render_map()
 
 
+def purge_orphan_souls(wid: str) -> None:
+    """删世界时清新魂模型(ascension)残留:把该世界从各魂的化身指针里摘掉;
+    某魂再无任何化身 → 清理孤儿魂目录(避免泄漏)。仅供"删世界"路径调用(融合自有去向,不在此)。"""
+    import shutil
+
+    from .config import SOULS_DIR
+    from .soul import Soul
+    if not SOULS_DIR.exists():
+        return
+    for d in sorted(SOULS_DIR.iterdir()):
+        if not (d / "meta.json").exists():
+            continue
+        s = Soul(d.name); m = s.meta()
+        incs = m.get("incarnations", [])
+        kept = [r for r in incs if r.split("/")[0] != wid]
+        if len(kept) == len(incs):
+            continue                                    # 与该世界无关,不动
+        if kept:
+            m["incarnations"] = kept; save_json(s.dir / "meta.json", m)   # 仍有别处化身:只摘该世界
+        else:
+            shutil.rmtree(s.dir)                        # 孤儿魂:再无任何化身 → 清理避免泄漏
+
+
 # ---------- 索引 ----------
 def _idx_path() -> Path:
     return NEXUS_DIR / "nexus.json"
