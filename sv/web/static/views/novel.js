@@ -35,6 +35,10 @@ async function viewNovel(wid,tid){
       <div class="metarow"><span>题材</span><b>${esc(d.meta.genre||'')}</b></div>
       <div class="metarow"><span>章数</span><b>${d.meta.chapter_count||d.chapters.length}</b></div>
       <div class="metarow"><span>字数</span><b>${d.chapters.reduce((a,c)=>a+c.hanzi,0)}</b></div>
+      <h3>生效组件 · 写章注入</h3>
+      <div class="metarow"><span>📖 名词库</span><b>${((wd.glossary&&wd.glossary.terms)||[]).length} 词</b></div>
+      <div class="metarow"><span>🗂 大纲</span><b>${(d.outline&&d.outline.chapters?Object.keys(d.outline.chapters).length:0)} 章细纲</b></div>
+      <p class="note" style="margin-top:6px">工艺/配方（去AI味·钩子·扩充·对话·题材配方）+ 名词库 + 大纲随写章自动注入，反思据此查命名漂移/偏离细纲。<a href="/components" target="_blank" style="color:var(--violet)">🧱 组件库 →</a></p>
       <h3>产线 · 写→审→改→落</h3>
       <div class="pipe"><span class="step" onclick="actWriteChapter()">✍ 写一章</span><span class="step" onclick="actNarrateRun()">✨ AI产线</span><span class="step" onclick="actExport()">⤓ 导出</span></div>
       <p class="note">「AI产线」自动写→质检→修订。</p>
