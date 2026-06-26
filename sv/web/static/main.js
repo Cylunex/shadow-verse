@@ -7,6 +7,8 @@ import './components.js';
 import './router.js';
 import './views/works.js';
 import './views/chars.js';
+import './views/incarnations.js';
+import './views/farewell.js';
 import './views/chat.js';
 import './views/companion.js';
 import './views/novel.js';

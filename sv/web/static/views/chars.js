@@ -4,19 +4,23 @@
 async function viewChars(){
   loading();
   const lists=await Promise.all(OV.worlds.map(w=>api('/world/'+w.id).then(d=>({w,ents:d.entities})).catch(()=>({w,ents:[]}))));
-  const xids=new Set(OV.nexus.entities.map(e=>e.id));
-  const xmap={};OV.nexus.entities.forEach(e=>xmap[e.id]=e);
+  // 跨世界标记：合并旧 nexus 实体 + 新「魂」(ascension)；魂为准，魂能进化身对照。
+  const xmap={};
+  (OV.nexus.entities||[]).forEach(e=>xmap[e.id]={name:e.name,inc:e.incarnations||[],soul:false});
+  (OV.souls||[]).forEach(s=>xmap[s.id]={name:s.name,inc:s.worlds||[],soul:true});
   let cards=[];
   for(const {w,ents} of lists)for(const e of ents){
-    const cross=xids.has(e.id);const inc=cross?(xmap[e.id].incarnations||[]):[];
-    cards.push({wid:w.id,wname:w.name,genre:w.genre,...e,cross,inc});
+    const x=xmap[e.id];
+    cards.push({wid:w.id,wname:w.name,genre:w.genre,...e,cross:!!x,inc:x?x.inc:[],soul:x?x.soul:false});
   }
-  const html=cards.map(c=>`<div class="charcard" onclick="location.hash='#/companion/${c.wid}/${c.id}'">
-    ${c.cross?'<span class="xw">✦ 跨世界</span>':''}
+  const html=cards.map(c=>{
+    const cmp=c.soul?` onclick="event.stopPropagation();location.hash='#/incarnations/${jsq(c.id)}'" style="cursor:pointer" title="看她在各世界的化身"`:'';
+    return `<div class="charcard" onclick="location.hash='#/companion/${c.wid}/${c.id}'">
+    ${c.cross?`<span class="xw"${cmp}>✦ 跨世界</span>`:''}
     <div class="av ${coverClass(c.genre)}"></div>
     <h3>${esc(c.name)}</h3><div class="role">${esc(c.role||'')}</div>
     <div class="from">出自《${esc(c.wname)}》</div>
-    ${c.cross&&c.inc.length?`<div class="incar">✦ 现身于 ${c.inc.map(esc).join(' · ')}</div>`:''}</div>`).join('');
+    ${c.cross&&c.inc.length>1?`<div class="incar"${cmp}>✦ 现身于 ${c.inc.map(esc).join(' · ')}</div>`:''}</div>`;}).join('');
   const newcard=`<div class="charcard newcard" onclick="actNewEntity()"><div><div style="font-size:32px">＋</div><div style="margin-top:8px;color:var(--faint)">新建角色</div></div></div>`;
   app().innerHTML=`<div class="wrap">
     <div class="page-head"><h1>角色</h1><span class="sub">住在你世界里的人 —— 有的，能走出原来的世界</span></div>

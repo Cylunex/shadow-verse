@@ -38,9 +38,8 @@ async function viewCompanion(wid,eid){
   const miles=exps.length?exps.slice(-8).map(x=>`<div class="mile ${x.level==='身份'?'star':''}"><div class="mt">${esc(x.where||'')}${x.level==='身份'?' · ★成长':''}</div><div class="md">${esc(x.text)}</div></div>`).join(''):'<p class="note">还没有共同经历。聊起来，重要的瞬间会沉淀在这里。</p>';
   const remembered=exps.length?exps[exps.length-1].text:'';
   const soulId=c.soul_id;
-  const fwBtn=soulId
-    ?`<button class="btn ghost sm" onclick="actSummonSoul('${jsq(soulId)}','${jsq(name)}')">✦ 召唤 ${esc(name)} 降临别的世界</button>`
-    :`<button class="btn ghost sm" onclick="actExtract('${jsq(wid)}','${jsq(eid)}','${jsq(name)}')">✦ 带 ${esc(name)} 离开这个世界（先提取为魂）</button>`;
+  const fwBtn=`<button class="btn ghost sm" onclick="location.hash='#/farewell/${wid}/${eid}'">✦ 带 ${esc(name)} 去别的世界</button>`
+    +(soulId?` <button class="btn ghost sm" onclick="location.hash='#/incarnations/${jsq(soulId)}'">✦ 看各世界里的她</button>`:'');
 
   app().innerHTML=`<div class="wrap">
     <div class="page-head"><h1>陪伴</h1><span class="sub">一个一直在的人</span>

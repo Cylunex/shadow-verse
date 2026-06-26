@@ -90,8 +90,7 @@ async function actUndoImport(){const ids=OV.worlds.map(w=>w.id);if(!ids.length)r
     {n:'world',label:'世界',type:'select',options:ids},
     {n:'entity',label:'角色 id'},
   ],'撤销',async v=>{if(!v.entity)throw new Error('填角色 id');await post('/import/undo',{world:v.world,entity:v.entity});closeModal();await refresh();toast('✓ 已撤销该角色的导入');});}
-function openFarewell(wid,eid){ /* reserved for direct link */ route(); }
 
 
-/* —— 暴露到全局命名空间（内联 onclick + 跨模块裸引用）—— */
-Object.assign(window, { slug, asciiSlug, isId, actNewWorld, actNewEntity, actEntityCard, actImportCard, actNewCodex, actSeedCodex, actDelCodex, actImportPreset, actImportRegex, actMergeWorld, actUndoImport, actDelWorld, actExtract, actSummonSoul, openFarewell });
+/* —— 暴露到全局命名空间（内联 onclick + 跨模块裸引用）。openFarewell 见 views/farewell.js —— */
+Object.assign(window, { slug, asciiSlug, isId, actNewWorld, actNewEntity, actEntityCard, actImportCard, actNewCodex, actSeedCodex, actDelCodex, actImportPreset, actImportRegex, actMergeWorld, actUndoImport, actDelWorld, actExtract, actSummonSoul });

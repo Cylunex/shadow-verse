@@ -425,6 +425,15 @@ iframe.hud{padding:0}
 .nx-elabel{fill:var(--cyan);font-size:12px;text-anchor:middle}
 .nx-node circle{stroke-width:2;cursor:pointer;transition:.15s}
 .nx-node:hover circle{filter:brightness(1.25)}
+.linkpanel{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px 14px 12px}
+.lp-title{font-size:11px;letter-spacing:1px;color:var(--faint);margin:6px 0 4px}
+.linkrow{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--line-soft)}
+.linkrow:last-child{border-bottom:none}
+.lr-pair{font-size:13.5px;color:var(--ink)}
+.lr-arr{color:var(--violet)}
+.lr-rel{flex:1;font-size:12.5px;color:var(--cyan)}
+.lr-x{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--faint);cursor:pointer;transition:.15s}
+.lr-x:hover{border-color:var(--bad);color:var(--bad)}
 .nx-name{fill:var(--ink);font-size:13px;text-anchor:middle;cursor:pointer}
 .chron{border-left:2px solid var(--line);margin-left:8px;padding-left:20px}
 .cev{position:relative;margin-bottom:16px}
@@ -454,6 +463,81 @@ iframe.hud{padding:0}
 .fw-say{font-size:16px;color:var(--ink);line-height:2.1;font-style:italic;margin-bottom:14px;white-space:pre-line}
 .fw-note{font-size:13px;color:var(--dim);line-height:1.85;margin-bottom:28px}
 .fw-acts{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+
+/* —— 离别 / 回响 三幕场景（T2.4）—— */
+@keyframes fwRise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes fwSpin{to{transform:rotate(360deg)}}
+@keyframes fwBeam{0%{transform:translateX(-42%);opacity:.15}50%{opacity:1}100%{transform:translateX(42%);opacity:.15}}
+@keyframes fwJolt{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+/* 第一幕：逐元素登场 + 迟疑的一拍 */
+.fw-card>.fw-portrait{animation:fwRise .5s .05s both}
+.fw-card>.fw-k{animation:fwRise .5s .18s both}
+.fw-card>h2{animation:fwRise .5s .30s both}
+.fw-card>.fw-say{animation:fwRise .6s .44s both}
+.fw-card>.fw-note{animation:fwRise .6s .60s both}
+.fw-hesitate{opacity:0;animation:fwRise .5s .70s forwards}
+.fw-swap{animation:fwRise .32s both}
+.fw-loading{color:var(--dim);letter-spacing:3px;padding:40px}
+.fw-fail{color:var(--rose,#ff8fb0);font-style:normal}
+/* 第二幕：源—门—目标 阈限 */
+.fw-threshold{display:flex;align-items:center;justify-content:center;gap:8px;margin:4px 0 22px}
+.fw-tnode{flex:0 0 120px;padding:13px 8px;border:1px solid var(--line);border-radius:14px;background:#ffffff06}
+.fw-tnode b{display:block;font-size:14px;color:var(--ink);margin-top:5px}
+.fw-tnode small{font-size:11px;color:var(--faint)}
+.fw-sig{font-size:22px}
+.fw-tgate{flex:1;min-width:40px;height:3px;border-radius:3px;position:relative;background:repeating-linear-gradient(90deg,var(--faint) 0 6px,transparent 6px 12px)}
+.fw-tgate[data-state="has"]{background:linear-gradient(90deg,transparent,var(--cyan),transparent);box-shadow:0 0 20px #5ee0d055}
+.fw-tgate[data-state="no"]{background:linear-gradient(90deg,transparent,var(--rose),transparent);box-shadow:0 0 14px #ff8fb055;opacity:.85}
+/* 第二幕：去处卡片 */
+.fw-dests{display:flex;flex-direction:column;gap:10px;max-height:40vh;overflow:auto;margin:0 0 16px;text-align:left}
+.fw-dest{display:flex;gap:12px;align-items:center;width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:14px;background:#ffffff06;color:var(--ink);cursor:pointer;transition:border-color .2s,background .2s,transform .15s;font:inherit}
+.fw-dest:hover{transform:translateY(-1px);background:#ffffff0d}
+.fw-dest.gated{border-style:dashed}
+.fw-dest.sel{border-color:var(--cyan);box-shadow:0 0 22px #5ee0d033}
+.fw-dest-cv{width:46px;height:46px;border-radius:10px;flex:0 0 auto;background-size:cover;background-position:center}
+.fw-dest-body{display:flex;flex-direction:column;gap:2px;min-width:0}
+.fw-dest-body b{font-size:15px}
+.fw-dest-body span{font-size:12px;color:var(--dim)}
+.fw-gate{font-size:11.5px;font-style:normal;letter-spacing:.3px;margin-top:3px;color:var(--cyan)}
+.fw-gate.gated{color:var(--gold)}
+/* 第二幕：进入方式 + 就地开门 */
+.fw-entry{display:flex;gap:10px;justify-content:center;margin:0 0 14px}
+.fw-entry .btn.sm.on{border-color:var(--violet);box-shadow:0 0 16px #7a5cf044}
+.btn.warn{background:linear-gradient(135deg,#caa15a,#b9763a);border-color:transparent}
+.fw-doornote{margin:0 0 14px}
+.fw-door-open{border:1px solid var(--gold);border-radius:13px;background:#ffcd6b0d;padding:11px 13px;text-align:left}
+.fw-door-open-h{font-size:13px;color:var(--gold);line-height:1.7;margin-bottom:9px}
+.fw-door-open-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--dim)}
+.fw-door-open-row select{padding:5px 8px;background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--ink);font:inherit}
+/* 第三幕：渡（旋环 + 光带）*/
+.fw-crossing{text-align:center}
+.fw-ring{width:150px;height:150px;margin:0 auto 22px;border-radius:50%;position:relative;overflow:hidden}
+.fw-ring::before{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid transparent;border-top-color:var(--cyan);border-right-color:var(--violet);animation:fwSpin 1.1s linear infinite}
+.fw-ring .fw-portrait{margin:16px auto 0;width:118px;height:118px;animation:none}
+.fw-beam{position:absolute;inset:0;pointer-events:none}
+.fw-ring[data-state="has"] .fw-beam{background:linear-gradient(90deg,transparent,var(--cyan),transparent);animation:fwBeam 1.1s ease-in-out infinite}
+.fw-ring[data-state="no"] .fw-beam{background:linear-gradient(90deg,transparent,var(--rose),transparent);animation:fwBeam 1.1s ease-in-out infinite,fwJolt .5s steps(4) infinite}
+.fw-arrived{border-color:var(--cyan)!important;box-shadow:0 0 50px #5ee0d055!important;transition:box-shadow .8s,border-color .8s}
+@media(max-width:560px){.fw-threshold{flex-direction:column}.fw-tgate{width:60%;height:34px;align-self:center}.fw-entry{flex-direction:column}}
+
+/* 化身对照（incarnations） */
+.incsoul{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;margin-bottom:18px}
+.incsoul h2{font-size:14px;margin:0 0 12px;display:flex;align-items:center;gap:10px}
+.incsoul h2 small{color:var(--faint);font-weight:400;font-size:12px}
+.inccols{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}
+.inccol{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.ic-head{height:150px;position:relative;background-size:cover;background-position:center}
+.ic-head.missing{height:auto;padding:16px;background:var(--surface2)}
+.ic-head .vig{position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,#0b0b13f2 100%)}
+.ic-name{position:absolute;left:16px;bottom:12px}
+.ic-head.missing .ic-name{position:static}
+.ic-name b{display:block;font-size:19px}
+.ic-name span{font-size:12px;color:var(--dim)}
+.ic-body{padding:14px 16px 16px}
+.ic-stat{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--dim);margin-bottom:10px}
+.ic-stat i{color:var(--cyan);font-style:normal}
+.ic-exptitle{font-size:11px;letter-spacing:1px;color:var(--faint);margin:0 0 12px}
+.ic-more{font-size:11px;color:var(--faint);margin-top:8px}
 
 @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 

@@ -30,6 +30,7 @@ async function route(){
   const p=hash.split('/').filter(Boolean);
   const fam=(hash==='/')?'works':(p[0]||'works');
   renderNav(fam);
+  if(fam!=='farewell')fwTeardown();   // 任何非离别路由都收掉离别全屏遮罩（防 Back/导航后遮罩卡住整屏）
   try{
     if(hash==='/'||fam==='works')return viewWorks(p[1]||'gallery',p[2]);
     if(fam==='chat')return viewChat(p[1],p[2]);
@@ -40,6 +41,7 @@ async function route(){
     if(fam==='assets')return viewAssets();
     if(fam==='presets')return viewPresets();
     if(fam==='settings')return viewSettings();
+    if(fam==='incarnations')return viewIncarnations(p[1]);
     if(fam==='farewell')return openFarewell(p[1],p[2]);
     viewWorks('gallery');
   }catch(e){app().innerHTML=`<div class="wrap"><div class="empty">✗ ${esc(e.message)}</div></div>`;}

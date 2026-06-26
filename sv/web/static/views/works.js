@@ -56,21 +56,54 @@ function worldMenu(wid,name){
     </div>`);
 }
 function worksNexus(head){
-  const W=OV.worlds,X=OV.nexus.entities,L=OV.nexus.links;
+  const W=OV.worlds,L=OV.nexus.links||[];
+  const wmap={};W.forEach(w=>wmap[w.id]=w.name);const wname=id=>wmap[id]||id;
+  // 跨世界角色：合并旧 nexus 实体 + 新「魂」(ascension)；魂为准。incarnations 统一成世界 id 列表。
+  const xm=new Map();
+  (OV.nexus.entities||[]).forEach(e=>xm.set(e.id,{id:e.id,name:e.name,incs:e.incarnations||[],soul:false}));
+  (OV.souls||[]).forEach(s=>xm.set(s.id,{id:s.id,name:s.name,incs:s.worlds||[],soul:true}));
+  const X=[...xm.values()];
   const cx=400,cy=170,R=130,vw=800,vh=360;const pos={};
   W.forEach((w,i)=>{const a=-Math.PI/2+i*2*Math.PI/Math.max(1,W.length);pos[w.id]=[cx+R*Math.cos(a),cy+R*Math.sin(a)];});
   let edges='';for(const e of L){const a=pos[e.a],b=pos[e.b];if(a&&b){
     edges+=`<line class="nx-edge" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"/><text class="nx-elabel" x="${(a[0]+b[0])/2}" y="${(a[1]+b[1])/2-4}">${esc(e.relation||'')}</text>`;}}
   // 跨世界角色标在其化身世界之间
-  for(const x of X){const incs=x.incarnations||[];for(let i=0;i<incs.length-1;i++){const a=pos[incs[i]],b=pos[incs[i+1]];
+  for(const x of X){const incs=x.incs;for(let i=0;i<incs.length-1;i++){const a=pos[incs[i]],b=pos[incs[i+1]];
     if(a&&b)edges+=`<text class="nx-elabel" x="${(a[0]+b[0])/2}" y="${(a[1]+b[1])/2+14}" style="fill:var(--violet)">${esc(x.name)} ✦</text>`;}}
   const colors=['#a98bff','#5fe3d2','#ffce86','#97c459','#ff8fb0'];
   let nodes='';W.forEach((w,i)=>{const[x,y]=pos[w.id];const c=colors[i%colors.length];
     nodes+=`<g class="nx-node" onclick="location.hash='#/works/chron/${w.id}'"><circle cx="${x}" cy="${y}" r="34" fill="#16162a" stroke="${c}"/><text class="nx-name" x="${x}" y="${y+54}">${esc(w.name)}</text></g>`;});
+  // 世界互联（/link）：按无序世界对归并，每对一行 + 断开
+  const pairs=new Map();
+  for(const e of L){const k=[e.a,e.b].sort().join('|');if(!pairs.has(k))pairs.set(k,{a:e.a,b:e.b,rels:[]});pairs.get(k).rels.push(e.relation||'连接');}
+  const linkRows=[...pairs.values()].map(p=>`<div class="linkrow"><span class="lr-pair">${esc(wname(p.a))} <span class="lr-arr">⇄</span> ${esc(wname(p.b))}</span><span class="lr-rel">${p.rels.map(esc).join(' · ')}</span><button class="lr-x" title="断开这道门" onclick="actUnlinkWorlds('${jsq(p.a)}','${jsq(p.b)}')">✕</button></div>`).join('');
+  const xline=X.length?`<p class="note">跨世界的她：${X.map(x=>x.soul?`<a style="color:var(--violet);cursor:pointer" onclick="location.hash='#/incarnations/${x.id}'">${esc(x.name)} ✦</a>`:`<a style="color:var(--violet);cursor:pointer" onclick="location.hash='#/chars'">${esc(x.name)} ✦</a>`).join('、')} —— 点开看她在每个世界里的化身。</p>`
+    :'<p class="note">还没有跨世界的角色。在「陪伴」页把一个角色「带出这个世界」，她就能穿行别的世界。</p>';
   app().innerHTML=`<div class="wrap">${head}
-    <p class="lead" style="margin:6px 0 14px">你创造的世界与角色如何彼此相连 —— 连线上标的是世界间的关系，以及在两个世界间穿行的角色（✦ 跨世界）。</p>
+    <p class="lead" style="margin:6px 0 14px">你创造的世界与角色如何彼此相连 —— 连线是世界间的「门」，✦ 是在世界间穿行的她。<b style="color:var(--violet)">连一道门</b>，魂就能经它跨越；没有门时只能「无门强召」。</p>
+    <div class="toolrow" style="margin-bottom:14px"><span style="flex:1"></span><button class="btn sm" onclick="actLinkWorlds()">＋ 连接两个世界</button></div>
     ${W.length?`<div class="nexusmap"><svg viewBox="0 0 ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg">${edges}${nodes}</svg></div>`:'<div class="empty">还没有世界。</div>'}
-    ${X.length?`<p class="note">跨世界角色：${X.map(x=>`<a style="color:var(--violet)" onclick="location.hash='#/chars'">${esc(x.name)} ✦</a>`).join('、')}</p>`:'<p class="note">还没有跨世界角色。在角色页把一个角色「提取为魂」，它就能穿行别的世界。</p>'}</div>`;
+    ${linkRows?`<div class="linkpanel"><div class="lp-title">世界互联（门）</div>${linkRows}</div>`:(W.length>1?'<p class="note" style="margin-top:12px">还没有连接。点「连接两个世界」开一道门（裂隙 / 同源 / 传承…），让角色能跨越过去。</p>':'')}
+    ${xline}</div>`;
+}
+async function actLinkWorlds(){
+  const ids=OV.worlds.map(w=>w.id);
+  if(ids.length<2)return toast('至少要有两个世界才能连接',true);
+  formModal('连接两个世界 · 开一道门',[
+    {n:'a',label:'世界 A',type:'select',options:ids},
+    {n:'b',label:'世界 B',type:'select',options:ids,value:ids[1]},
+    {n:'relation',label:'门的性质',type:'select',options:['裂隙','同源','传承','梦境','转世','镜像','其他']},
+    {n:'note',label:'描述（可空）',ph:'如 临江是无限塔的一层副本'},
+  ],'连接 ✦',async v=>{
+    if(v.a===v.b)throw new Error('两个世界不能相同');
+    await post('/link',{a:v.a,b:v.b,relation:v.relation,note:v.note||''});
+    closeModal();await refresh();route();
+    toast(`✓ 已连接 ${v.a} ⇄ ${v.b}（${v.relation}）。魂现在可经这道门跨越，而非「无门强召」。`);
+  });
+}
+async function actUnlinkWorlds(a,b){
+  if(!confirm(`断开《${a}》⇄《${b}》之间的所有连接？\n（连接撤掉后，魂仍可强召，但会标记为「无门强召」。）`))return;
+  try{await post('/unlink',{a,b});await refresh();route();toast('✓ 已断开');}catch(e){toast('✗ '+e.message,true);}
 }
 async function worksChron(head,wid){
   if(!wid)wid=(OV.worlds[0]||{}).id;
@@ -89,4 +122,4 @@ async function worksChron(head,wid){
 
 
 /* —— 暴露到全局命名空间（内联 onclick + 跨模块裸引用）—— */
-Object.assign(window, { viewWorks, openWork, worldMenu, worksNexus, worksChron });
+Object.assign(window, { viewWorks, openWork, worldMenu, worksNexus, worksChron, actLinkWorlds, actUnlinkWorlds });

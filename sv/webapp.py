@@ -43,7 +43,17 @@ def api_overview() -> dict:
     cats: dict[str, int] = {}
     for e in codex.all_elements():
         cats[e["category"]] = cats.get(e["category"], 0) + 1
-    return {"worlds": worlds, "nexus": nx, "codex": {"count": len(codex.all_elements()), "by_category": cats},
+    # 魂(新跨世界路径,ascension):投影出来让星图/角色页把"跨世界的她"画出来。incarnations=world/entity 引用。
+    from .config import SOULS_DIR
+    from .soul import Soul
+    souls = []
+    if SOULS_DIR.exists():
+        for d in sorted(p for p in SOULS_DIR.iterdir() if (p / "meta.json").exists()):
+            s = Soul(d.name); sm = s.meta(); refs = s.incarnations()
+            souls.append({"id": s.id, "name": sm.get("name", s.id), "origin": sm.get("origin", {}),
+                          "incarnations": refs, "worlds": [r.split("/")[0] for r in refs]})
+    return {"worlds": worlds, "nexus": nx, "souls": souls,
+            "codex": {"count": len(codex.all_elements()), "by_category": cats},
             "genres": recipes.genres(),
             "llm": {"provider": config.PROVIDER, "available": llm.available()}}
 
@@ -572,6 +582,30 @@ def api_soul(sid: str) -> dict:
             "identity": [x.get("text", "") for x in read_jsonl(_identity_path(s.dir))]}
 
 
+def api_soul_incarnations(sid: str) -> dict:
+    """化身对照:同一魂在各世界的化身并排数据(只读投影,0 token)。化身缺失(原世界被删)优雅标记。"""
+    from .config import read_jsonl
+    from .memory import _identity_path
+    from .soul import Soul
+    s = Soul.load(sid); m = s.meta()
+    incs = []
+    for ref in s.incarnations():
+        wid, _, eid = ref.partition("/")
+        try:
+            w = World.load(wid); e = LocalEntity.load(w, eid)
+        except FileNotFoundError:
+            incs.append({"world": wid, "entity": eid, "missing": True})
+            continue
+        exps = memory.all_experiences(e.dir)
+        incs.append({"world": wid, "world_name": w.meta().get("name", wid), "genre": w.meta().get("genre", ""),
+                     "entity": eid, "name": e.card().get("name", eid), "role": e.card().get("role", ""),
+                     "state": memory.read_state(e.dir), "avatar": e.avatar_rel(),
+                     "experiences": exps[-6:], "exp_count": len(exps)})
+    return {"id": s.id, "name": m.get("name", sid), "origin": m.get("origin", {}),
+            "anchors": s.anchors(), "incarnations": incs,
+            "identity": [x.get("text", "") for x in read_jsonl(_identity_path(s.dir))]}
+
+
 # ---- 世界书(露出已建的 worldbook 引擎:读/存条目/删条目;引擎逻辑不动)----
 def api_worldbook(wid: str) -> dict:
     from . import worldbook as wb
@@ -719,6 +753,7 @@ GET_ROUTES = [
     (re.compile(r"^/api/thread/([\w-]+)/([\w-]+)$"), lambda m, q: api_thread(m.group(1), m.group(2))),
     (re.compile(r"^/api/entity/([\w-]+)/([\w-]+)$"), lambda m, q: api_entity(m.group(1), m.group(2))),
     (re.compile(r"^/api/nexus/([\w-]+)$"), lambda m, q: api_nexus_entity(m.group(1))),
+    (re.compile(r"^/api/soul/([\w-]+)/incarnations$"), lambda m, q: api_soul_incarnations(m.group(1))),
     (re.compile(r"^/api/soul/([\w-]+)$"), lambda m, q: api_soul(m.group(1))),
     (re.compile(r"^/api/worldbook/([\w-]+)$"), lambda m, q: api_worldbook(m.group(1))),
     (re.compile(r"^/api/trace$"), lambda m, q: api_trace(q)),
