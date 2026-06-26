@@ -67,5 +67,21 @@ ok(len(nexus.links()) == 0, "purge:删世界连带清连接")
 ok("w2" not in NexusEntity.load("hero").incarnations(), "purge:删世界连带清化身")
 ok(all(l.get("to") != "w2" for l in World.load("w1").meta().get("links", [])), "w1.meta 不再指向已删的 w2")
 
+# 站内基础编辑(webapp 薄路由 post_entity_save 复用 entity 原语,核心不动)
+from sv import webapp  # noqa: E402
+
+LocalEntity.create(w1, "edith", "伊迪丝", role="secondary")
+webapp.post_entity_save({"world": "w1", "entity": "edith", "name": "Edith", "role": "main",
+                         "appearance": "silver hair", "profile_md": "# Edith\n## 核心事实\n- 守诺"})
+_c = LocalEntity.load(w1, "edith").card()
+ok(_c["name"] == "Edith" and _c["role"] == "main" and _c["appearance"] == "silver hair", "entity/save 改 名称/role/外貌")
+ok("守诺" in (w1.entities_dir / "edith" / "profile.md").read_text(encoding="utf-8"), "entity/save 写 profile.md")
+_bad = False
+try:
+    webapp.post_entity_save({"world": "w1", "entity": "edith", "role": "boss"})
+except ValueError:
+    _bad = True
+ok(_bad, "entity/save 拒绝非法 role")
+
 print(f"\n{len(P)} 通过 / {len(F)} 失败")
 sys.exit(1 if F else 0)

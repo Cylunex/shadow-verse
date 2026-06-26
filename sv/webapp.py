@@ -18,7 +18,7 @@ import base64
 from . import chat as chatmod
 from . import codex, config, export, forge, importer, lenses, llm, memory, nexus, recipes, util, varstate
 from .config import UNIVERSE, read_jsonl
-from .entity import LocalEntity
+from .entity import ROLES, LocalEntity
 from .nexus import NexusEntity
 from .thread import Thread
 from .world import World
@@ -244,6 +244,22 @@ def post_entity_create(b: dict) -> dict:
     w = World.load(b["world"])
     e = LocalEntity.create(w, b["id"], b.get("name", b["id"]), role=b.get("role", "secondary"),
                            appearance=b.get("appearance", ""))
+    if b.get("profile_md"):
+        util.write_md(e.dir / "profile.md", b["profile_md"])
+    return {"ok": True, "id": e.id}
+
+
+def post_entity_save(b: dict) -> dict:
+    """站内基础编辑:名称/role/外貌/profile —— 复用 entity 既有原语,核心模块不动。"""
+    w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
+    if b.get("role") and b["role"] not in ROLES:
+        raise ValueError(f"role 必须 ∈ {ROLES}:{b['role']!r}")
+    if b.get("name"):
+        e.set_card_field("name", b["name"])
+    if b.get("role"):
+        e.set_card_field("role", b["role"])
+    if b.get("appearance") is not None:
+        e.set_appearance(b["appearance"])
     if b.get("profile_md"):
         util.write_md(e.dir / "profile.md", b["profile_md"])
     return {"ok": True, "id": e.id}
@@ -717,6 +733,7 @@ POST_ROUTES = [
     (re.compile(r"^/api/world/create$"), post_world_create),
     (re.compile(r"^/api/world/save-md$"), post_world_save_md),
     (re.compile(r"^/api/entity/create$"), post_entity_create),
+    (re.compile(r"^/api/entity/save$"), post_entity_save),
     (re.compile(r"^/api/thread/create$"), post_thread_create),
     (re.compile(r"^/api/codex/create$"), post_codex_create),
     (re.compile(r"^/api/codex/seed$"), post_codex_seed),

@@ -2,14 +2,52 @@
    跨模块/内联 onclick 经 window 全局命名空间访问，保持原单一作用域语义。 */
 
 function slug(s){return (s||'').toLowerCase().replace(/[^\w一-鿿]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40)||('w'+Math.floor(performance.now()));}
+/* 引擎 id 铁律:必须 ASCII kebab-case(util.is_id)。中文名推断不出 id 时要求显式填。 */
+function asciiSlug(s){return (s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40);}
+function isId(s){return /^[a-z0-9][a-z0-9-]*$/.test(s||'');}
 async function actNewWorld(){formModal('新建作品（世界）',[
   {n:'name',label:'名字',ph:'如 夜行动物'},
+  {n:'id',label:'id（英文 kebab-case，留空按名字推断；中文名请填）',ph:'如 ye-xing-dong-wu'},
   {n:'genre',label:'题材',ph:'如 都市校园 / 治愈'},
   {n:'world_md',label:'世界设定（可空，可后补）',type:'textarea',rows:4,ph:'这座城市有四百万人。凌晨三点，醒着的只有我们两个……'},
 ],'创建',async v=>{if(!v.name)throw new Error('起个名');
-  const id=slug(v.name);await post('/world/create',{id,name:v.name,genre:v.genre,world_md:v.world_md});
-  closeModal();await refresh();location.hash='#/worldbook/'+id;toast('✓ 已建《'+v.name+'》。接下来加角色（控制台）或写世界书。');},
+  const id=v.id||asciiSlug(v.name);
+  if(!isId(id))throw new Error('id 需为英文 kebab-case（小写字母/数字/连字符）；中文名请手动填一个 id');
+  await post('/world/create',{id,name:v.name,genre:v.genre,world_md:v.world_md});
+  closeModal();await refresh();location.hash='#/chat/'+id;toast('✓ 已建《'+v.name+'》。先给她加个角色吧。');},
   (OV.llm&&OV.llm.available)?{label:'✨ AI 生成设定',run:async(v,set)=>{const r=await post('/gen/world',{prompt:v.name+' '+v.genre,genre:v.genre});set('world_md',r.body||'');}}:null);}
+async function actNewEntity(wid){
+  const ids=OV.worlds.map(w=>w.id);
+  if(!wid&&!ids.length)return toast('先建一个作品',true);
+  const fields=[];
+  if(!wid)fields.push({n:'world',label:'所属作品',type:'select',options:ids});
+  fields.push(
+    {n:'name',label:'名字',ph:'如 苏栀'},
+    {n:'id',label:'id（英文 kebab-case，留空按名字推断；中文名请填）',ph:'如 su-zhi'},
+    {n:'role',label:'戏份',type:'select',options:['main','secondary','cameo','npc'],value:'secondary'},
+    {n:'appearance',label:'外貌锚点（英文打底，保持立绘是同一人，可空）',ph:'1girl, black hair, calm eyes …'},
+    {n:'profile_md',label:'角色设定（可空，可后补）',type:'textarea',rows:5,ph:'身份 / Identity Core / 声音指纹 / 核心欲望与底线 …'},
+  );
+  formModal('新建角色',fields,'创建',async v=>{
+    const w=wid||v.world;if(!w)throw new Error('选个作品');if(!v.name)throw new Error('起个名');
+    const id=v.id||asciiSlug(v.name);
+    if(!isId(id))throw new Error('id 需为英文 kebab-case；中文名请手动填一个 id');
+    await post('/entity/create',{world:w,id,name:v.name,role:v.role,appearance:v.appearance,profile_md:v.profile_md});
+    closeModal();await refresh();location.hash='#/chat/'+w+'/'+id;toast('✓ 已建角色 '+v.name);
+  },(OV.llm&&OV.llm.available)?{label:'✨ AI 生成设定',run:async(v,set)=>{const w=wid||v.world;if(!w)throw new Error('先选作品');const r=await post('/gen/entity',{world:w,prompt:v.name||v.id,role:v.role});set('profile_md',r.body||'');}}:null);
+}
+async function actEntityCard(wid,eid){
+  const d=await api('/entity/'+wid+'/'+eid);const c=d.card||{};
+  formModal(`资料 · ${esc(c.name||eid)}`,[
+    {n:'name',label:'名称',value:c.name||''},
+    {n:'role',label:'戏份',type:'select',options:['main','secondary','cameo','npc'],value:c.role||'secondary'},
+    {n:'appearance',label:'外貌锚点（保持立绘是同一人）',value:d.appearance||c.appearance||''},
+    {n:'profile_md',label:'角色设定 · profile.md',type:'textarea',rows:12,value:d.profile_md||''},
+  ],'保存',async v=>{
+    await post('/entity/save',{world:wid,entity:eid,name:v.name,role:v.role,appearance:v.appearance,profile_md:v.profile_md});
+    closeModal();route();toast('✓ 已保存资料');
+  });
+}
 async function actImportCard(){formModal('导入角色卡（SillyTavern）',[
   {n:'card',label:'粘贴卡 JSON（或用控制台传 PNG）',type:'textarea',rows:6,ph:'{ "name": "...", "description": "..." }'},
   {n:'world_name',label:'新世界名（留空用卡名）',ph:''},
@@ -39,4 +77,4 @@ function openFarewell(wid,eid){ /* reserved for direct link */ route(); }
 
 
 /* —— 暴露到全局命名空间（内联 onclick + 跨模块裸引用）—— */
-Object.assign(window, { slug, actNewWorld, actImportCard, actNewCodex, actSeedCodex, actDelCodex, actImportPreset, actDelWorld, actExtract, actSummonSoul, openFarewell });
+Object.assign(window, { slug, asciiSlug, isId, actNewWorld, actNewEntity, actEntityCard, actImportCard, actNewCodex, actSeedCodex, actDelCodex, actImportPreset, actDelWorld, actExtract, actSummonSoul, openFarewell });

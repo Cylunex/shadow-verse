@@ -92,7 +92,7 @@ async function viewChat(wid,eid){
   loading();
   if(!wid){wid=(OV.worlds[0]||{}).id;}
   if(!wid){app().innerHTML='<div class="wrap"><div class="empty">还没有作品。去 <a style="color:var(--violet)" href="#/works">作品库</a> 新建或导入一个。</div></div>';return;}
-  if(!eid){eid=await firstEntity(wid);if(!eid){app().innerHTML=`<div class="wrap"><div class="empty">《${esc(wid)}》还没有角色。<a style="color:var(--violet)" href="/legacy" target="_blank">去控制台添加 ›</a></div></div>`;return;}}
+  if(!eid){eid=await firstEntity(wid);if(!eid){app().innerHTML=`<div class="wrap"><div class="empty">《${esc(wid)}》还没有角色。<a style="color:var(--violet);cursor:pointer" onclick="actNewEntity('${jsq(wid)}')">＋ 新建角色</a></div></div>`;return;}}
   let d,ent;
   try{[d,ent]=await Promise.all([api('/chat/'+wid+'/'+eid),api('/entity/'+wid+'/'+eid).catch(()=>({}))]);}
   catch(e){app().innerHTML=`<div class="wrap"><div class="empty">${esc(e.message)}</div></div>`;return;}
@@ -177,7 +177,7 @@ async function viewChat(wid,eid){
             <p class="note" style="margin-top:8px">⚡ 当前驱动（Desire 层）—— 引擎已具三层认知，实时驱动接口待接入。</p>
           </div>
           <div class="pchar"><div class="hd">${headAv}<div class="t"><div class="nm">${esc(d.name)}</div><div class="rl">${ent.card?esc(ent.card.role||''):''}${ent.card&&ent.card.soul_id?' · ✦ 跨世界':''}</div></div></div>
-            <div class="ops"><span class="op" onclick="location.hash='#/companion/${wid}/${eid}'">陪伴</span><span class="op" onclick="window.open('/legacy','_blank')">资料</span><span class="op" onclick="actExtract('${jsq(wid)}','${jsq(eid)}','${jsq(d.name)}')">提取为魂</span></div>
+            <div class="ops"><span class="op" onclick="location.hash='#/companion/${wid}/${eid}'">陪伴</span><span class="op" onclick="actEntityCard('${jsq(wid)}','${jsq(eid)}')">资料</span><span class="op" onclick="actExtract('${jsq(wid)}','${jsq(eid)}','${jsq(d.name)}')">提取为魂</span></div>
           </div>
           <p class="note">在「角色」页可查看全部角色与跨世界化身。</p>
         </div>

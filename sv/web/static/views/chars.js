@@ -17,7 +17,7 @@ async function viewChars(){
     <h3>${esc(c.name)}</h3><div class="role">${esc(c.role||'')}</div>
     <div class="from">出自《${esc(c.wname)}》</div>
     ${c.cross&&c.inc.length?`<div class="incar">✦ 现身于 ${c.inc.map(esc).join(' · ')}</div>`:''}</div>`).join('');
-  const newcard=`<div class="charcard newcard" onclick="location.hash='#/works'"><div><div style="font-size:32px">＋</div><div style="margin-top:8px;color:var(--faint)">新建角色（去作品里加）</div></div></div>`;
+  const newcard=`<div class="charcard newcard" onclick="actNewEntity()"><div><div style="font-size:32px">＋</div><div style="margin-top:8px;color:var(--faint)">新建角色</div></div></div>`;
   app().innerHTML=`<div class="wrap">
     <div class="page-head"><h1>角色</h1><span class="sub">住在你世界里的人 —— 有的，能走出原来的世界</span></div>
     <p class="note" style="margin:8px 0 18px">点角色进入「陪伴」；带 <span style="color:var(--violet)">✦</span> 的是跨世界的魂，可被召唤进别的世界。</p>
