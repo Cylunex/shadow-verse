@@ -7,7 +7,7 @@ async function viewNovel(wid,tid){
   if(!wid){app().innerHTML='<div class="wrap"><div class="empty">还没有作品。</div></div>';return;}
   let wd;try{wd=await api('/world/'+wid);}catch(e){app().innerHTML=`<div class="wrap"><div class="empty">${esc(e.message)}</div></div>`;return;}
   if(!wd.threads.length){app().innerHTML=`<div class="wrap"><div class="page-head"><h1>小说 · ${esc(wd.meta.name)}</h1></div>
-    <p class="empty">《${esc(wd.meta.name)}》还没有世界线/书。<a style="color:var(--violet)" href="/legacy" target="_blank">去控制台新建一条 ›</a></p></div>`;return;}
+    <p class="empty">《${esc(wd.meta.name)}》还没有世界线/书。<a style="color:var(--violet);cursor:pointer" onclick="actNewThread('${jsq(wid)}')">＋ 新建一条 ›</a></p></div>`;return;}
   if(!tid)tid=wd.threads[0].id;
   let d;try{d=await api('/thread/'+wid+'/'+tid);}catch(e){app().innerHTML=`<div class="wrap"><div class="empty">${esc(e.message)}</div></div>`;return;}
   window._chs=d.chapters;window._novel={wid,tid,chNo:(d.chapters[0]||{}).no||1};
@@ -22,7 +22,7 @@ async function viewNovel(wid,tid){
   const beats=d.beats||[];
   app().innerHTML=`<div class="novel">
     <div class="nv-side">
-      <div class="grp">${esc(wd.meta.name)} · 世界线</div>${threadSel}
+      <div class="grp">${esc(wd.meta.name)} · 世界线 <a style="color:var(--violet);cursor:pointer;float:right;font-weight:400" onclick="actNewThread('${jsq(wid)}')">＋</a></div>${threadSel}
       <div class="grp" style="margin-top:18px">${esc(d.meta.title)} · 目录</div>${chSel||'<p class="note">还没有章节</p>'}
       <div class="grp" style="margin-top:18px">分支 · 蝴蝶效应 <a style="color:var(--violet);cursor:pointer;float:right;font-weight:400" onclick="actBranch()">＋</a></div>
       ${branches.length?branches.map(b=>`<div class="nv-ch" title="${esc(b.divergence||'')}">⑂ ${esc(b.name||b.id)} <span class="w">第${b.from_chapter}章</span></div>`).join(''):'<p class="note" style="margin:4px 6px">还没有分支。从某章分叉出一条平行线（蝴蝶效应）。</p>'}
@@ -74,7 +74,45 @@ async function actNarrateRun(){if(!window._novel)return;const {wid,tid}=window._
   formModal('✨ AI 产线写一章',[{n:'intent',label:'这一章想写什么（可空，让它顺着钩子走）',type:'textarea',rows:3,ph:'如：让蓑衣人揭露身份'}],'开始',async v=>{
     closeModal();toast('AI 产线运行中（写→质检→修订）…');
     try{await post('/narrate/run',{world:wid,thread:tid,intent:v.intent||''});toast('✓ 新章已落');route();}catch(e){toast('✗ '+e.message,true)}});}
-async function actWriteChapter(){window.open('/legacy','_blank');toast('手写章节请在控制台（写作包→回填）');}
+async function actNewThread(wid){
+  if(!wid)wid=(window._novel&&window._novel.wid)||(OV.worlds[0]||{}).id;
+  if(!wid)return toast('先建一个作品',true);
+  formModal('新建世界线（书）',[
+    {n:'title',label:'书名 / 线名',ph:'如 第一卷 · 初遇'},
+    {n:'id',label:'id（英文 kebab-case，留空按书名推断；中文请填）',ph:'如 vol-1'},
+    {n:'genre',label:'题材（可空，默认随世界）',ph:''},
+  ],'新建',async v=>{
+    if(!v.title)throw new Error('起个名');
+    const id=v.id||asciiSlug(v.title);
+    if(!isId(id))throw new Error('id 需为英文 kebab-case；中文名请手动填一个 id');
+    await post('/thread/create',{world:wid,id,title:v.title,genre:v.genre});
+    closeModal();await refresh();location.hash='#/novel/'+wid+'/'+id;toast('✓ 已建世界线《'+v.title+'》');
+  });
+}
+/* 人在环手写：取写作包 → 交宿主模型/自己写 → 回填正文 → /narrate/commit 落章 */
+async function actWriteChapter(){if(!window._novel)return;const {wid,tid}=window._novel;
+  const o=openModal(`<h3>✍ 手写下一章 · 人在环（取包 → 回填 → 落）</h3>
+    <div class="field"><label>① 这一章想写什么（可空，让它顺着钩子走）</label><input id="w_intent" placeholder="如：让蓑衣人揭露身份"></div>
+    <div style="display:flex;gap:8px;align-items:center;margin:2px 0 6px"><button class="btn ghost sm" id="w_pack">取写作包</button><button class="btn ghost sm" id="w_copy" style="display:none">⧉ 复制</button><span class="note" id="w_packnote" style="margin:0"></span></div>
+    <div class="packet" id="w_packbox" style="display:none;max-height:30vh;overflow:auto;white-space:pre-wrap;font-size:12px"></div>
+    <div class="field" style="margin-top:10px"><label>② 章节标题</label><input id="w_title" placeholder="本章标题"></div>
+    <div class="field"><label>③ 章节正文（把你/宿主模型写好的贴进来）</label><textarea id="w_text" rows="9" placeholder="把写好的正文贴进来…"></textarea></div>
+    <div class="err" id="w_err"></div>
+    <div class="modal-actions"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn" id="w_ok">落这一章</button></div>`);
+  let packText='';
+  o.querySelector('#w_pack').onclick=async()=>{const b=o.querySelector('#w_pack');const t0=b.textContent;b.textContent='取包中…';b.disabled=true;o.querySelector('#w_err').textContent='';
+    try{const intent=o.querySelector('#w_intent').value.trim();
+      const r=await api('/prep/narrate?world='+encodeURIComponent(wid)+'&thread='+encodeURIComponent(tid)+(intent?'&intent='+encodeURIComponent(intent):''));
+      packText=JSON.stringify(r,null,2);
+      const box=o.querySelector('#w_packbox');box.style.display='block';box.textContent=packText;
+      o.querySelector('#w_copy').style.display='';o.querySelector('#w_packnote').textContent='第 '+(r.writing_chapter||'?')+' 章 · 复制给你的写作模型';
+    }catch(e){o.querySelector('#w_err').textContent='✗ '+e.message;}finally{b.textContent=t0;b.disabled=false;}};
+  o.querySelector('#w_copy').onclick=async()=>{try{await navigator.clipboard.writeText(packText);toast('✓ 写作包已复制');}catch(e){toast('✗ 复制失败，手动选中复制',true);}};
+  o.querySelector('#w_ok').onclick=async()=>{const text=o.querySelector('#w_text').value.trim();if(!text){o.querySelector('#w_err').textContent='✗ 先把正文贴进来';return;}
+    try{const r=await post('/narrate/commit',{world:wid,thread:tid,chapter_text:text,title:o.querySelector('#w_title').value.trim()});
+      closeModal();const fnd=(r.auto_checks||[]).length;toast('✓ 已落第 '+r.chapter+' 章（'+(r.hanzi||0)+'字'+(fnd?(' · '+fnd+' 条质检提示'):'')+'）');route();}
+    catch(e){o.querySelector('#w_err').textContent='✗ '+e.message;}};
+}
 function _qa(html){const o=el('qaout');if(o)o.innerHTML=html;}
 async function actChecks(){if(!window._novel)return;const {wid,tid}=window._novel;_qa('<span style="color:var(--faint)">全书质检中…（确定性，0 token）</span>');
   try{const r=await post('/checks',{world:wid,thread:tid});const f=r.findings||[];
@@ -109,4 +147,4 @@ async function actBranch(){if(!window._novel)return;const {wid,tid}=window._nove
 
 
 /* —— 暴露到全局命名空间（内联 onclick + 跨模块裸引用）—— */
-Object.assign(window, { viewNovel, showCh, actExport, actNarrateRun, actWriteChapter, _qa, actChecks, actReflect, actConvert, actBranch });
+Object.assign(window, { viewNovel, showCh, actExport, actNarrateRun, actNewThread, actWriteChapter, _qa, actChecks, actReflect, actConvert, actBranch });
