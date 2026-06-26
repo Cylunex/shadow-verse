@@ -140,7 +140,7 @@ def entity_commit(world: World, eid: str, name: str, body: str, *, role: str = "
 # ---------- 线 ----------
 def thread_prep(world: World, prompt: str, *, tags=None) -> dict:
     picks = _picks(prompt, tags=tags)
-    return {
+    pkg = {
         "forge": "thread", "prompt": prompt, "world": world.id,
         "world_setting": util.read_md(world.dir / "world.md")[:2000],
         "canon": util.read_md(world.dir / "canon.md"),
@@ -150,6 +150,10 @@ def thread_prep(world: World, prompt: str, *, tags=None) -> dict:
         "guide": THREAD_GUIDE,
         "commit_hint": "生成 thread.md 后调 thread-commit --json {id,title,genre,pacing,body}",
     }
+    terms = (world.glossary() or {}).get("terms", [])   # C2:世界已有名词库则注入,新线沿用规范命名(无则休眠)
+    if terms:
+        pkg["glossary"] = terms
+    return pkg
 
 
 def thread_commit(world: World, tid: str, title: str, body: str, *, genre: str = "",

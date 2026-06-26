@@ -130,6 +130,38 @@ def _chapter_parts(inst: "Thread", no: int) -> tuple[str, str]:
     return title, "\n".join(body).strip()
 
 
+def _c2_diagnose(inst: "Thread") -> list:
+    """C2 规则化诊断:偏离细纲(字数/出场) + 命名混用。无 outline/glossary 数据则空(休眠)。"""
+    out: list = []
+    chapters_spec = (inst.outline() or {}).get("chapters") or {}
+    terms = (inst.world.glossary() or {}).get("terms", [])
+    for no in range(1, inst.last_chapter_no() + 1):
+        _, body = _chapter_parts(inst, no)
+        if not body:
+            continue
+        spec = chapters_spec.get(str(no))
+        if spec:
+            tgt = spec.get("target_hanzi") or 0
+            if tgt:
+                actual = util.hanzi_count(body)
+                if abs(actual - tgt) / tgt > 0.4:
+                    out.append({"rule": "偏离细纲·字数", "target": "writer",
+                                "evidence": f"ch{no} 实际 {actual} 字 vs 细纲目标 {tgt} 字",
+                                "suggestion": "贴近细纲目标字数,或修订该章细纲"})
+            missing = [c for c in (spec.get("cast") or []) if c and c not in body]
+            if missing:
+                out.append({"rule": "偏离细纲·出场", "target": "writer",
+                            "evidence": f"ch{no} 细纲计划出场未见:{'、'.join(missing)}",
+                            "suggestion": "让计划出场的角色到场,或修订细纲出场表"})
+        for t in terms:   # 命名混用:同一词条本章出现 ≥2 个不同别名 = 称呼不一致(低噪)
+            aliases = sorted({a for a in (t.get("aliases") or []) if a and a in body})
+            if len(aliases) >= 2:
+                out.append({"rule": "命名混用", "target": "writer",
+                            "evidence": f"ch{no} 同一对象混用别名「{'/'.join(aliases[:3])}」",
+                            "suggestion": f"统一为规范名「{t.get('name', '')}」"})
+    return out
+
+
 def reflect_diagnose(inst: "Thread") -> dict:
     """规则化诊断(吸收 ainovel-cli/diag):聚合全书基线 + 钩子台账 → Finding{rule,evidence,suggestion,target}。
 
@@ -147,6 +179,7 @@ def reflect_diagnose(inst: "Thread") -> dict:
     if inst.last_chapter_no() >= 3 and not inst.open_hooks():
         findings.append({"rule": "钩子断档", "target": "recipe",
                          "evidence": "当前无开放钩子", "suggestion": "埋新钩牵引追读(见 HOOK_TAXONOMY)"})
+    findings.extend(_c2_diagnose(inst))   # C2:偏离细纲 / 命名混用(无 outline/glossary 则空)
     from collections import Counter
     return {"findings": findings, "profile": recipes.get_profile(inst.meta().get("genre", "")),
             "target_summary": dict(Counter(f["target"] for f in findings))}

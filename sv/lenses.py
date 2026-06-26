@@ -31,6 +31,21 @@ def _active(world: World, ids):
 
 
 # ========== narrate(读 / 小说)==========
+def _c2_inject(pkg: dict, world: World, thread: Thread, chapter_no=None) -> dict:
+    """C2 注入:命名库(命名一致) + 三级大纲(本章细纲 / 卷·节点脊柱)。
+    无 glossary/outline 数据时不加任何键 → 休眠,与今日写/审包逐字节一致。"""
+    terms = (world.glossary() or {}).get("terms", [])
+    if terms:
+        pkg["glossary"] = terms
+    ol = thread.outline() or {}
+    spec = (ol.get("chapters") or {}).get(str(chapter_no)) if chapter_no is not None else None
+    if spec:
+        pkg["chapter_outline"] = spec                       # 写本章:六元细纲(目标/冲突/钩子/披露/出场/字数)
+    if ol.get("volumes") or ol.get("beats"):
+        pkg["outline_spine"] = {"volumes": ol.get("volumes", []), "beats": ol.get("beats", [])}
+    return pkg
+
+
 def narrate_prep(world: World, thread: Thread, *, focus=None, brief: str = "") -> dict:
     meta = thread.meta()
     nxt = thread.last_chapter_no() + 1
@@ -48,7 +63,7 @@ def narrate_prep(world: World, thread: Thread, *, focus=None, brief: str = "") -
     # 世界书触发:据本章意图+上章结尾+出场角色名,激活相关设定条目
     wb_ctx = "\n".join([brief or "", last_tail, "、".join(b["name"] for b in blocks),
                         " ".join(h.get("desc", "") for h in thread.open_hooks())])
-    return {
+    return _c2_inject({
         "lens": "narrate",
         "thread": {"world": world.id, "id": thread.id, "title": meta.get("title"), "genre": meta.get("genre"), "scale": meta.get("scale")},
         "writing_chapter": nxt, "pacing_contract": meta.get("pacing"), "hanzi_target": meta.get("hanzi_target"),
@@ -69,7 +84,7 @@ def narrate_prep(world: World, thread: Thread, *, focus=None, brief: str = "") -
         "alpha": thread.hooks_data().get("alpha", ""),
         "open_hooks": [{"id": h["id"], "desc": h["desc"], "level": h["level"], "payoff_target": h.get("payoff_target")}
                        for h in thread.open_hooks()],
-    }
+    }, world, thread, nxt)
 
 
 _SEP = "===沉淀==="
@@ -149,7 +164,7 @@ def _parse_json(text: str) -> dict:
 def review_prep(world: World, thread: Thread, chapter_text: str) -> dict:
     """审校包:供宿主 Agent 的审校子代理(冷面、便宜模型)独立查问题。"""
     m = thread.meta()
-    return {
+    return _c2_inject({
         "lens": "narrate", "role": "review",
         "thread": {"world": world.id, "id": thread.id, "title": m.get("title")},
         "chapter_text": chapter_text,
@@ -159,7 +174,7 @@ def review_prep(world: World, thread: Thread, chapter_text: str) -> dict:
         "rubric": craft.REVIEWER_RUBRIC, "discipline": craft.REVIEWER_DISCIPLINE,
         "consistency": craft.CONSISTENCY_CHECKS,
         "auto_checks": checks.check_text(chapter_text, genre=m.get("genre", ""), target=m.get("hanzi_target", 0)),
-    }
+    }, world, thread)
 
 
 def narrate_review(world: World, thread: Thread, chapter_text: str) -> dict:

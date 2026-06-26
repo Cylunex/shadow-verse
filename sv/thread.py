@@ -69,6 +69,18 @@ class Thread:
     def save_meta(self, meta: dict) -> None:
         save_json(self.meta_path, meta)
 
+    @property
+    def outline_path(self) -> Path:
+        return self.dir / "outline.json"
+
+    def outline(self) -> dict:
+        """三级大纲脊柱:卷 volumes / 节点 beats(转折·爆点·信息点)/ 章节细纲 chapters{no:六元}。无文件=空(休眠)。"""
+        empty = {"volumes": [], "beats": [], "chapters": {}}
+        return load_json(self.outline_path, empty) or empty
+
+    def save_outline(self, data: dict) -> None:
+        save_json(self.outline_path, data)
+
     def update_meta(self, **kw) -> dict:
         m = self.meta()
         m.update(kw)

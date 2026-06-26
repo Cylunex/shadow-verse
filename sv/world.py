@@ -64,6 +64,17 @@ class World:
     def save_meta(self, meta: dict) -> None:
         save_json(self.meta_path, meta)
 
+    @property
+    def glossary_path(self) -> Path:
+        return self.dir / "glossary.json"
+
+    def glossary(self) -> dict:
+        """名词库(人名/地名/技能/组织 + 别名):供命名一致的注入与校验。无文件=空(休眠)。"""
+        return load_json(self.glossary_path, {"terms": []}) or {"terms": []}
+
+    def save_glossary(self, data: dict) -> None:
+        save_json(self.glossary_path, data)
+
     @classmethod
     def create(
         cls, wid: str, name: str, *, genre: str = "", scale: str = DEFAULT_SCALE,

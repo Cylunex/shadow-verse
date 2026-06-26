@@ -73,6 +73,7 @@ def api_world(wid: str) -> dict:
                         "chapters": tm.get("chapter_count", 0), "lenses": tm.get("lenses", [])})
     return {"meta": m, "world_md": util.read_md(w.dir / "world.md"),
             "canon_md": util.read_md(w.dir / "canon.md"), "entities": ents, "threads": threads,
+            "glossary": w.glossary(),
             "nexus_here": [k["id"] for k in nexus.kept_entities()
                            if wid in (NexusEntity(k["id"]).incarnations() if NexusEntity(k["id"]).exists() else [])]}
 
@@ -93,7 +94,7 @@ def api_thread(wid: str, tid: str) -> dict:
     return {"meta": m, "thread_md": util.read_md(t.dir / "thread.md"), "summary_md": t.summary(),
             "chapters": chapters, "beats": t.beats(), "sessions": sessions, "renders": renders,
             "hooks": {"alpha": hd["alpha"], "items": hd["hooks"], "overdue": list(overdue)},
-            "recipe": recipes.get(m.get("genre", "")),
+            "recipe": recipes.get(m.get("genre", "")), "outline": t.outline(),
             "entities": [{"id": e, "name": LocalEntity(w, e).card().get("name", e),
                           "role": LocalEntity(w, e).card().get("role", "")} for e in w.list_entities()]}
 
@@ -164,6 +165,20 @@ def post_components_delete(b: dict) -> dict:
 
 def post_components_seed(b: dict) -> dict:
     return {"ok": True, **components.seed_all()}
+
+
+# ---- C2 内容组件:名词库(世界级) / 三级大纲(线级);整体保存(管理台/新 UI 编辑后回存)----
+def post_glossary_save(b: dict) -> dict:
+    w = World.load(b["world"])
+    w.save_glossary({"terms": b.get("terms") or []})
+    return {"ok": True, "terms": w.glossary().get("terms", [])}
+
+
+def post_outline_save(b: dict) -> dict:
+    w = World.load(b["world"]); t = Thread.load(w, b["thread"])
+    o = b.get("outline") or {}
+    t.save_outline({"volumes": o.get("volumes", []), "beats": o.get("beats", []), "chapters": o.get("chapters", {})})
+    return {"ok": True, "outline": t.outline()}
 
 
 def api_codex_element(cat: str, eid: str) -> dict:
@@ -850,6 +865,8 @@ POST_ROUTES = [
     (re.compile(r"^/api/components/upsert$"), post_components_upsert),
     (re.compile(r"^/api/components/delete$"), post_components_delete),
     (re.compile(r"^/api/components/seed$"), post_components_seed),
+    (re.compile(r"^/api/glossary/save$"), post_glossary_save),
+    (re.compile(r"^/api/outline/save$"), post_outline_save),
     (re.compile(r"^/api/narrate/commit$"), post_narrate_commit),
     (re.compile(r"^/api/play/commit$"), post_play_commit),
     (re.compile(r"^/api/ascend$"), post_ascend),
