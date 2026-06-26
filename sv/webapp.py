@@ -811,6 +811,14 @@ class Handler(BaseHTTPRequestHandler):
             if ctype and root in target.parents and target.exists():
                 return self._send(200, target.read_bytes(), ctype)
             return self._send(404, b"not found", "text/plain")
+        if path.startswith("/static/"):   # 服务 sv/web/static 下的 CSS/JS(防目录穿越)
+            from urllib.parse import unquote
+            sroot = (WEB_DIR / "static").resolve()
+            target = (sroot / unquote(path[len("/static/"):])).resolve()
+            ctype = {".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8"}.get(target.suffix.lower())
+            if ctype and sroot in target.parents and target.exists():
+                return self._send(200, target.read_bytes(), ctype)
+            return self._send(404, b"not found", "text/plain")
         q = _qs(self.path)
         for rx, fn in GET_ROUTES:
             mm = rx.match(path)
