@@ -19,12 +19,22 @@ async function viewCompanion(wid,eid){
   const pname=(chat.player&&chat.player.name)||'你';
   let relObj=null;const meta={};(chat.var_view||[]).forEach(x=>meta[x.name]=x);
   for(const x of (chat.var_view||[])){if(x.vis==='rel'){const u=relUnwrap(x.value,pname);if(u)relObj=u;}}
-  let relHtml,stageHtml='';
+  let relHtml,stageHtml='',msHtml='',hidHtml='';
   if(relObj){
     stageHtml=relObj['阶段']?`<div class="stage">${esc(relObj['阶段'])}${relObj['称呼']?' · 称你「'+esc(relObj['称呼'])+'」':''}</div>`:'';
     relHtml=`<div class="rel" style="margin-top:16px">`+REL_AXES.filter(a=>typeof relObj[a.key]==='number').map(a=>{
       const pct=Math.max(0,Math.min(100,(relObj[a.key]-a.min)/((a.max-a.min)||1)*100));
       return `<div class="relrow"><div class="rt"><span class="rn">${a.key}</span><span class="rv">${relObj[a.key]}</span></div><div class="reltrack"><div class="rf" style="width:${pct}%;background:${a.color}"></div></div></div>`;}).join('')+`</div>`;
+    // 里程碑:关系卡自带的阶段跃迁标记(★);与下方「重要时刻」(经历)不同,这是攻略板的进度勋章
+    const ms=(relObj['里程碑']||[]).filter(Boolean);
+    if(ms.length)msHtml=`<div class="chips" style="margin:12px 0 0">`+ms.map(m=>`<span class="kw" style="background:#ffcd6b18;border-color:#5a4a2a;color:var(--gold)">★ ${esc(m)}</span>`).join('')+`</div>`;
+    // 高亲密解锁的隐藏真心话(galgame:亲密 ≥ 60 才看得见,否则 ?? 锁着)——镜像 attrs.REL_HIDDEN
+    const intim=typeof relObj['亲密']==='number'?relObj['亲密']:0,unlocked=intim>=60;
+    const hid=['真心话','隐藏期待','雷区'].map(k=>{
+      let val=relObj[k];if(Array.isArray(val))val=val.filter(Boolean).join('、');val=(val==null?'':val).toString().trim();
+      if(!unlocked)return `<span class="kw" style="color:var(--faint);background:#0004;border-color:#ffffff14;letter-spacing:1px">🔒 ${esc(k)} ??</span>`;
+      return val?`<span class="kw" style="color:#ffd9e6;background:#ff7b9c1a;border-color:#ff7b9c44">${esc(k)}：${esc(val)}</span>`:'';}).filter(Boolean).join('');
+    if(hid)hidHtml=`<div style="margin-top:14px;border-top:1px dashed #ffffff12;padding-top:11px"><div class="note" style="margin:0 0 8px">内在真心话 · ${unlocked?'高亲密已解锁':'亲密 ≥ 60 解锁'}</div><div class="chips" style="margin:0">${hid}</div></div>`;
   }else{
     // fallback: visible numeric bars
     const bars=(chat.var_view||[]).filter(x=>x.vis==='bar'&&typeof x.value==='number');
@@ -60,7 +70,7 @@ async function viewCompanion(wid,eid){
         </div>
       </div>
       <div class="compmain">
-        <section><h2>关系 <small>你们之间发生过的事的总和</small></h2>${stageHtml}${relHtml}</section>
+        <section><h2>关系 <small>你们之间发生过的事的总和</small></h2>${stageHtml}${relHtml}${msHtml}${hidHtml}</section>
         <section><h2>⚡ 她此刻想 <small>Desire 层 · 据目标与最近经历投影</small></h2>
           ${drvList.length?`<div class="drives" style="background:none;border:none;padding:0;margin:0">`+drvList.map(x=>`<div class="drive"><span class="di ${x.source==='目标'?'now':'recent'}">${esc(x.kind)}</span><span class="dt">${esc(x.text)}</span></div>`).join('')+`</div>`:'<p class="note" style="margin:0">此刻没有明确的近期驱动 —— 由她的锚点（见下）支撑。</p>'}</section>
         <section><h2>她是谁 <small>不会变的内核 · 锚点</small></h2>
