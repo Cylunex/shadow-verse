@@ -192,6 +192,8 @@ def purge_world(wid: str) -> None:
             inc = ne.incarnation_dir(wid)
             if inc.exists():
                 shutil.rmtree(inc)
+    from .soul import prune_world as _prune_souls   # 新魂模型:摘掉该世界化身,清孤儿魂(惰性导入避环)
+    _prune_souls(wid)
     render_map()
 
 

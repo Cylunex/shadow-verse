@@ -91,6 +91,20 @@ def _meta() -> dict:
     return m
 
 
+def rel_spec() -> dict:
+    """关系攻略板的渲染规格(前端 HUD 用,单一真相):多轴元 + 阶段阶梯 + 隐藏槽。
+
+    心防是逆向轴(越攻略越低),reverse=True 让前端把进度条按「攻下多少」渲染。
+    """
+    return {
+        "axes": [{"key": a["key"], "label": a["label"], "color": a["color"], "icon": a["icon"],
+                  "min": a["min"], "max": a["max"], "reverse": a["key"] == "心防"} for a in REL_AXES],
+        "stages": REL_STAGES,
+        "hidden": REL_HIDDEN,
+        "unlock_axis": "亲密", "unlock_at": 60,   # 高亲密才解锁隐藏真心话/期待/雷区
+    }
+
+
 def relationship_with(name: str = "你") -> dict:
     """一条对某人的关系卡(galgame 攻略板):多轴 + 阶段 + 称呼 + 里程碑 + 隐藏真心话。"""
     rel = {a["key"]: a["start"] for a in REL_AXES}

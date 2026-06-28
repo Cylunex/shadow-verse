@@ -397,6 +397,47 @@ def cmd_create_soul(a):
     print(f"✓ 创造即魂:{r['name']}(`{r['soul']}` @ {r['incarnation']})。锚点:{r['anchors'] or '—'}")
 
 
+# ---------- 陪伴透镜(夺舍 Agent 灵魂 + 累积)----------
+def cmd_companion_persona(a):
+    from . import companion
+    print(companion.persona(World.load(a.world), a.entity, player_name=a.player or None, recall=a.recall or ""))
+
+
+def cmd_companion_commit(a):
+    from . import companion
+    _out(companion.commit_turn(World.load(a.world), a.entity, a.message or "", a.reply or "",
+                               player_name=a.player or None, remember=a.remember or ""))
+
+
+def cmd_rel_board(a):
+    from . import companion
+    _out(companion.board(World.load(a.world), a.entity, player_name=a.player or None))
+
+
+# ---------- 回溯(执钟人拨钟:世界快照 + 回滚)----------
+def cmd_snapshot(a):
+    from . import rewind
+    r = rewind.snapshot(World.load(a.world), label=a.label or "")
+    print(f"✓ 快照已存:{r['id']}{(' · ' + r['label']) if r['label'] else ''}(beats={r['beats']})")
+
+
+def cmd_snapshots(a):
+    from . import rewind
+    snaps = rewind.snapshots(World.load(a.world))
+    if not snaps:
+        print("(无快照)"); return
+    for s in snaps:
+        print(f"  {s['id']}  {s.get('ts', '')}  beats={s.get('beats', 0)}  "
+              f"{s.get('label', '')}{' (自动)' if s.get('auto') else ''}")
+
+
+def cmd_rollback(a):
+    from . import rewind
+    r = rewind.rollback(World.load(a.world), a.snapshot)
+    print(f"✓ 已拨回到 {r['restored']}{(' · ' + r['label']) if r.get('label') else ''}"
+          f"(回溯前备份 {r['backup']},世界线已留痕)")
+
+
 def cmd_link(a):
     e = nexus.link_worlds(a.world_a, a.world_b, a.relation, note=a.note or "")
     print(f"✓ 世界互联:{e['a']} ⇄ {e['b']} :{e['relation']}")
@@ -655,6 +696,16 @@ def build_parser():
     add("summon-soul", cmd_summon_soul, ["soul", "world"], [("entry", {"default": "本体进"}), ("as-id", {"default": None})])
     add("create-soul", cmd_create_soul, ["world", "entity", "name"],
         [("role", {"default": "main"}), ("anchors", {"default": ""})])
+    # 陪伴透镜:夺舍宿主 Agent 当灵魂(persona)+ 回灌累积(commit)+ 关系板(board)
+    add("companion-persona", cmd_companion_persona, ["world", "entity"],
+        [("player", {"default": ""}), ("recall", {"default": ""})])
+    add("companion-commit", cmd_companion_commit, ["world", "entity"],
+        [("message", {"default": ""}), ("reply", {"default": ""}), ("player", {"default": ""}), ("remember", {"default": ""})])
+    add("rel-board", cmd_rel_board, ["world", "entity"], [("player", {"default": ""})])
+    # 回溯(执钟人拨钟):世界快照 + 回滚
+    add("snapshot", cmd_snapshot, ["world"], [("label", {"default": ""})])
+    add("snapshots", cmd_snapshots, ["world"])
+    add("rollback", cmd_rollback, ["world", "snapshot"])
 
     add("export-thread", cmd_export_thread, ["world", "thread"])
     add("delete-world", cmd_delete_world, ["id"])

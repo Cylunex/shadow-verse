@@ -261,6 +261,11 @@ def _system(world: World, e: LocalEntity, pl: dict, varbag: dict) -> str:
         parts.append(
             f"当前变量:{json.dumps(varbag, ensure_ascii=False)}。若本轮该变,在正文最后另起一行写 `{VAR_SEP}`,"
             f"其下写一行 JSON(只写要变的;数值用 +N/-N 增减或写新值);没变就别写、也别提变量。")
+    if e._soul() is not None:           # soul-entity(看板娘/陪伴魂):她记得你们到哪一步 + 怎么结算关系
+        from . import companion
+        add = companion.chat_addendum(e, pl["name"])
+        if add:
+            parts.append(add)
     core = macros.expand("\n\n".join(parts), varbag)
     # 预设(ST 采样集+提示词模块):作者写的系统/越狱/文风模块作为前置层叠加;
     # 引擎核心(人设/铁律/变量协议)始终保留在后、最终权威,预设无法覆盖正确性。
@@ -301,7 +306,7 @@ def _build_prompt(world: World, e: LocalEntity, message: str, hist: list[dict], 
     """组装 (system, transcript)。供阻塞生成与流式生成共用,保证两条路提示词一致。"""
     varbag = vars(e)
     sys = _system(world, e, pl, varbag)
-    mem = memory.retrieve(e.dir, message)
+    mem = e.retrieve(message)        # soul-entity 走 retrieve_soul:并入魂的身份记忆(她记得你)
     if mem:
         sys += "\n\n该想起的事:" + " / ".join(m["text"] for m in mem)
     wb = worldbook.scan(world, message + "\n" + " ".join(h["text"] for h in hist[-4:]),
@@ -384,8 +389,14 @@ def stream_turn(world: World, e: LocalEntity, message: str):
         append_jsonl(_path(e), _new_char_row(prose, updates, baseline))
         persisted = True
         newvars, notes = _apply_baseline(e, baseline, updates)
-        yield ("done", {"available": True, "reply": prose, "vars": newvars, "var_changed": list(updates or {}),
-                        "var_notes": notes, "swipe_id": 0, "swipe_n": 1, "emotion": _emotion(world, e, prose)})
+        comp = _companion_refresh(world, e)             # soul-entity:关系阶段推进(在发 done 前,让 HUD 立刻反映)
+        if comp:
+            newvars = vars(e)
+        done = {"available": True, "reply": prose, "vars": newvars, "var_changed": list(updates or {}),
+                "var_notes": notes, "swipe_id": 0, "swipe_n": 1, "emotion": _emotion(world, e, prose)}
+        if comp and comp.get("advanced"):
+            done["rel_advanced"], done["rel_milestone"] = comp.get("stage"), comp.get("milestone")
+        yield ("done", done)
         _kick_summary(world, e)           # done 已发,这里只是快速 spawn 后台线程,不拖慢客户端
         _rp_commit(world, e, message, prose, updates)   # RP → 世界线
     finally:
@@ -460,6 +471,18 @@ def _rp_commit(world: World, e: LocalEntity, message: str, prose: str, updates: 
         pass
 
 
+def _companion_refresh(world: World, e: LocalEntity):
+    """soul-entity(看板娘/陪伴魂):网页聊天结算后推进关系阶段(里程碑/身份/世界线 beat)。
+    非 soul 返回 None(字节等价,旧行为不变)。关系增量本身已由 ===变量=== 结算进 关系.你.<轴>。"""
+    if e._soul() is None:
+        return None
+    try:
+        from . import companion
+        return companion.refresh_stage(world, e)
+    except Exception:  # noqa: BLE001 — 关系推进绝不阻断对话
+        return None
+
+
 def turn(world: World, e: LocalEntity, message: str) -> dict:
     if not llm.available():
         return {"available": False,
@@ -473,8 +496,14 @@ def turn(world: World, e: LocalEntity, message: str) -> dict:
     newvars, notes = _apply_baseline(e, baseline, updates)
     _kick_summary(world, e)
     _rp_commit(world, e, message, reply, updates)   # RP → 世界线
-    return {"available": True, "reply": reply, "vars": newvars, "var_changed": list(updates or {}),
-            "var_notes": notes, "swipe_id": 0, "swipe_n": 1, "emotion": _emotion(world, e, reply)}
+    comp = _companion_refresh(world, e)             # soul-entity:关系阶段推进
+    if comp:
+        newvars = vars(e)                           # 重读,让 HUD 反映阶段/里程碑
+    out = {"available": True, "reply": reply, "vars": newvars, "var_changed": list(updates or {}),
+           "var_notes": notes, "swipe_id": 0, "swipe_n": 1, "emotion": _emotion(world, e, reply)}
+    if comp and comp.get("advanced"):
+        out["rel_advanced"], out["rel_milestone"] = comp.get("stage"), comp.get("milestone")
+    return out
 
 
 # ---------- swipe(一楼多候选;只作用于末楼)----------

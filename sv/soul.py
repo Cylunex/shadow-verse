@@ -77,3 +77,34 @@ class Soul:
         if ref not in m.get("incarnations", []):
             m.setdefault("incarnations", []).append(ref)
             save_json(self.dir / "meta.json", m)
+
+
+def prune_world(world_id: str) -> dict:
+    """世界被删时:从所有魂的 incarnations 摘掉它在该世界的化身;摘空了(再无任何化身)= 孤儿魂,删除。
+
+    魂与世界同等:一具魂可有多世界化身,删一个世界只摘那一具,别的化身在则魂仍存活;全没了才算孤儿。
+    返回 {pruned:[魂id...], orphaned:[被删的孤儿魂id...]}。
+    """
+    import shutil
+
+    pruned, orphaned = [], []
+    if not SOULS_DIR.exists():
+        return {"pruned": pruned, "orphaned": orphaned}
+    prefix = f"{world_id}/"
+    for d in sorted(SOULS_DIR.iterdir()):
+        if not (d / "meta.json").exists():
+            continue
+        s = Soul(d.name)
+        m = s.meta()
+        incs = m.get("incarnations", [])
+        kept = [r for r in incs if not r.startswith(prefix)]
+        if kept == incs:
+            continue
+        if kept:
+            m["incarnations"] = kept
+            save_json(s.dir / "meta.json", m)
+            pruned.append(s.id)
+        else:
+            shutil.rmtree(s.dir)        # 无化身的孤儿魂:连同 anchors/identity 一并清
+            orphaned.append(s.id)
+    return {"pruned": pruned, "orphaned": orphaned}

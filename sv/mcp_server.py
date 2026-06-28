@@ -55,6 +55,16 @@ TOOLS = [
     ("summon", "L4 召唤:跨世界实体进入某世界开化身", {"nexus_id": "str", "world": "str", "entry": "str"}, ["nexus_id", "world"], ["entry"], False),
     ("link", "L4 世界互联:连一条暗宇宙边", {"world_a": "str", "world_b": "str", "relation": "str", "note": "str"}, ["world_a", "world_b", "relation"], ["note"], False),
     ("nexus", "L4 枢纽鸟瞰", {}, [], [], False),
+    # 陪伴透镜(夺舍宿主 Agent 当灵魂 + 关系累积)
+    ("companion_persona", "夺舍:把一具魂烘焙成宿主 Agent 的【系统人格】——你注入它即**成为**她(锚点+声音+当前关系板+身份记忆+铁律+关系结算协议)。返回纯文本,用作 system prompt",
+     {"world": "str", "entity": "str", "player": "str", "recall": "str"}, ["world", "entity"], ["player", "recall"], False),
+    ("companion_commit", "陪伴累积:把你(作为她)生成的这轮对话回灌——关系板增量结算+阶段确定性推进+跃迁落里程碑+世界线 beat。reply 里可带 `===关系===` 增量块(或显式 deltas 由引擎解析)",
+     {"world": "str", "entity": "str", "message": "str", "reply": "str", "player": "str", "remember": "str"}, ["world", "entity"], ["message", "reply", "player", "remember"], False),
+    ("rel_board", "读关系攻略板(9 轴 + 阶段阶梯 + 隐藏真心话 + 渲染规格)", {"world": "str", "entity": "str", "player": "str"}, ["world", "entity"], ["player"], False),
+    # 回溯(执钟人拨钟):世界状态/世界线快照 + 回滚
+    ("snapshot", "回溯:给世界拍一份可恢复快照(拨钟的存档点)", {"world": "str", "label": "str"}, ["world"], ["label"], False),
+    ("snapshots", "回溯:列出某世界的全部快照", {"world": "str"}, ["world"], [], False),
+    ("rollback", "回溯:把世界拨回到某快照(先自动备份当前可 redo;世界线留痕)。注:魂的身份记忆在时钟之上,不随单世界回滚", {"world": "str", "snapshot": "str"}, ["world", "snapshot"], [], False),
     ("hooks", "看钩子台账(α悬念+各钩状态+过期未回收)", {"world": "str", "thread": "str"}, ["world", "thread"], [], False),
     ("hook_add", "加钩子(type:event/concept,level:α/主/中/细)", {"world": "str", "thread": "str", "desc": "str", "type": "str", "level": "str", "payoff": "int"}, ["world", "thread", "desc"], ["type", "level", "payoff"], False),
     ("hook_set", "改钩子状态(待回收/进行中/已回收/顺延/放弃)或回收章", {"world": "str", "thread": "str", "hid": "str", "status": "str", "payoff": "int"}, ["world", "thread", "hid"], ["status", "payoff"], False),

@@ -21,7 +21,8 @@ TESTS = ["sim.test_memory", "sim.test_forge", "sim.test_lenses", "sim.test_nexus
          "sim.test_rp_commit", "sim.test_ascension", "sim.test_webproj",
          "sim.test_components", "sim.test_c2", "sim.test_mcp_server",
          "sim.test_convert", "sim.test_merge", "sim.test_macros",
-         "sim.test_provenance", "sim.test_export", "sim.smoke"]
+         "sim.test_provenance", "sim.test_export",
+         "sim.test_companion", "sim.test_rewind", "sim.smoke"]
 ROOT = Path(__file__).resolve().parent.parent
 
 
