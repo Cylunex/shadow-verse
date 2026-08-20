@@ -10,3 +10,16 @@ universe/
 sv.local.conf
 Properties.md
 *.key
+
+# Runtime deployment material stays local; packaged skills remain versioned.
+deploy/*
+!deploy/skills/
+!deploy/skills/**
+deploy/skills/.DS_Store
+ops/
+operations/
+*.pem
+*.p12
+*.pfx
+*.token
+*.secret

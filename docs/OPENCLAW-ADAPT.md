@@ -1,7 +1,7 @@
 # 接入 OpenClaw 当看板娘 · 适配计划（交付 code 实施 / 审查依据）
 
 > 缘起：把 shadow-verse 放进 OpenClaw（宿主 Agent），由 OpenClaw 充当「看板娘」——用它的 agent loop + 对话 UI + 工具调用机制来更方便地操作项目，并支持「切换不同角色扮演」。
-> 配套：`deploy/README.md`（三步接入）、`deploy/skills/shadowverse/SKILL.md`（宿主手册）、`sv/mcp_server.py`（~60 typed 工具）、`REDESIGN.md`（红线）、`docs/FRONTEND-PLAN.md`（webapp 现状）。
+> 配套：`deploy/skills/shadowverse/SKILL.md`（宿主手册）、`sv/mcp_server.py`（~60 typed 工具）、`REDESIGN.md`（红线）、`docs/FRONTEND-PLAN.md`（webapp 现状）。
 > 定位：本文是 plan-level 工单，schema/代码细节留给 code 发挥。
 
 ---
@@ -20,7 +20,6 @@
 | 能力 | 现状 |
 |---|---|
 | MCP server | `python -m sv.mcp_server`，stdio JSON-RPC，~60 typed 工具，语义同 CLI |
-| 接入指引 | `deploy/README.md` 三步（放项目 → 装 SKILL.md → 注册 MCP，附 JSON 配置）|
 | 宿主手册 | `deploy/skills/shadowverse/SKILL.md`（五层心法 + prep/commit 流 + 暗宇宙 + 守则）|
 | 数据/代码分离 | `SV_UNIVERSE_DIR` 指向数据区，更新代码不碰 `universe/` |
 
@@ -61,7 +60,7 @@
 
 ### A4 · 对齐 stale 文档 / 计数
 
-`deploy/README.md` 写「22 个 typed 工具」，实际 ~60；README/SKILL/VISION 各处计数不一。适配时顺手统一（以 `mcp_server.TOOLS` 实际长度为准），免得宿主被旧数字误导。
+README/SKILL/VISION 的工具计数应以 `mcp_server.TOOLS` 实际长度为准，避免宿主读取旧数字。
 
 ---
 
