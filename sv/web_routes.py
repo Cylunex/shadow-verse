@@ -58,6 +58,7 @@ def api_world(wid: str) -> dict:
     w = World.load(wid); m = w.meta()
     ents = [{"id": eid, "name": LocalEntity(w, eid).card().get("name", eid),
              "role": LocalEntity(w, eid).card().get("role", ""),
+             "voice": LocalEntity(w, eid).card().get("voice") or "",
              "avatar": LocalEntity(w, eid).avatar_rel() or "",
              "provenance": LocalEntity(w, eid).card().get("provenance", {}).get("source", "")}
             for eid in w.list_entities()]
@@ -129,6 +130,20 @@ def api_drives(wid: str, eid: str) -> dict:
             "note": "据她此刻的目标 + 最近经历投影(不调模型,0 token);锚点是跨世界不变基线。"}
 
 
+def api_rel_board(wid: str, eid: str) -> dict:
+    """陪伴关系攻略板轻量投影(复用 companion.board;酒馆 hub peek / 陪伴页可读)。"""
+    from . import companion as companion_mod
+    w = World.load(wid); e = LocalEntity.load(w, eid)
+    b = companion_mod.board(w, eid)
+    data = (varstate.load(e).get("data", {}) or {})
+    rel_root = data.get("关系") if isinstance(data.get("关系"), dict) else {}
+    has_rel = "你" in rel_root  # companion 卡键恒为「你」
+    return {"world": wid, "entity": eid, "name": e.card().get("name", eid),
+            "avatar": e.avatar_rel() or "", "has_rel": has_rel,
+            "player": b.get("player"), "rel": b.get("rel") or {},
+            "voice": b.get("voice") or {}, "spec": b.get("spec") or {}}
+
+
 def api_nexus_entity(nid: str) -> dict:
     ne = NexusEntity.load(nid); m = ne.meta()
     incs = [{"world": wid, "state": memory.read_state(ne.incarnation_dir(wid)),
@@ -191,7 +206,10 @@ def api_export_thread(wid: str, tid: str) -> dict:
 
 
 def api_config() -> dict:
-    return config.settings_snapshot()
+    """设置快照 + 玩家身份(settings 页 c.player 不再空)。"""
+    snap = config.settings_snapshot()
+    snap["player"] = chatmod.player()
+    return snap
 
 
 def _regex_render(text: str, scripts: list | None = None) -> str:
@@ -212,6 +230,14 @@ def _regex_out(d: dict) -> dict:
     if isinstance(d, dict) and d.get("reply"):
         d["reply"] = _regex_render(d["reply"])
     return d
+
+
+def api_chat_summary_status(wid: str, eid: str, q: dict | None = None) -> dict:
+    """轻量 poll:后台自动总结是否完成。?consume=1 取走 ready(toast 一次)。"""
+    w = World.load(wid); e = LocalEntity.load(w, eid)
+    q = q or {}
+    consume = str(q.get("consume", "")).lower() in ("1", "true", "yes")
+    return chatmod.summary_status(e, consume=consume)
 
 
 def api_chat(wid: str, eid: str) -> dict:
@@ -327,7 +353,7 @@ def post_entity_create(b: dict) -> dict:
 
 
 def post_entity_save(b: dict) -> dict:
-    """站内基础编辑:名称/role/外貌/profile —— 复用 entity 既有原语,核心模块不动。"""
+    """站内基础编辑:名称/role/voice/外貌/profile —— 复用 entity 既有原语,核心模块不动。"""
     w = World.load(b["world"]); e = LocalEntity.load(w, b["entity"])
     if b.get("role") and b["role"] not in ROLES:
         raise ValueError(f"role 必须 ∈ {ROLES}:{b['role']!r}")
@@ -335,6 +361,9 @@ def post_entity_save(b: dict) -> dict:
         e.set_card_field("name", b["name"])
     if b.get("role"):
         e.set_card_field("role", b["role"])
+    if "voice" in b:                          # 陪伴人称:she/he/they(空→中性)
+        from . import companion as companion_mod
+        companion_mod.set_voice(e, b.get("voice") or "they")
     if b.get("appearance") is not None:
         e.set_appearance(b["appearance"])
     if b.get("profile_md"):
@@ -371,7 +400,9 @@ def post_render_cover(b: dict) -> dict:
 def post_config(b: dict) -> dict:
     """保存设置到 sv.local.conf 并热加载(免重启)。只接受空字符串才清除某键。"""
     config.save_setting(b or {})
-    return {"ok": True, **config.settings_snapshot()}
+    snap = config.settings_snapshot()
+    snap["player"] = chatmod.player()
+    return {"ok": True, **snap}
 
 
 def post_llm_test(b: dict) -> dict:
@@ -825,6 +856,7 @@ GET_ROUTES = [
     (re.compile(r"^/api/thread/([\w-]+)/([\w-]+)$"), lambda m, q: api_thread(m.group(1), m.group(2))),
     (re.compile(r"^/api/entity/([\w-]+)/([\w-]+)$"), lambda m, q: api_entity(m.group(1), m.group(2))),
     (re.compile(r"^/api/drives/([\w-]+)/([\w-]+)$"), lambda m, q: api_drives(m.group(1), m.group(2))),
+    (re.compile(r"^/api/rel-board/([\w-]+)/([\w-]+)$"), lambda m, q: api_rel_board(m.group(1), m.group(2))),
     (re.compile(r"^/api/nexus/([\w-]+)$"), lambda m, q: api_nexus_entity(m.group(1))),
     (re.compile(r"^/api/soul/([\w-]+)/incarnations$"), lambda m, q: api_soul_incarnations(m.group(1))),
     (re.compile(r"^/api/soul/([\w-]+)$"), lambda m, q: api_soul(m.group(1))),
@@ -838,6 +870,8 @@ GET_ROUTES = [
     (re.compile(r"^/api/export/thread/([\w-]+)/([\w-]+)$"), lambda m, q: api_export_thread(m.group(1), m.group(2))),
     (re.compile(r"^/api/config$"), lambda m, q: api_config()),
     (re.compile(r"^/api/timeline/([\w-]+)$"), lambda m, q: api_timeline(m.group(1))),
+    (re.compile(r"^/api/chat/([\w-]+)/([\w-]+)/summary-status$"),
+     lambda m, q: api_chat_summary_status(m.group(1), m.group(2), q)),
     (re.compile(r"^/api/chat/([\w-]+)/([\w-]+)$"), lambda m, q: api_chat(m.group(1), m.group(2))),
     (re.compile(r"^/api/modes$"), lambda m, q: api_modes()),
     (re.compile(r"^/api/groups$"), lambda m, q: api_groups()),

@@ -24,14 +24,30 @@ const REL_AXES=[
   {key:'亲密',color:'#ffb3c8',min:0,max:100},
   {key:'默契',color:'#8fd0ff',min:0,max:100},
   {key:'安全感',color:'#7fce9f',min:0,max:100},
-  {key:'心防',color:'#a8a6c8',min:0,max:100},
+  {key:'心防',color:'#a8a6c8',min:0,max:100,reverse:true},  // 逆向轴:条越长=已攻下越多(心防越低)
   {key:'占有欲',color:'#ffcd6b',min:0,max:100},
 ];
-/* 关系 var 的真实形状是 {对象名:{好感..阶段..}} —— 剥掉外层人名层，拿到真正的攻略对象 */
+/* 进度条百分比;reverse 轴(心防)按「已攻破」渲染 */
+function relBarPct(a,val){
+  const raw=Math.max(0,Math.min(100,(val-a.min)/((a.max-a.min)||1)*100));
+  return a.reverse?100-raw:raw;
+}
+/* 人称代词:card.voice/gender/pronoun → 她/他/名字(中性默认用名字,避免硬编码她) */
+function voiceWho(card,name){
+  const raw=String((card&&(card.voice||card.gender||card.pronoun))||'').trim();
+  const vk=raw.toLowerCase();
+  if(vk==='she'||vk==='女'||vk==='her'||vk==='female'||vk==='f'||raw==='她')return '她';
+  if(vk==='he'||vk==='男'||vk==='him'||vk==='male'||vk==='m'||raw==='他')return '他';
+  return name||'TA';
+}
+function voiceSelf(who,name){return (who==='她'||who==='他')?(who+'自己'):((name||'TA')+'自己');}
+/* 关系 var 的真实形状是 {对象名:{好感..阶段..}} —— 卡键恒为「你」,playerName 只是称呼 */
 function relUnwrap(val,playerName){
   if(!val||typeof val!=='object')return null;
   if(REL_AXES.some(a=>typeof val[a.key]==='number')||val['阶段'])return val; // 已是内层
-  const pk=(playerName&&val[playerName])?playerName:Object.keys(val)[0];
+  if(val['你']&&typeof val['你']==='object')return val['你'];               // companion 恒定键
+  if(playerName&&val[playerName]&&typeof val[playerName]==='object')return val[playerName];
+  const pk=Object.keys(val)[0];
   const inner=pk?val[pk]:null;
   return (inner&&typeof inner==='object')?inner:null;
 }
@@ -67,4 +83,4 @@ function formModal(title,fields,submitLabel,onSubmit,aux){
 
 
 /* —— 暴露到全局命名空间（内联 onclick + 跨模块裸引用）—— */
-Object.assign(window, { coverClass, sigil, avBg, REL_AXES, relUnwrap, _hudIframe, closeModal, openModal, formModal });
+Object.assign(window, { coverClass, sigil, avBg, REL_AXES, relBarPct, relUnwrap, voiceWho, voiceSelf, _hudIframe, closeModal, openModal, formModal });

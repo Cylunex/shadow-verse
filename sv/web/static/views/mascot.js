@@ -9,7 +9,7 @@ function kbLine(){          // 星瞳:看时段 + 看你在哪一页,说一句�
   let h=12;try{h=new Date().getHours();}catch(e){}
   const greet=h<5?'夜深了':h<11?'早安':h<13?'午安':h<18?'下午好':h<23?'晚上好':'夜深了';
   const fam=(location.hash.slice(1).split('/').filter(Boolean)[0])||'works';
-  const byPage={chat:'在听呢。<b>想让谁开口？</b>',companion:'她一直在的。<b>去陪陪她？</b>',
+  const byPage={chat:'在听呢。<b>想让谁开口？</b>',companion:'一直在的。<b>去陪陪？</b>',
     novel:'笔还搁着。<b>续写哪一章？</b>',works:'想进哪个世界？<b>我带你去。</b>',
     chars:'这些住在你世界里的人，<b>想见见谁？</b>',worldbook:'设定我都替你记着。<b>要翻哪条？</b>',
     assets:'素材都在架上呢。',presets:'文风的旋钮在这儿。',settings:'要调点什么？'};

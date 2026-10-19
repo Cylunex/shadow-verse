@@ -52,7 +52,7 @@ MANAGED_KEYS = (
     "SV_LLM_TEMPERATURE", "SV_RENDER", "GITEE_API_KEY", "GITEE_BASE_URL", "SV_IMAGE_SIZE",
     "SV_EMBED_PROVIDER", "SV_EMBED_MODEL", "OLLAMA_BASE_URL", "SV_SIMULATE",
     "SV_PRESET", "SV_FALLBACK_PROVIDER", "SV_FALLBACK_MODEL", "SV_LLM_TIMEOUT",
-    "SV_RP_COMMIT",
+    "SV_RP_COMMIT", "SV_SUMMARY_EVERY", "SV_CHAT_SUMMARY",
 )
 SECRET_KEYS = {"ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GITEE_API_KEY"}
 
@@ -92,6 +92,8 @@ def _compute() -> None:
     # 叙事产线参数
     g["HANZI_TARGET"] = int(_get("SV_HANZI_TARGET", "2500"))
     g["SUMMARY_EVERY"] = int(_get("SV_SUMMARY_EVERY", "5"))
+    # 对话自动总结:on=有LLM用模型/无则抽取式;extract=只用抽取式;llm=仅真模型;off=关
+    g["CHAT_SUMMARY"] = (_get("SV_CHAT_SUMMARY", "on") or "on").strip().lower()
     # 可插拔 LLM(默认 stub;作为 skill 时不用,单机想一键生成才配)
     g["PROVIDER"] = _get("SV_PROVIDER", "stub")      # stub | openai | anthropic | ollama
     g["MODEL"] = _get("SV_MODEL", "")
@@ -150,6 +152,7 @@ def settings_snapshot() -> dict:
         "render": RENDER, "gitee_base_url": GITEE_BASE_URL, "image_size": IMAGE_SIZE,
         "embed_provider": EMBED_PROVIDER, "embed_model": EMBED_MODEL, "ollama_base_url": OLLAMA_BASE_URL,
         "simulate": SIMULATE_ENABLED,
+        "summary_every": SUMMARY_EVERY, "chat_summary": CHAT_SUMMARY,
         "secrets": {k: mask(k) for k in SECRET_KEYS},
         "env_overrides": [k for k in MANAGED_KEYS if os.environ.get(k)],
     }

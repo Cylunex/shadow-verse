@@ -5,6 +5,7 @@
 import './api.js';
 import './components.js';
 import './router.js';
+import './views/tavern.js';
 import './views/works.js';
 import './views/chars.js';
 import './views/incarnations.js';

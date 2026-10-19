@@ -14,7 +14,7 @@ async function actNewWorld(){formModal('新建作品（世界）',[
   const id=v.id||asciiSlug(v.name);
   if(!isId(id))throw new Error('id 需为英文 kebab-case（小写字母/数字/连字符）；中文名请手动填一个 id');
   await post('/world/create',{id,name:v.name,genre:v.genre,world_md:v.world_md});
-  closeModal();await refresh();location.hash='#/chat/'+id;toast('✓ 已建《'+v.name+'》。先给她加个角色吧。');},
+  closeModal();await refresh();location.hash='#/chat/'+id;toast('✓ 已建《'+v.name+'》。先给作品加个角色吧。');},
   (OV.llm&&OV.llm.available)?{label:'✨ AI 生成设定',run:async(v,set)=>{const r=await post('/gen/world',{prompt:v.name+' '+v.genre,genre:v.genre});set('world_md',r.body||'');}}:null);}
 async function actNewEntity(wid){
   const ids=OV.worlds.map(w=>w.id);
@@ -38,13 +38,19 @@ async function actNewEntity(wid){
 }
 async function actEntityCard(wid,eid){
   const d=await api('/entity/'+wid+'/'+eid);const c=d.card||{};
+  const voiceNow=c.voice||c.gender||c.pronoun||'they';
+  const voiceOpts=['they · 中性(TA)','she · 女(她)','he · 男(他)'];
+  const voiceVal=voiceOpts.find(x=>x.startsWith(String(voiceNow).toLowerCase().split(/[^a-z]/)[0]))||(
+    voiceNow==='她'||voiceNow==='女'?'she · 女(她)':voiceNow==='他'||voiceNow==='男'?'he · 男(他)':'they · 中性(TA)');
   formModal(`资料 · ${esc(c.name||eid)}`,[
     {n:'name',label:'名称',value:c.name||''},
     {n:'role',label:'戏份',type:'select',options:['main','secondary','cameo','npc'],value:c.role||'secondary'},
+    {n:'voice',label:'人称代词（陪伴人格/HUD 文案）',type:'select',options:voiceOpts,value:voiceVal},
     {n:'appearance',label:'外貌锚点（保持立绘是同一人）',value:d.appearance||c.appearance||''},
     {n:'profile_md',label:'角色设定 · profile.md',type:'textarea',rows:12,value:d.profile_md||''},
   ],'保存',async v=>{
-    await post('/entity/save',{world:wid,entity:eid,name:v.name,role:v.role,appearance:v.appearance,profile_md:v.profile_md});
+    const vk=(v.voice||'they').split('·')[0].trim();
+    await post('/entity/save',{world:wid,entity:eid,name:v.name,role:v.role,voice:vk,appearance:v.appearance,profile_md:v.profile_md});
     closeModal();route();toast('✓ 已保存资料');
   });
 }
@@ -65,7 +71,7 @@ async function actImportPreset(){formModal('导入 SillyTavern 预设',[{n:'name
   async v=>{await post('/import/preset',{name:v.name,data:v.data});closeModal();route();toast('✓ 已导入预设');});}
 async function actDelWorld(wid,name){if(!confirm(`删除作品「${name}」及其全部世界线/角色？并清理跨世界连接。不可撤销。`))return;
   try{await post('/delete/world',{id:wid});closeModal();await refresh();location.hash='#/works';toast('✓ 已删除');}catch(e){toast('✗ '+e.message,true)}}
-async function actExtract(wid,eid,name){if(!confirm(`把 ${name} 提取/升华为跨世界的「魂」？\n她将获得跨世界不变量（声音/底线/身份记忆），从此可被召唤进别的世界。原世界的她照常存在。`))return;
+async function actExtract(wid,eid,name){if(!confirm(`把 ${name} 提取/升华为跨世界的「魂」？\n将获得跨世界不变量（声音/底线/身份记忆），从此可被召唤进别的世界。原世界的化身照常存在。`))return;
   try{const r=await post('/extract',{world:wid,entity:eid});await refresh();toast(`✓ ${name} 已成魂（soul: ${esc(r.soul||r.soul_id||'')}）。现在可以「召唤进别的世界」了。`);route();}catch(e){toast('✗ '+e.message,true)}}
 async function actSummonSoul(soul,name){const ids=OV.worlds.map(w=>w.id);if(!ids.length)return toast('还没有别的世界',true);
   formModal(`✦ 召唤 ${name} 降临别的世界`,[

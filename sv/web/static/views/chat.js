@@ -40,7 +40,27 @@ function scrollChat(){const s=document.querySelector('.scroll');if(s)s.scrollTop
 function _lastCharBubble(){const rows=el('chatbox').querySelectorAll('.brow.char .bubble');return rows[rows.length-1]||null;}
 
 function updateSwBar(r){const c=el('swcount');if(c&&r&&typeof r.swipe_n==='number')c.textContent=((r.swipe_id||0)+1)+'/'+r.swipe_n;
-  if(r&&r.vars)renderVars(r.vars);if(r&&r.var_changed&&r.var_changed.length)toast('变量更新：'+r.var_changed.join('、'));}
+  if(r&&r.vars)renderVars(r.vars);if(r&&r.var_changed&&r.var_changed.length)toast('变量更新：'+r.var_changed.join('、'));
+  // 陪伴关系反馈:阶段跃迁 / 温层印象落盘
+  if(r&&r.rel_advanced){const ms=r.rel_milestone?String(r.rel_milestone).replace(/^关系进展到「/,'').replace(/」$/,''):r.rel_advanced;toast('💗 关系到了「'+ms+'」');}
+  else if(r&&r.rel_warmed)toast('✦ 这段相处留下了印象');
+  // 自动总结:同步完成立刻 toast;异步 LLM 轻量 poll summary-status
+  if(r&&r.summary_done)toast('📝 对话已写入记忆'+(r.summary_preview?' · '+String(r.summary_preview).slice(0,28):''));
+  else if(r&&r.summary_pending)watchSummaryReady();}
+function watchSummaryReady(){
+  if(!CHAT||CHAT._sumWatch)return;CHAT._sumWatch=true;
+  const wid=CHAT.wid,eid=CHAT.eid;let n=0;
+  const tick=async()=>{
+    n++;
+    try{
+      const s=await api('/chat/'+encodeURIComponent(wid)+'/'+encodeURIComponent(eid)+'/summary-status?consume=1');
+      if(s&&s.done){toast('📝 对话已写入记忆'+(s.preview?' · '+String(s.preview).slice(0,28):''));CHAT._sumWatch=false;return;}
+    }catch(e){}
+    if(n<12&&CHAT&&CHAT.wid===wid&&CHAT.eid===eid)setTimeout(tick,1500);
+    else if(CHAT)CHAT._sumWatch=false;
+  };
+  setTimeout(tick,900);
+}
 async function chatSwipe(delta){if(!CHAT)return;const tgt=_lastCharBubble();if(!tgt)return;
   const old=tgt.textContent;if(delta>0)tgt.textContent='…';
   try{const r=await post('/chat/swipe',{world:CHAT.wid,entity:CHAT.eid,delta});
@@ -60,11 +80,18 @@ function renderVars(v){const box=el('varpanel');if(!box)return;
   box.innerHTML=ks.map(k=>{const m=meta[k]||{},val=v[k];const label=esc(m.label||k),icon=m.icon?'':'';
     if(m.vis==='rel'){const rel=relUnwrap(val,CHAT&&CHAT.playerName);
       if(rel){
-        const stg=rel['阶段']?`<span class="stage" style="padding:2px 10px;font-size:11px">${esc(rel['阶段'])}</span>`:'';
-        const axes=REL_AXES.filter(a=>typeof rel[a.key]==='number').slice(0,5).map(a=>{
-          const pct=Math.max(0,Math.min(100,(rel[a.key]-a.min)/((a.max-a.min)||1)*100));
-          return `<div class="var"><div class="vh"><span class="vn">${a.key}</span><span class="vv">${rel[a.key]}</span></div><div class="vtrack"><div class="vf" style="width:${pct}%;background:${a.color}"></div></div></div>`;}).join('');
-        return `<div style="margin-bottom:10px"><div class="vh" style="margin-bottom:8px"><span class="vn">${label}</span>${stg}</div>${axes}<a class="note" style="color:var(--violet);cursor:pointer" onclick="location.hash='#/companion/${CHAT.wid}/${CHAT.eid}'">完整关系板 ›</a></div>`;
+        const call=rel['称呼']?` · 称你「${esc(rel['称呼'])}」`:'';
+        const stg=rel['阶段']?`<span class="stage" style="padding:2px 10px;font-size:11px">${esc(rel['阶段'])}${call}</span>`:'';
+        // 优先显示攻略核心轴,最多 7 条;心防 reverse 条已攻破
+        const prefer=['好感','心动','信任','亲密','心防','依赖','安全感','默契','占有欲'];
+        const ordered=prefer.map(k=>REL_AXES.find(a=>a.key===k)).filter(a=>a&&typeof rel[a.key]==='number').slice(0,7);
+        const axes=ordered.map(a=>{
+          const pct=relBarPct(a,rel[a.key]);
+          const tip=a.reverse?' <span class="note" style="font-size:10px">已攻破</span>':'';
+          return `<div class="var"><div class="vh"><span class="vn">${a.key}${tip}</span><span class="vv">${rel[a.key]}</span></div><div class="vtrack"><div class="vf" style="width:${pct}%;background:${a.color}"></div></div></div>`;}).join('');
+        const ms=(rel['里程碑']||[]).filter(Boolean).slice(-3);
+        const msHtml=ms.length?`<div class="chips" style="margin:6px 0 4px">`+ms.map(x=>`<span class="kw" style="background:#ffcd6b18;border-color:#5a4a2a;color:var(--gold);font-size:11px">★ ${esc(x)}</span>`).join('')+`</div>`:'';
+        return `<div style="margin-bottom:10px"><div class="vh" style="margin-bottom:8px"><span class="vn">${label}</span>${stg}</div>${axes}${msHtml}<a class="note" style="color:var(--violet);cursor:pointer" onclick="location.hash='#/companion/${CHAT.wid}/${CHAT.eid}'">完整关系板 ›</a></div>`;
       }
     }
     let disp;
@@ -172,10 +199,10 @@ async function viewChat(wid,eid){
           <div id="varpanel"></div>
         </div>
         <div class="ptab-pane" data-pt="chars">
-          <div class="drives"><div class="dh">🜂 她的内核 · 锚点（跨世界不变量）</div>
+          <div class="drives"><div class="dh">🜂 ${esc(d.name||'角色')}的内核 · 锚点（跨世界不变量）</div>
             ${(ent.anchors&&ent.anchors.length)?ent.anchors.map((a,i)=>`<div class="drive"><span class="di">${i+1}</span><span class="dt">${esc(a)}</span></div>`).join(''):'<p class="note" style="margin:0">这个角色还没有锚点。提取为魂后会沉淀出跨世界不变量。</p>'}
             <div class="dh" style="margin-top:13px">⚡ 当前驱动 · Desire 层 <span style="text-transform:none;letter-spacing:0">据目标/最近经历投影</span></div>
-            ${(drv&&drv.drives&&drv.drives.length)?drv.drives.map(x=>`<div class="drive"><span class="di ${x.source==='目标'?'now':'recent'}">${esc(x.kind)}</span><span class="dt">${esc(x.text)}</span></div>`).join(''):'<p class="note" style="margin:0">此刻没有明确的近期驱动 —— 她的行动由上面的锚点支撑。</p>'}
+            ${(drv&&drv.drives&&drv.drives.length)?drv.drives.map(x=>`<div class="drive"><span class="di ${x.source==='目标'?'now':'recent'}">${esc(x.kind)}</span><span class="dt">${esc(x.text)}</span></div>`).join(''):'<p class="note" style="margin:0">此刻没有明确的近期驱动 —— 行动由上面的锚点支撑。</p>'}
           </div>
           <div class="pchar"><div class="hd">${headAv}<div class="t"><div class="nm">${esc(d.name)}</div><div class="rl">${ent.card?esc(ent.card.role||''):''}${ent.card&&ent.card.soul_id?' · ✦ 跨世界':''}</div></div></div>
             <div class="ops"><span class="op" onclick="location.hash='#/companion/${wid}/${eid}'">陪伴</span><span class="op" onclick="actEntityCard('${jsq(wid)}','${jsq(eid)}')">资料</span><span class="op" onclick="actExtract('${jsq(wid)}','${jsq(eid)}','${jsq(d.name)}')">提取为魂</span></div>
@@ -269,8 +296,8 @@ function ptab(t){document.querySelectorAll('.ptabs .ptab').forEach(x=>x.classLis
   document.querySelectorAll('.ptab-pane').forEach(p=>p.classList.toggle('on',p.dataset.pt===t.dataset.pt));}
 function toggleOoc(){if(!CHAT)return;CHAT.ooc=!CHAT.ooc;const c=el('composer'),tg=el('ooctgl'),h=el('oochint'),ta=el('chatmsg');
   c.classList.toggle('director',CHAT.ooc);tg.classList.toggle('on',CHAT.ooc);
-  ta.placeholder=CHAT.ooc?'导演指令：如 [下一幕下雨] [她更冷淡些] [跳到第二天]':('对 '+CHAT.name+' 说点什么……');
-  h.textContent=CHAT.ooc?'开：导演旁白 ——[方括号] 内容作为指令发给她，引导剧情走向':('关：你在对 '+CHAT.name+' 说话');}
+  ta.placeholder=CHAT.ooc?'导演指令：如 [下一幕下雨] [气氛更冷淡些] [跳到第二天]':('对 '+CHAT.name+' 说点什么……');
+  h.textContent=CHAT.ooc?'开：导演旁白 ——[方括号] 内容作为指令，引导剧情走向':('关：你在对 '+CHAT.name+' 说话');}
 function convFilter(q){q=(q||'').trim().toLowerCase();
   document.querySelectorAll('#convlist .conv').forEach((c,i)=>{const w=OV.worlds[i];c.style.display=(!q||(w.name+w.genre).toLowerCase().includes(q))?'':'none';});}
 async function gswipe(delta){if(!CHAT)return;const n=(CHAT.greetings||[]).length;if(n<2)return;
@@ -278,7 +305,7 @@ async function gswipe(delta){if(!CHAT)return;const n=(CHAT.greetings||[]).length
 async function actSaveNote(){if(!CHAT)return;const t=el('authornote').value;
   try{await post('/chat/author-note',{world:CHAT.wid,entity:CHAT.eid,text:t});toast('✓ 作者笔记已存，下条起生效');}catch(e){toast('✗ '+e.message,true)}}
 async function actQuickReplies(){const cur=(CHAT&&CHAT.qr||[]).map(q=>q.label&&q.label!==q.message?q.label+' | '+q.message:q.message).join('\n');
-  formModal('快速回复（每行一条；可写「按钮名 | 发送内容」）',[{n:'list',label:'每行一条',type:'textarea',rows:7,value:cur,ph:'问她在等谁\n陪你坐一会儿 | "陪你坐一会儿"'}],'保存',async v=>{
+  formModal('快速回复（每行一条；可写「按钮名 | 发送内容」）',[{n:'list',label:'每行一条',type:'textarea',rows:7,value:cur,ph:'问问在等谁\n陪你坐一会儿 | "陪你坐一会儿"'}],'保存',async v=>{
     const items=v.list.split('\n').map(s=>s.trim()).filter(Boolean).map(s=>{const i=s.indexOf('|');return i>=0?{label:s.slice(0,i).trim(),message:s.slice(i+1).trim()}:{label:s,message:s};});
     const r=await post('/quick-replies',{items});closeModal();if(CHAT)CHAT.qr=r.quick_replies;renderQR();toast('✓ 快速回复已存');});}
 function _floorText(i){const h=CHAT&&CHAT.hist;if(h&&h[i]&&h[i].text!=null)return h[i].text;
@@ -296,4 +323,4 @@ async function actRegenFloor(i){if(!CHAT)return;const rows=document.querySelecto
 
 
 /* —— 暴露到全局命名空间（内联 onclick + 跨模块裸引用）—— */
-Object.assign(window, { _av, _msgctrl, _avHtml, bubbleHtml, renderTrace, traceToggle, _addBubble, scrollChat, _lastCharBubble, updateSwBar, chatSwipe, chatRegen, chatClear, chatUndo, renderVars, varAdd, varSet, varDel, varInit, viewChat, autoGrow, finalizeBubble, fillSwMods, chatPresetToggle, renderQR, qrSend, ptab, toggleOoc, convFilter, gswipe, actSaveNote, actQuickReplies, _floorText, actEditFloor, actDelFloor, actRegenFloor });
+Object.assign(window, { _av, _msgctrl, _avHtml, bubbleHtml, renderTrace, traceToggle, _addBubble, scrollChat, _lastCharBubble, updateSwBar, watchSummaryReady, chatSwipe, chatRegen, chatClear, chatUndo, renderVars, varAdd, varSet, varDel, varInit, viewChat, autoGrow, finalizeBubble, fillSwMods, chatPresetToggle, renderQR, qrSend, ptab, toggleOoc, convFilter, gswipe, actSaveNote, actQuickReplies, _floorText, actEditFloor, actDelFloor, actRegenFloor });

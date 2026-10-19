@@ -21,7 +21,7 @@ WEB_DIR = Path(__file__).resolve().parent / "web"
 # 路由表 + 处理器(含测试/兼容直接引用的若干处理器与正则渲染助手)从拆出的 web_routes 引入。
 from .web_routes import (  # noqa: E402
     GET_ROUTES, POST_ROUTES, _qs, _regex_out, _regex_render,
-    api_overview, api_world, api_drives, api_soul_incarnations,
+    api_overview, api_world, api_drives, api_rel_board, api_soul_incarnations,
     post_entity_save, post_render_cover,
 )
 

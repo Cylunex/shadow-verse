@@ -45,7 +45,7 @@ async function viewWorks(sub,arg){
     document.querySelectorAll('#worksgrid .work:not(.newcard)').forEach((c,i)=>{const w=W[i];
       c.style.display=(!q||((w.name+w.genre).toLowerCase().includes(q)))?'':'none';});};
 }
-function openWork(wid){location.hash='#/chat/'+wid;}
+function openWork(wid){if(typeof tavernRemember==='function')tavernRemember(wid);location.hash='#/chat/'+wid;}
 async function actRenderCover(wid){closeModal();toast('生成封面中…（需配出图后端）');
   try{const r=await post('/render/cover',{world:wid});
     if(r&&(r.enabled===false||r.error)){toast(r.note||'未配出图后端 —— 设置 › 渲染',true);return;}
@@ -83,10 +83,10 @@ function worksNexus(head){
   const pairs=new Map();
   for(const e of L){const k=[e.a,e.b].sort().join('|');if(!pairs.has(k))pairs.set(k,{a:e.a,b:e.b,rels:[]});pairs.get(k).rels.push(e.relation||'连接');}
   const linkRows=[...pairs.values()].map(p=>`<div class="linkrow"><span class="lr-pair">${esc(wname(p.a))} <span class="lr-arr">⇄</span> ${esc(wname(p.b))}</span><span class="lr-rel">${p.rels.map(esc).join(' · ')}</span><button class="lr-x" title="断开这道门" onclick="actUnlinkWorlds('${jsq(p.a)}','${jsq(p.b)}')">✕</button></div>`).join('');
-  const xline=X.length?`<p class="note">跨世界的她：${X.map(x=>x.soul?`<a style="color:var(--violet);cursor:pointer" onclick="location.hash='#/incarnations/${x.id}'">${esc(x.name)} ✦</a>`:`<a style="color:var(--violet);cursor:pointer" onclick="location.hash='#/chars'">${esc(x.name)} ✦</a>`).join('、')} —— 点开看她在每个世界里的化身。</p>`
-    :'<p class="note">还没有跨世界的角色。在「陪伴」页把一个角色「带出这个世界」，她就能穿行别的世界。</p>';
+  const xline=X.length?`<p class="note">跨世界的魂：${X.map(x=>x.soul?`<a style="color:var(--violet);cursor:pointer" onclick="location.hash='#/incarnations/${x.id}'">${esc(x.name)} ✦</a>`:`<a style="color:var(--violet);cursor:pointer" onclick="location.hash='#/chars'">${esc(x.name)} ✦</a>`).join('、')} —— 点开看各自在每个世界里的化身。</p>`
+    :'<p class="note">还没有跨世界的角色。在「陪伴」页把一个角色「带出这个世界」，就能穿行别的世界。</p>';
   app().innerHTML=`<div class="wrap">${head}
-    <p class="lead" style="margin:6px 0 14px">你创造的世界与角色如何彼此相连 —— 连线是世界间的「门」，✦ 是在世界间穿行的她。<b style="color:var(--violet)">连一道门</b>，魂就能经它跨越；没有门时只能「无门强召」。</p>
+    <p class="lead" style="margin:6px 0 14px">你创造的世界与角色如何彼此相连 —— 连线是世界间的「门」，✦ 是在世界间穿行的魂。<b style="color:var(--violet)">连一道门</b>，魂就能经它跨越；没有门时只能「无门强召」。</p>
     <div class="toolrow" style="margin-bottom:14px"><span style="flex:1"></span><button class="btn sm" onclick="actLinkWorlds()">＋ 连接两个世界</button></div>
     ${W.length?`<div class="nexusmap"><svg viewBox="0 0 ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg">${edges}${nodes}</svg></div>`:'<div class="empty">还没有世界。</div>'}
     ${linkRows?`<div class="linkpanel"><div class="lp-title">世界互联（门）</div>${linkRows}</div>`:(W.length>1?'<p class="note" style="margin-top:12px">还没有连接。点「连接两个世界」开一道门（裂隙 / 同源 / 传承…），让角色能跨越过去。</p>':'')}

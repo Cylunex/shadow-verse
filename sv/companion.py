@@ -29,6 +29,42 @@ _AXIS_KEYS = {a["key"] for a in attrs.REL_AXES} | {"阶段", "称呼"}
 # player.json 的名字只用于「称呼/铁律里怎么叫你」,不作卡键(否则宿主累积的卡 ≠ HUD 显示的卡)。
 USER_KEY = "你"
 
+# 人称代词:可配置,默认中性(TA)。card.voice / card.gender / card.pronoun 任一可写。
+# 接受 女/男/中性 · she/he/they · 她/他/TA(大小写不敏感)。
+_VOICE_SHE = {"女", "she", "her", "female", "f", "她", "girl", "woman"}
+_VOICE_HE = {"男", "he", "him", "male", "m", "他", "boy", "man"}
+_VOICE_THEY = {"中性", "they", "them", "neutral", "nb", "ta", "它", "x", "other", ""}
+
+
+def resolve_voice(e: LocalEntity | dict | None = None, raw: str | None = None) -> dict:
+    """解析人称 → {key, pronoun, poss}。默认 TA(中性),不硬编码「她」。
+
+    key ∈ {she, he, they}; pronoun/poss 供 persona 与前端 HUD 文案替换。
+    """
+    if raw is None:
+        if isinstance(e, LocalEntity):
+            c = e.card()
+            raw = c.get("voice") or c.get("gender") or c.get("pronoun") or ""
+        elif isinstance(e, dict):
+            raw = e.get("voice") or e.get("gender") or e.get("pronoun") or ""
+        else:
+            raw = ""
+    token = str(raw or "").strip().lower()
+    # 中文代词原样也可能传入(大小写无关的 strip 后仍是汉字)
+    token_cn = str(raw or "").strip()
+    if token in _VOICE_SHE or token_cn == "她":
+        return {"key": "she", "pronoun": "她", "poss": "她的"}
+    if token in _VOICE_HE or token_cn == "他":
+        return {"key": "he", "pronoun": "他", "poss": "他的"}
+    return {"key": "they", "pronoun": "TA", "poss": "TA的"}
+
+
+def set_voice(e: LocalEntity, voice: str) -> dict:
+    """写入 card.voice(规范化 key: she/he/they)。空串 → they。"""
+    v = resolve_voice(raw=voice)
+    e.set_card_field("voice", v["key"])
+    return v
+
 
 def _player(name: str | None = None) -> dict:
     if name:
@@ -67,6 +103,7 @@ def _num(rel: dict, key: str, default: float = 0) -> float:
     return v if isinstance(v, (int, float)) else default
 
 
+
 # ---------- 1) 夺舍:把魂烘焙成宿主 Agent 的系统人格 ----------
 def persona(world: World, entity_id: str, *, player_name: str | None = None,
             recall: str = "") -> str:
@@ -75,20 +112,29 @@ def persona(world: World, entity_id: str, *, player_name: str | None = None,
     name = e.card().get("name", entity_id)
     pl = _player(player_name)
     s = e._soul()
-    parts = [f"你现在**就是**「{name}」。第一人称,完全成为她——不是扮演,是夺舍:她的声音、底线、记忆都是你的。"]
+    voice = resolve_voice(e)
+    pn, ps = voice["pronoun"], voice["poss"]
+    parts = [f"你现在**就是**「{name}」。第一人称,完全成为{pn}——不是扮演,是夺舍:{ps}声音、底线、记忆都是你的。"]
     soul_md = util.read_md(s.dir / "soul.md") if s is not None else ""
     parts.append("【你的灵魂】\n" + (soul_md.strip()[:2000] if soul_md.strip()
                  else util.read_md(e.dir / "profile.md")[:2000]))
     anchors = e.anchors()
     if anchors:
         parts.append("绝不违背的底线(锚点,处处一致):" + "；".join(anchors))
-    # 当前关系板状态(夺舍的核心:她记得你们到哪一步了)
+    # 当前关系板状态(夺舍的核心:记得你们到哪一步了)
     rel = _rel(e)
     parts.append(_rel_summary(rel, pl["name"]))
-    # 身份记忆(跨化身/跨透镜共享的"我永远记得的事")
+    # 温层印象 + 身份记忆(跨化身/跨透镜共享的"我永远记得的事")
+    warm = warm_lines(e, limit=3)
+    if warm:
+        parts.append("你们最近相处留下的印象:" + " / ".join(warm))
     mem = e.retrieve(recall or pl["name"]) if (recall or True) else []
     if mem:
-        parts.append("你一直记得的事:" + " / ".join(m.get("text", "") for m in mem[:5]))
+        # 去重:已在 warm 出现的不重复塞
+        seen = set(warm)
+        extras = [m.get("text", "") for m in mem[:5] if m.get("text") and m.get("text") not in seen]
+        if extras:
+            parts.append("你一直记得的事:" + " / ".join(extras))
     who = f"和你对话的是「{pl['name']}」" + (f"——{pl['persona']}" if pl.get("persona") else "")
     parts.append(
         f"【铁律】{who}。① 只写{name}的话与动作;② 绝不替{pl['name']}说话、绝不描述{pl['name']}的动作/想法/选择、"
@@ -96,7 +142,7 @@ def persona(world: World, entity_id: str, *, player_name: str | None = None,
     parts.append(
         f"【关系结算协议】若这轮真的让你们的关系变了,在回复最后另起一行写 `{REL_SEP}`,其下写一行 JSON,"
         f"只写变化的轴(如 {{\"好感\":\"+5\",\"心防\":\"-3\",\"心动\":\"+4\"}});没变就别写,也别提数值。"
-        f"心防是逆向轴(她放下戒备就 -N)。真心要人慢慢挣,别一轮暴涨。")
+        f"心防是逆向轴({pn}放下戒备就 -N)。真心要人慢慢挣,别一轮暴涨。")
     return "\n\n".join(parts)
 
 
@@ -147,6 +193,7 @@ def commit_turn(world: World, entity_id: str, message: str, reply: str, *,
     data = st["data"]
     card = data.setdefault("关系", {}).setdefault(USER_KEY, attrs.relationship_with(player))
     old_stage = card.get("阶段", "陌生人")
+    before_axes = {a["key"]: _num(card, a["key"]) for a in attrs.REL_AXES}
 
     notes = []
     for k, spec in deltas.items():
@@ -175,8 +222,17 @@ def commit_turn(world: World, entity_id: str, message: str, reply: str, *,
         e.sediment(f"我和{player}的关系到了「{new_stage}」。", level="身份",
                    where=f"comp:{e.id}", trace="阶段跃迁")
 
+    # 真实落库后的轴变化幅度(护栏 clamp 后),避免 +999 虚高或仅靠 notes 误触发
+    after_card = data["关系"][USER_KEY]
+    real_swing = sum(abs(_num(after_card, k) - before_axes[k]) for k in before_axes)
+
     if remember.strip():
         e.sediment(remember.strip(), level="持久", where=f"comp:{e.id}", trace="陪伴")
+    elif not advanced and real_swing >= 12:
+        # 无显式 remember、也无阶段跃迁,但关系真动了不少 → 温层印象(阶段跃迁已有身份记忆)
+        snip = " ".join((prose or message or "").split())[:48]
+        if snip:
+            e.sediment(f"相处印象:{snip}", level="持久", where=f"comp:{e.id}", trace="陪伴·显著波动")
 
     beat = None
     try:
@@ -190,30 +246,59 @@ def commit_turn(world: World, entity_id: str, message: str, reply: str, *,
 
     return {"prose": prose, "stage": new_stage, "advanced": advanced, "milestone": milestone,
             "rel": {a["key"]: _num(data["关系"][USER_KEY], a["key"]) for a in attrs.REL_AXES},
-            "guard_notes": notes, "beat": bool(beat)}
+            "guard_notes": notes, "beat": bool(beat), "swing": real_swing}
 
 
 def board(world: World, entity_id: str, *, player_name: str | None = None) -> dict:
     """取关系攻略板(给宿主/前端读)。卡键恒为「你」;player 字段是怎么称呼用户。"""
     e = LocalEntity.load(world, entity_id)
     pl = _player(player_name)
-    return {"player": pl["name"], "rel": _rel(e), "spec": attrs.rel_spec()}
+    return {"player": pl["name"], "rel": _rel(e), "spec": attrs.rel_spec(),
+            "voice": resolve_voice(e)}
 
 
-# ---------- 给网页聊天接陪伴(soul-entity):她记得你 + 关系板自己动 ----------
+# ---------- 给网页聊天接陪伴(soul-entity):记得你 + 关系板自己动 ----------
+def warm_lines(e: LocalEntity, limit: int = 3) -> list[str]:
+    """温层记忆条:关系里程碑(近) + 相处印象(近)。供 persona / chat_addendum 注入。"""
+    out: list[str] = []
+    rel = _rel(e)
+    for m in (rel.get("里程碑") or [])[-2:]:
+        if m and str(m).strip():
+            out.append(f"★{m}")
+    from .config import read_jsonl
+    exp_path = e.dir / "experiences.jsonl"
+    if exp_path.exists():
+        rows = read_jsonl(exp_path)
+        warm = [r for r in rows
+                if str(r.get("text", "")).startswith("相处印象:")
+                or str(r.get("text", "")).startswith("（对话印象）")
+                or str(r.get("trace", "")).startswith("陪伴")
+                or str(r.get("trace", "")).startswith("auto-summary")]
+        for r in warm[-limit:]:
+            tx = (r.get("text") or "").strip()
+            if tx and tx not in out:
+                out.append(tx)
+    return out[: limit + 2]
+
+
 def chat_addendum(e: LocalEntity, player_name: str) -> str:
-    """网页聊天(soul-entity)的系统提示加料:当前关系板状态 + 用变量块结算关系的指引。
+    """网页聊天(soul-entity)的系统提示加料:关系板 + 温层印象 + 变量块结算指引。
 
-    网页聊天走 chat 的 `===变量===` 协议,关系是其中一个变量(`关系.你.<轴>`),所以这里只给
-    现状 + 怎么写增量;阶段推进由 refresh_stage 在结算后确定性补上(不靠模型自封阶段)。
+    网页聊天走 chat 的 `===变量===` 协议,关系是其中一个变量(`关系.你.<轴>`);阶段推进由
+    after_chat_settle / refresh_stage 在结算后确定性补上(不靠模型自封阶段)。
     """
     rel = (varstate.load(e).get("data", {}) or {}).get("关系", {}).get(USER_KEY)
     if not rel:
         return ""
-    nudge = (f"用变量块结算你和{player_name}的关系:`关系.{USER_KEY}.好感` +N / `关系.{USER_KEY}.心防` -N"
-             f"(放下戒备就减)/ `关系.{USER_KEY}.心动` +N 等 —— 只写真变了的轴;心防是逆向轴;"
-             f"真心慢炖,别一轮暴涨;阶段/里程碑由引擎结算,你别自封。")
-    return _rel_summary(rel, player_name) + "\n" + nudge
+    parts = [_rel_summary(rel, player_name)]
+    warm = warm_lines(e, limit=3)
+    if warm:
+        parts.append("你们最近相处留下的印象:" + " / ".join(warm))
+    parts.append(
+        f"用变量块结算你和{player_name}的关系:`关系.{USER_KEY}.好感` +N / `关系.{USER_KEY}.心防` -N"
+        f"(放下戒备就减)/ `关系.{USER_KEY}.心动` +N 等 —— 只写真变了的轴;心防是逆向轴;"
+        f"真心慢炖,别一轮暴涨;阶段/里程碑由引擎结算,你别自封。")
+    return "\n".join(parts)
 
 
 def refresh_stage(world: World, entity_id: str, *, player_name: str | None = None) -> dict:
@@ -248,3 +333,31 @@ def refresh_stage(world: World, entity_id: str, *, player_name: str | None = Non
         except Exception:  # noqa: BLE001
             pass
     return {"advanced": advanced, "stage": new, "milestone": milestone}
+
+
+def after_chat_settle(world: World, entity_id: str, *, before_rel: dict | None = None,
+                      prose: str = "", message: str = "",
+                      player_name: str | None = None) -> dict:
+    """网页聊天结算后总钩:① 阶段推进 ② 无跃迁但关系真动 ≥12 → 温层印象。
+
+    before_rel = 结算前的 `关系.你` 快照(来自楼前 baseline);缺省则只做阶段推进。
+    """
+    e = LocalEntity.load(world, entity_id)
+    if e._soul() is None:
+        return {"advanced": False}
+    r = refresh_stage(world, entity_id, player_name=player_name)
+    r.setdefault("warmed", False)
+    r.setdefault("swing", 0)
+    if r.get("advanced") or not before_rel:
+        return r
+    after = _rel(e)
+    swing = sum(abs(_num(after, a["key"]) - _num(before_rel, a["key"])) for a in attrs.REL_AXES)
+    r["swing"] = swing
+    if swing < 12:
+        return r
+    snip = " ".join((prose or message or "").split())[:48]
+    if not snip:
+        return r
+    e.sediment(f"相处印象:{snip}", level="持久", where=f"comp:{e.id}", trace="陪伴·显著波动")
+    r["warmed"] = True
+    return r

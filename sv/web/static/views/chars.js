@@ -14,7 +14,7 @@ async function viewChars(){
     cards.push({wid:w.id,wname:w.name,genre:w.genre,...e,cross:!!x,inc:x?x.inc:[],soul:x?x.soul:false});
   }
   const html=cards.map(c=>{
-    const cmp=c.soul?` onclick="event.stopPropagation();location.hash='#/incarnations/${jsq(c.id)}'" style="cursor:pointer" title="看她在各世界的化身"`:'';
+    const who=voiceWho(c,c.name);const cmp=c.soul?` onclick="event.stopPropagation();location.hash='#/incarnations/${jsq(c.id)}'" style="cursor:pointer" title="看${who}在各世界的化身"`:'';
     const av=c.avatar?`style="background-image:url('/img/${esc(c.avatar)}')"`:'';
     return `<div class="charcard" onclick="location.hash='#/companion/${c.wid}/${c.id}'">
     ${c.cross?`<span class="xw"${cmp}>✦ 跨世界</span>`:''}

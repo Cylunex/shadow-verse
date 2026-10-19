@@ -4,6 +4,7 @@
 window.OV={worlds:[],nexus:{entities:[],links:[]},codex:{count:0},genres:[],llm:{}};
 async function refresh(){window.OV=await api('/overview')}
 const NAV=[
+  {fam:'tavern',label:'酒馆',icon:'⟡',href:'#/tavern'},
   {fam:'chat',label:'对话',icon:'💬',href:'#/chat'},
   {fam:'companion',label:'陪伴',icon:'💗',href:'#/companion'},
   {fam:'novel',label:'小说',icon:'✍',href:'#/novel'},
@@ -28,11 +29,12 @@ function renderNav(active){
 async function route(){
   const hash=location.hash.slice(1)||'/';
   const p=hash.split('/').filter(Boolean);
-  const fam=(hash==='/')?'works':(p[0]||'works');
+  const fam=(hash==='/')?'tavern':(p[0]||'tavern');
   renderNav(fam);
   if(fam!=='farewell')fwTeardown();   // 任何非离别路由都收掉离别全屏遮罩（防 Back/导航后遮罩卡住整屏）
   try{
-    if(hash==='/'||fam==='works')return viewWorks(p[1]||'gallery',p[2]);
+    if(hash==='/'||fam==='tavern')return viewTavern();
+    if(fam==='works')return viewWorks(p[1]||'gallery',p[2]);
     if(fam==='chat')return viewChat(p[1],p[2]);
     if(fam==='companion')return viewCompanion(p[1],p[2]);
     if(fam==='novel')return viewNovel(p[1],p[2]);
@@ -43,7 +45,7 @@ async function route(){
     if(fam==='settings')return viewSettings();
     if(fam==='incarnations')return viewIncarnations(p[1]);
     if(fam==='farewell')return openFarewell(p[1],p[2]);
-    viewWorks('gallery');
+    viewTavern();
   }catch(e){app().innerHTML=`<div class="wrap"><div class="empty">✗ ${esc(e.message)}</div></div>`;}
 }
 

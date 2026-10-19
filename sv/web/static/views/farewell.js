@@ -19,12 +19,13 @@ function openFarewell(wid,eid){
   Promise.all([api('/entity/'+wid+'/'+eid),api('/chat/'+wid+'/'+eid).catch(()=>({}))])
     .then(([ent,chat])=>{if(!FW)return;fwAssemble(ent,chat);fwRenderAct1();})
     .catch(e=>{fwcard().innerHTML=
-      `<div class="fw-k">✦ 回 响 ✦</div><div class="fw-note">没能唤起她：${esc(e.message)}</div>
+      `<div class="fw-k">✦ 回 响 ✦</div><div class="fw-note">没能唤起${esc(FW&&FW.name?FW.name:"对方")}：${esc(e.message)}</div>
        <div class="fw-acts"><button class="btn" onclick="closeFarewell()">回到陪伴</button></div>`;});
 }
 function fwAssemble(ent,chat){
   const c=ent.card||{},st=ent.state||{};
   FW.card=c;FW.st=st;FW.name=c.name||FW.eid;
+  FW.who=voiceWho(c,FW.name);FW.self=voiceSelf(FW.who,FW.name);
   FW.world=OV.worlds.find(w=>w.id===FW.wid)||{name:FW.wid,genre:''};
   FW.av=ent.avatar?('/img/'+ent.avatar):'';
   FW.anchors=ent.anchors||[];FW.exps=ent.experiences||[];
@@ -53,7 +54,7 @@ function composeParting(){
   let L1;
   if(trust!==null||guard!==null){
     if((trust!==null&&trust>=60)||(guard!==null&&guard<=30))L1=`「${call}……真的要带我走？」`;
-    else if((trust!==null&&trust<=0)||(guard!==null&&guard>=70))L1=`「${call}。」（她看着你，没立刻动。）`;
+    else if((trust!==null&&trust<=0)||(guard!==null&&guard>=70))L1=`「${call}。」（${FW.who}看着你，没立刻动。）`;
     else L1=`「要走了？」`;
   }else if(/戒备|冷|防/.test(mood))L1=`「……要带我走？」`;
   else if(/怕|慌|不安/.test(mood))L1=`「去哪都行，只要不是一个人。」`;
@@ -94,12 +95,12 @@ function buildAct1(){
     <div class="fw-k">✦ 回 响 ✦</div>
     <h2>要把 ${esc(FW.name)} 带出《${esc(FW.world.name)}》吗</h2>
     <div class="fw-say">${say}</div>
-    <div class="fw-note">原来的世界会照常运转，那里的她会走向别的结局。<br>
-      而你带走的，是带着这段经历的她——一段不会被改写的回响。</div>
+    <div class="fw-note">原来的世界会照常运转，那里的${esc(FW.who)}会走向别的结局。<br>
+      而你带走的，是带着这段经历的${esc(FW.who)}——一段不会被改写的回响。</div>
     <div class="fw-acts fw-hesitate">
-      <button class="btn ghost" onclick="closeFarewell()">再陪她一会儿</button>
-      ${others.length?`<button class="btn" onclick="fwGotoAct2()">带她走，去新的世界 ✦</button>`
-        :`<button class="btn" disabled>带她走，去新的世界 ✦</button>`}
+      <button class="btn ghost" onclick="closeFarewell()">再陪${esc(FW.who)}一会儿</button>
+      ${others.length?`<button class="btn" onclick="fwGotoAct2()">带${esc(FW.who)}走，去新的世界 ✦</button>`
+        :`<button class="btn" disabled>带${esc(FW.who)}走，去新的世界 ✦</button>`}
     </div>
     ${others.length?'':`<div class="fw-note" style="margin-top:14px;color:var(--gold)">还没有别的世界可去——先去
        <a style="color:var(--cyan);cursor:pointer" onclick="fwGotoWorks()">作品库</a>造一个，门才有彼端。</div>`}`;
@@ -124,29 +125,30 @@ function fwGate(destId){
 /* —— ACT 2 · 选门 —— */
 function fwGotoAct2(){
   const others=OV.worlds.filter(w=>w.id!==FW.wid);
+  const who=FW.who;
   const dests=others.map(w=>{const g=fwGate(w.id);
     return `<button class="fw-dest ${g.gated?'gated':'open'}" data-w="${esc(w.id)}" onclick="fwPickDest('${jsq(w.id)}')">
       <div class="fw-dest-cv ${coverClass(w.genre)}"></div>
       <div class="fw-dest-body"><b>${esc(w.name)}</b><span>${esc(w.genre||'—')}</span>
-        <em class="fw-gate ${g.gated?'gated':''}">${g.gated?'⚠ 无门强召 · 凭空将她拽入':('⟡ '+esc(g.relation)+' · 循着旧世界的痕迹过去')}</em>
+        <em class="fw-gate ${g.gated?'gated':''}">${g.gated?'⚠ 无门强召 · 凭空将'+esc(who)+'拽入':('⟡ '+esc(g.relation)+' · 循着旧世界的痕迹过去')}</em>
       </div></button>`;}).join('');
   fwSwap(`
-    <div class="fw-k">✦ 她 要 去 哪 ✦</div>
+    <div class="fw-k">✦ ${esc(who)} 要 去 哪 ✦</div>
     <h2>${esc(FW.name)} 的下一个世界</h2>
     <div class="fw-threshold">
-      <div class="fw-tnode"><span class="fw-sig">${sigil(FW.world.genre)}</span><b>${esc(FW.world.name)}</b><small>她现在的世界</small></div>
+      <div class="fw-tnode"><span class="fw-sig">${sigil(FW.world.genre)}</span><b>${esc(FW.world.name)}</b><small>${esc(who)}现在的世界</small></div>
       <div class="fw-tgate" id="fwgate" data-state="idle"></div>
       <div class="fw-tnode" id="fwdst"><span class="fw-sig">？</span><b>选一个世界</b><small>&nbsp;</small></div>
     </div>
     <div class="fw-dests">${dests}</div>
     <div class="fw-entry" id="fwentry" style="display:none">
-      <button class="btn ghost sm on" data-e="本体进" onclick="fwSetEntry('本体进')">本体进 · 还是她自己</button>
+      <button class="btn ghost sm on" data-e="本体进" onclick="fwSetEntry('本体进')">本体进 · 还是${esc(FW.self)}</button>
       <button class="btn ghost sm" data-e="换皮进" onclick="fwSetEntry('换皮进')">换皮进 · 借这世界一副身体</button>
     </div>
     <div class="fw-doornote" id="fwdoornote"></div>
     <div class="fw-acts">
       <button class="btn ghost" onclick="fwGotoAct1()">← 再想想</button>
-      <button class="btn" id="fwgo" disabled onclick="fwCommit()">送她过去 ✦</button>
+      <button class="btn" id="fwgo" disabled onclick="fwCommit()">送${esc(who)}过去 ✦</button>
     </div>`);
 }
 function fwPickDest(destId){
@@ -158,15 +160,15 @@ function fwPickDest(destId){
       b.classList.toggle('gated',FW.gate.gated);b.classList.toggle('open',!FW.gate.gated);
       const em=b.querySelector('.fw-gate');
       if(em){em.className='fw-gate '+(FW.gate.gated?'gated':'');
-        em.textContent=FW.gate.gated?'⚠ 无门强召 · 凭空将她拽入':('⟡ '+FW.gate.relation+' · 循着旧世界的痕迹过去');}
+        em.textContent=FW.gate.gated?'⚠ 无门强召 · 凭空将'+FW.who+'拽入':('⟡ '+FW.gate.relation+' · 循着旧世界的痕迹过去');}
     }
   });
   el('fwgate').dataset.state=FW.gate.gated?'no':'has';
   el('fwdst').innerHTML=`<span class="fw-sig">${sigil(w.genre)}</span><b>${esc(FW.destName)}</b><small>${FW.gate.gated?'无门':esc(FW.gate.relation)}</small>`;
   el('fwentry').style.display='flex';
   const go=el('fwgo');go.disabled=false;
-  if(FW.gate.gated){go.textContent='强召她过去 ⚠';go.classList.add('warn');fwRenderDoorOpener();}
-  else{go.textContent='送她过去 ✦';go.classList.remove('warn');el('fwdoornote').innerHTML='';}
+  if(FW.gate.gated){go.textContent='强召'+FW.who+'过去 ⚠';go.classList.add('warn');fwRenderDoorOpener();}
+  else{go.textContent='送'+FW.who+'过去 ✦';go.classList.remove('warn');el('fwdoornote').innerHTML='';}
 }
 function fwSetEntry(mode){FW.entry=mode;
   fwcard().querySelectorAll('.fw-entry .btn').forEach(b=>b.classList.toggle('on',b.dataset.e===mode));}
@@ -175,7 +177,7 @@ function fwRenderDoorOpener(){
   const opts=anchorWorlds.map(wd=>`<option value="${esc(wd)}">${esc((OV.worlds.find(x=>x.id===wd)||{}).name||wd)}</option>`).join('');
   el('fwdoornote').innerHTML=`
     <div class="fw-door-open">
-      <div class="fw-door-open-h">⚠ 《${esc(FW.destName)}》和她待过的世界之间没有门。要不要先开一道？</div>
+      <div class="fw-door-open-h">⚠ 《${esc(FW.destName)}》和${esc(FW.who)}待过的世界之间没有门。要不要先开一道？</div>
       <div class="fw-door-open-row">
         <select id="fwrel"><option>裂隙</option><option>同源</option><option>传承</option><option>共享历史</option></select>
         <span>连到</span>
@@ -199,7 +201,7 @@ async function fwOpenDoor(){
 function fwRenderCrossing(){
   fwSwap(`<div class="fw-crossing">
     <div class="fw-ring" data-state="${FW.gate&&FW.gate.gated?'no':'has'}">${fwPortrait()}<div class="fw-beam"></div></div>
-    <div class="fw-note" id="fwstatus">正在把她凝成一个魂…</div>
+    <div class="fw-note" id="fwstatus">正在把${esc(FW.who)}凝成一个魂…</div>
   </div>`);
 }
 async function fwCommit(){
@@ -209,12 +211,12 @@ async function fwCommit(){
   try{
     let soul=FW.soul||(FW.card&&FW.card.soul_id);
     if(!soul){
-      if(status())status().textContent='正在把她凝成一个魂…';
+      if(status())status().textContent='正在把'+FW.who+'凝成一个魂…';
       try{const r1=await post('/extract',{world:FW.wid,entity:FW.eid});soul=r1.soul;}
       catch(e){if(/已是魂/.test(e.message))soul=(FW.card&&FW.card.soul_id)||FW.eid;else throw e;}
     }
     FW.soul=soul;
-    if(status())status().textContent='为她推开《'+FW.destName+'》的门…';
+    if(status())status().textContent='为'+FW.who+'推开《'+FW.destName+'》的门…';
     const r2=await post('/summon-soul',{soul,world:FW.dest,entry:FW.entry});
     FW.committed=true;FW.busy=false;
     FW.result={destEid:r2.incarnation,entry:r2.entry,via:r2.via};   // 后端为终判
@@ -234,23 +236,23 @@ function fwRenderArrival(){
     <h2>${esc(FW.name)} 来到了《${esc(FW.destName)}》</h2>
     <div class="fw-say">${say}</div>
     <div class="fw-note">
-      ${gated?'没有门，她是被生生带来的——给她点时间适应这个陌生的世界。'
-        :'她经「'+esc(relTxt)+'」之门而来，记忆完整。'}<br>
-      她带着在《${esc(FW.world.name)}》的全部记忆醒来。那边的她，仍在原地。</div>
+      ${gated?'没有门，'+FW.who+'是被生生带来的——给'+FW.who+'点时间适应这个陌生的世界。'
+        :esc(FW.who)+'经「'+esc(relTxt)+'」之门而来，记忆完整。'}<br>
+      ${esc(FW.who)}带着在《${esc(FW.world.name)}》的全部记忆醒来。那边的${esc(FW.who)}，仍在原地。</div>
     <div class="fw-acts">
-      <button class="btn" onclick="fwEnter()">陪她在这里继续 →</button>
-      <button class="btn ghost" onclick="fwSeeBoth()">看两个世界里的她</button>
+      <button class="btn" onclick="fwEnter()">陪${esc(FW.who)}在这里继续 →</button>
+      <button class="btn ghost" onclick="fwSeeBoth()">看两个世界里的${esc(FW.who)}</button>
     </div>`);
 }
 function fwRenderAlreadyThere(){
   const dest=FW.dest,eid=FW.eid,name=FW.name,destName=FW.destName;
   fwSwap(`${fwPortrait()}
-    <div class="fw-k">✦ 她 已 在 那 里 ✦</div>
+    <div class="fw-k">✦ ${esc(FW.who)} 已 在 那 里 ✦</div>
     <h2>${esc(name)} 已经在《${esc(destName)}》了</h2>
     <div class="fw-say">「我已经在这儿了呀。」</div>
-    <div class="fw-note">这个世界里已经有她的一具化身。</div>
+    <div class="fw-note">这个世界里已经有${esc(FW.who)}的一具化身。</div>
     <div class="fw-acts">
-      <button class="btn" id="fwgoexist">去看看她 →</button>
+      <button class="btn" id="fwgoexist">去看看${esc(FW.who)} →</button>
       <button class="btn ghost" onclick="fwGotoAct2()">换个去处</button>
     </div>`);
   const b=el('fwgoexist');if(b)b.onclick=()=>{fwTeardown();location.hash='#/companion/'+dest+'/'+eid;};

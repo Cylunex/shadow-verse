@@ -11,6 +11,7 @@ async function viewCompanion(wid,eid){
   try{[ent,chat,drv]=await Promise.all([api('/entity/'+wid+'/'+eid),api('/chat/'+wid+'/'+eid).catch(()=>({})),api('/drives/'+wid+'/'+eid).catch(()=>({drives:[]}))]);}
   catch(e){app().innerHTML=`<div class="wrap"><div class="empty">${esc(e.message)}</div></div>`;return;}
   const c=ent.card||{},st=ent.state||{};const name=c.name||eid;
+  const who=voiceWho(c,name);
   const world=OV.worlds.find(w=>w.id===wid)||{};
   const av=ent.avatar?('/img/'+ent.avatar):'';
   const portrait=av?`style="background-image:url('${av}')"`:'';
@@ -23,8 +24,9 @@ async function viewCompanion(wid,eid){
   if(relObj){
     stageHtml=relObj['阶段']?`<div class="stage">${esc(relObj['阶段'])}${relObj['称呼']?' · 称你「'+esc(relObj['称呼'])+'」':''}</div>`:'';
     relHtml=`<div class="rel" style="margin-top:16px">`+REL_AXES.filter(a=>typeof relObj[a.key]==='number').map(a=>{
-      const pct=Math.max(0,Math.min(100,(relObj[a.key]-a.min)/((a.max-a.min)||1)*100));
-      return `<div class="relrow"><div class="rt"><span class="rn">${a.key}</span><span class="rv">${relObj[a.key]}</span></div><div class="reltrack"><div class="rf" style="width:${pct}%;background:${a.color}"></div></div></div>`;}).join('')+`</div>`;
+      const pct=relBarPct(a,relObj[a.key]);
+      const tip=a.reverse?' · 已攻破':'';
+      return `<div class="relrow"><div class="rt"><span class="rn">${a.key}${a.reverse?'<span class="note" style="margin-left:4px;font-size:10px">'+tip+'</span>':''}</span><span class="rv">${relObj[a.key]}</span></div><div class="reltrack"><div class="rf" style="width:${pct}%;background:${a.color}"></div></div></div>`;}).join('')+`</div>`;
     // 里程碑:关系卡自带的阶段跃迁标记(★);与下方「重要时刻」(经历)不同,这是攻略板的进度勋章
     const ms=(relObj['里程碑']||[]).filter(Boolean);
     if(ms.length)msHtml=`<div class="chips" style="margin:12px 0 0">`+ms.map(m=>`<span class="kw" style="background:#ffcd6b18;border-color:#5a4a2a;color:var(--gold)">★ ${esc(m)}</span>`).join('')+`</div>`;
@@ -47,11 +49,11 @@ async function viewCompanion(wid,eid){
   const exps=ent.experiences||[];
   const miles=exps.length?exps.slice(-8).map(x=>`<div class="mile ${x.level==='身份'?'star':''}"><div class="mt">${esc(x.where||'')}${x.level==='身份'?' · ★成长':''}</div><div class="md">${esc(x.text)}</div></div>`).join(''):'<p class="note">还没有共同经历。聊起来，重要的瞬间会沉淀在这里。</p>';
   const remembered=exps.length?exps[exps.length-1].text:'';
-  // Desire 层投影:此处去掉与下方「她记得」重复的那条(最近经历),免同屏重复
+  // Desire 层投影:此处去掉与下方「记得」重复的那条(最近经历),免同屏重复
   const drvList=((drv&&drv.drives)||[]).filter(x=>x.text!==remembered);
   const soulId=c.soul_id;
   const fwBtn=`<button class="btn ghost sm" onclick="location.hash='#/farewell/${wid}/${eid}'">✦ 带 ${esc(name)} 去别的世界</button>`
-    +(soulId?` <button class="btn ghost sm" onclick="location.hash='#/incarnations/${jsq(soulId)}'">✦ 看各世界里的她</button>`:'');
+    +(soulId?` <button class="btn ghost sm" onclick="location.hash='#/incarnations/${jsq(soulId)}'">✦ 看各世界里的${esc(name)}</button>`:'');
 
   app().innerHTML=`<div class="wrap">
     <div class="page-head"><h1>陪伴</h1><span class="sub">一个一直在的人</span>
@@ -71,14 +73,14 @@ async function viewCompanion(wid,eid){
       </div>
       <div class="compmain">
         <section><h2>关系 <small>你们之间发生过的事的总和</small></h2>${stageHtml}${relHtml}${msHtml}${hidHtml}</section>
-        <section><h2>⚡ 她此刻想 <small>Desire 层 · 据目标与最近经历投影</small></h2>
-          ${drvList.length?`<div class="drives" style="background:none;border:none;padding:0;margin:0">`+drvList.map(x=>`<div class="drive"><span class="di ${x.source==='目标'?'now':'recent'}">${esc(x.kind)}</span><span class="dt">${esc(x.text)}</span></div>`).join('')+`</div>`:'<p class="note" style="margin:0">此刻没有明确的近期驱动 —— 由她的锚点（见下）支撑。</p>'}</section>
-        <section><h2>她是谁 <small>不会变的内核 · 锚点</small></h2>
+        <section><h2>⚡ ${esc(who)}此刻想 <small>Desire 层 · 据目标与最近经历投影</small></h2>
+          ${drvList.length?`<div class="drives" style="background:none;border:none;padding:0;margin:0">`+drvList.map(x=>`<div class="drive"><span class="di ${x.source==='目标'?'now':'recent'}">${esc(x.kind)}</span><span class="dt">${esc(x.text)}</span></div>`).join('')+`</div>`:'<p class="note" style="margin:0">此刻没有明确的近期驱动 —— 由锚点（见下）支撑。</p>'}</section>
+        <section><h2>${esc(name)}是谁 <small>不会变的内核 · 锚点</small></h2>
           <div class="kwrow">${(ent.anchors&&ent.anchors.length)?ent.anchors.map(a=>`<span class="kw">${esc(a)}</span>`).join(''):'<span class="note">还没有锚点 —— 提取为魂后会沉淀出来。</span>'}</div></section>
-        ${remembered?`<section><h2>她记得 <small>从共同经历里被唤起的一刻</small></h2><div class="mem">${esc(remembered)}</div></section>`:''}
+        ${remembered?`<section><h2>${esc(who)}记得 <small>从共同经历里被唤起的一刻</small></h2><div class="mem">${esc(remembered)}</div></section>`:''}
         <section><h2>你们的重要时刻</h2><div class="miles">${miles}</div></section>
         <section><h2>✦ 回响 <small>把 ${esc(name)} 带出这个世界</small></h2>
-          <p style="color:var(--dim);font-size:13px;line-height:1.75;margin:0 0 13px">你可以把 ${esc(name)} 从《${esc(world.name||wid)}》里带出来 —— ${soulId?'她已是一个魂，可被召唤进别的世界，带着记忆继续陪你。':'先把她提取为「魂」（跨世界不变量），之后就能召唤她降临别的世界。'}原来的世界照常运转，而你带走的，是带着这段经历的她。</p>
+          <p style="color:var(--dim);font-size:13px;line-height:1.75;margin:0 0 13px">你可以把 ${esc(name)} 从《${esc(world.name||wid)}》里带出来 —— ${soulId?esc(name)+' 已是一个魂，可被召唤进别的世界，带着记忆继续陪你。':'先提取为「魂」（跨世界不变量），之后就能召唤降临别的世界。'}原来的世界照常运转，而你带走的，是带着这段经历的 ${esc(name)}。</p>
           ${fwBtn}</section>
         <div class="composer" style="border:none;padding:0;background:none"><div class="box" style="max-width:none">
           <textarea id="compmsg" placeholder="回 ${esc(name)}……" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();compSend('${wid}','${eid}')}"></textarea>

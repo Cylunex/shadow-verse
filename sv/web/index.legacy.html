@@ -391,10 +391,10 @@ async function actSummon(nid,name){const ids=OV.worlds.map(w=>w.id);formModal(`�
 ],'召唤',async v=>{v.nexus_id=nid;await post('/summon',v);await refresh();closeModal();toast(`✓ <b>${esc(name)}</b> 在 <b>${esc(v.world)}</b> 开了化身`);route()})}
 
 // 魂模型(一魂·多门重设计):提取升华 / 跨世界召唤
-async function actExtract(wid,eid,name){if(!confirm(`把 ${name} 提取/升华为跨世界的魂?\n她将获得跨世界不变量(声音/底线/身份记忆)+ 一套多维数值攻略卡,从此可跨世界穿行。`))return;
+async function actExtract(wid,eid,name){if(!confirm(`把 ${name} 提取/升华为跨世界的魂?\n将获得跨世界不变量(声音/底线/身份记忆)+ 一套多维数值攻略卡,从此可跨世界穿行。`))return;
   try{const r=await post('/extract',{world:wid,entity:eid});toast(`✨ <b>${esc(name)}</b> 已升华为魂 <b>${esc(r.soul)}</b>(搬走身份记忆 ${r.moved_identity} 条,已落攻略数值卡)`);route();}catch(e){toast('✗ '+e.message,true)}}
 async function actSummonSoul(soul,name){const ids=OV.worlds.map(w=>w.id);formModal(`召唤 ${name} 降临别的世界`,[
-  {n:'world',label:'目标世界(需与她已在的世界有链接,否则记为「无门强召」)',type:'select',options:ids,value:ids[0]},
+  {n:'world',label:'目标世界(需与已在的世界有链接,否则记为「无门强召」)',type:'select',options:ids,value:ids[0]},
   {n:'entry',label:'方式',type:'select',options:['本体进','换皮进'],value:'本体进'},
 ],'召唤',async v=>{const r=await post('/summon-soul',{soul,world:v.world,entry:v.entry});closeModal();
   toast(`✦ <b>${esc(name)}</b> 降临 <b>${esc(r.world)}</b>(${esc(r.entry)}${r.via?' · 经「'+esc(r.via)+'」':''});世界线已记一笔`);route()})}

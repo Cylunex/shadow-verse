@@ -114,5 +114,29 @@ try:
 except ValueError:
     ok(True, "无内嵌卡的 PNG 报 ValueError")
 
+
+# ST gender / tags → card.voice
+female_card = importer.parse_card(json.dumps({
+    "spec": "chara_card_v2", "data": {
+        "name": "薇拉", "description": "守灯人", "personality": "温柔", "first_mes": "……你来了。",
+        "tags": ["female", "陪伴"], "extensions": {}
+    }}))
+ok(importer.infer_voice(female_card) == "she", "infer_voice: tags 含 female → she")
+rf = importer.import_card(w, female_card, role="secondary")
+ok(LocalEntity.load(w, rf["entity"]).card().get("voice") == "she", "导入落盘 card.voice=she")
+
+male_card = importer.parse_card(json.dumps({
+    "name": "顾深", "description": "他是这座塔的守塔人", "personality": "寡言", "first_mes": "嗯。",
+    "tags": ["无限流"], "extensions": {"gender": "male"}
+}))
+ok(importer.infer_voice(male_card) == "he", "infer_voice: extensions.gender=male → he")
+ok(male_card.get("gender") == "male", "parse_card: 抽出 gender 字段")
+
+neutral = importer.parse_card(json.dumps({
+    "name": "无性", "description": "一团雾", "personality": "——", "first_mes": "…", "tags": ["抽象"]
+}))
+ok(importer.infer_voice(neutral) is None, "infer_voice: 无性别信号 → None(不硬塞)")
+
+
 print(f"\n{len(P)} 通过 / {len(F)} 失败")
 sys.exit(1 if F else 0)

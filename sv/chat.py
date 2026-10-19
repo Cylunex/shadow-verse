@@ -261,7 +261,7 @@ def _system(world: World, e: LocalEntity, pl: dict, varbag: dict) -> str:
         parts.append(
             f"当前变量:{json.dumps(varbag, ensure_ascii=False)}。若本轮该变,在正文最后另起一行写 `{VAR_SEP}`,"
             f"其下写一行 JSON(只写要变的;数值用 +N/-N 增减或写新值);没变就别写、也别提变量。")
-    if e._soul() is not None:           # soul-entity(看板娘/陪伴魂):她记得你们到哪一步 + 怎么结算关系
+    if e._soul() is not None:           # soul-entity(看板娘/陪伴魂):记得你们到哪一步 + 怎么结算关系
         from . import companion
         add = companion.chat_addendum(e, pl["name"])
         if add:
@@ -306,7 +306,7 @@ def _build_prompt(world: World, e: LocalEntity, message: str, hist: list[dict], 
     """组装 (system, transcript)。供阻塞生成与流式生成共用,保证两条路提示词一致。"""
     varbag = vars(e)
     sys = _system(world, e, pl, varbag)
-    mem = e.retrieve(message)        # soul-entity 走 retrieve_soul:并入魂的身份记忆(她记得你)
+    mem = e.retrieve(message)        # soul-entity 走 retrieve_soul:并入魂的身份记忆(记得你)
     if mem:
         sys += "\n\n该想起的事:" + " / ".join(m["text"] for m in mem)
     wb = worldbook.scan(world, message + "\n" + " ".join(h["text"] for h in hist[-4:]),
@@ -389,16 +389,20 @@ def stream_turn(world: World, e: LocalEntity, message: str):
         append_jsonl(_path(e), _new_char_row(prose, updates, baseline))
         persisted = True
         newvars, notes = _apply_baseline(e, baseline, updates)
-        comp = _companion_refresh(world, e)             # soul-entity:关系阶段推进(在发 done 前,让 HUD 立刻反映)
+        comp = _companion_refresh(world, e, before_rel=_rel_snapshot(baseline),
+                                  prose=prose, message=message)  # 阶段 + 温层
         if comp:
             newvars = vars(e)
         done = {"available": True, "reply": prose, "vars": newvars, "var_changed": list(updates or {}),
                 "var_notes": notes, "swipe_id": 0, "swipe_n": 1, "emotion": _emotion(world, e, prose)}
         if comp and comp.get("advanced"):
             done["rel_advanced"], done["rel_milestone"] = comp.get("stage"), comp.get("milestone")
-        yield ("done", done)
-        _kick_summary(world, e)           # done 已发,这里只是快速 spawn 后台线程,不拖慢客户端
+        if comp and comp.get("warmed"):
+            done["rel_warmed"] = True
         _rp_commit(world, e, message, prose, updates)   # RP → 世界线
+        # 总结在 yield done 前:同步抽取可带 summary_done;异步标 pending
+        _attach_summary(done, _kick_summary(world, e))
+        yield ("done", done)
     finally:
         if not persisted:                 # 流中途异常 / 客户端中止(GeneratorExit):把已出的部分也落盘,刷新后不蒸发
             prose, updates = _split_vars("".join(raw_parts).strip())
@@ -471,16 +475,30 @@ def _rp_commit(world: World, e: LocalEntity, message: str, prose: str, updates: 
         pass
 
 
-def _companion_refresh(world: World, e: LocalEntity):
-    """soul-entity(看板娘/陪伴魂):网页聊天结算后推进关系阶段(里程碑/身份/世界线 beat)。
+def _companion_refresh(world: World, e: LocalEntity, *, before_rel=None,
+                       prose: str = "", message: str = ""):
+    """soul-entity(看板娘/陪伴魂):网页聊天结算后推进关系阶段 + 显著波动温层印象。
     非 soul 返回 None(字节等价,旧行为不变)。关系增量本身已由 ===变量=== 结算进 关系.你.<轴>。"""
     if e._soul() is None:
         return None
     try:
         from . import companion
-        return companion.refresh_stage(world, e)
+        return companion.after_chat_settle(
+            world, e.id, before_rel=before_rel, prose=prose, message=message)
     except Exception:  # noqa: BLE001 — 关系推进绝不阻断对话
         return None
+
+
+def _rel_snapshot(baseline: dict | None) -> dict | None:
+    """从楼前 baseline 抽出 关系.你 快照(供温层 swing 计算)。"""
+    if not isinstance(baseline, dict):
+        return None
+    rel = baseline.get("关系")
+    if not isinstance(rel, dict):
+        return None
+    from . import companion
+    card = rel.get(companion.USER_KEY) or (next(iter(rel.values())) if rel else None)
+    return dict(card) if isinstance(card, dict) else None
 
 
 def turn(world: World, e: LocalEntity, message: str) -> dict:
@@ -494,15 +512,19 @@ def turn(world: World, e: LocalEntity, message: str) -> dict:
     append_jsonl(_path(e), {"role": "user", "text": message, "ts": clock.now_iso()})
     append_jsonl(_path(e), _new_char_row(reply, updates, baseline))
     newvars, notes = _apply_baseline(e, baseline, updates)
-    _kick_summary(world, e)
     _rp_commit(world, e, message, reply, updates)   # RP → 世界线
-    comp = _companion_refresh(world, e)             # soul-entity:关系阶段推进
+    comp = _companion_refresh(world, e, before_rel=_rel_snapshot(baseline),
+                              prose=reply, message=message)  # 阶段 + 温层
     if comp:
         newvars = vars(e)                           # 重读,让 HUD 反映阶段/里程碑
     out = {"available": True, "reply": reply, "vars": newvars, "var_changed": list(updates or {}),
            "var_notes": notes, "swipe_id": 0, "swipe_n": 1, "emotion": _emotion(world, e, reply)}
     if comp and comp.get("advanced"):
         out["rel_advanced"], out["rel_milestone"] = comp.get("stage"), comp.get("milestone")
+    if comp and comp.get("warmed"):
+        out["rel_warmed"] = True
+    # 总结放在回执组装后:同步抽取可立刻 toast;异步 LLM 标 pending 让前端 poll
+    _attach_summary(out, _kick_summary(world, e))
     return out
 
 
@@ -643,6 +665,20 @@ def delete_floor(e: LocalEntity, idx: int) -> dict:
     return {"ok": True, "remaining": len(h)}
 
 
+
+def _attach_summary(out: dict, summary: dict | None) -> dict:
+    """把 _kick_summary 结果挂到 turn/stream 回执上,供前端 toast。"""
+    if not summary:
+        return out
+    if summary.get("done"):
+        out["summary_done"] = True
+        if summary.get("preview"):
+            out["summary_preview"] = summary["preview"]
+    elif summary.get("pending"):
+        out["summary_pending"] = True
+    return out
+
+
 # ---------- 自动总结(滚出模型窗口的对话 → 压缩进长期记忆,供 retrieve 召回)----------
 _SUMMARY_SYS = ("你在把一段角色扮演对话压缩成「记忆」。只输出 2-3 句中文要点"
                 "(关键事件 / 关系或态度变化 / 承诺与约定 / 状态变更),不要解说、不要分点、不要复述原文。")
@@ -667,43 +703,172 @@ _summary_inflight: set = set()                  # (entity_dir, cut) 已在跑,�
 _summary_lock = threading.Lock()
 
 
-def _summarize_chunk(world: World, e: LocalEntity, chunk: list[dict]) -> None:
+def _chat_summary_mode() -> str:
+    """归一化 SV_CHAT_SUMMARY → on|off|extract|llm。"""
+    m = (getattr(config, "CHAT_SUMMARY", "on") or "on").strip().lower()
+    if m in ("0", "false", "no", "off", "none"):
+        return "off"
+    if m in ("extract", "local", "offline", "stub"):
+        return "extract"
+    if m in ("llm", "model", "ai"):
+        return "llm"
+    return "on"
+
+
+def _extract_summary(chunk: list[dict], *, char_name: str, user_name: str) -> str:
+    """零依赖抽取式压缩(interactive-novel 温层思路):首条用户意图 + 中段 + 末条角色反应。
+    stub / 无 LLM 时仍能落记忆,不阻塞、不造幻觉长文。"""
+    lines: list[tuple[str, str]] = []
+    for t in chunk:
+        text = " ".join((t.get("text") or "").split())
+        if not text:
+            continue
+        who = user_name if t.get("role") == "user" else char_name
+        lines.append((who, text[:72]))
+    if not lines:
+        return ""
+    picks: list[str] = []
+    users = [x for x in lines if x[0] == user_name]
+    chars = [x for x in lines if x[0] == char_name]
+    if users:
+        picks.append(f"{users[0][0]}:{users[0][1]}")
+    if len(lines) >= 6:
+        mid = lines[len(lines) // 2]
+        picks.append(f"{mid[0]}:{mid[1]}")
+    if chars:
+        picks.append(f"{chars[-1][0]}:{chars[-1][1]}")
+    elif lines:
+        picks.append(f"{lines[-1][0]}:{lines[-1][1]}")
+    seen, out = set(), []
+    for p in picks:
+        if p not in seen:
+            seen.add(p); out.append(p)
+    return ("（对话印象）" + "；".join(out[:3]))[:220]
+
+
+def _summarize_chunk(world: World, e: LocalEntity, chunk: list[dict], *,
+                     mode: str | None = None) -> str:
+    """压缩一段对话 → 记忆文本。返回落盘文本(空=没写)。mode 覆盖全局。"""
     pl = player()
-    label = {"user": pl["name"], "char": e.card().get("name", e.id)}
-    convo = "\n".join(f"{label.get(t.get('role'), '?')}:{t.get('text', '')}" for t in chunk if t.get("text"))
-    if not convo.strip():
-        return
-    note = llm.generate(_SUMMARY_SYS, convo, max_tokens=300, temperature=0.3).strip()
+    cname = e.card().get("name", e.id)
+    uname = pl["name"]
+    m = mode or _chat_summary_mode()
+    note = ""
+    trace = "auto-summary"
+    if m in ("on", "llm") and llm.available():
+        convo = "\n".join(
+            f"{(uname if t.get('role') == 'user' else cname)}:{t.get('text', '')}"
+            for t in chunk if t.get("text"))
+        if convo.strip():
+            try:
+                note = llm.generate(_SUMMARY_SYS, convo, max_tokens=300, temperature=0.3).strip()
+            except Exception:  # noqa: BLE001 — on 可回退抽取式;llm 则空
+                note = ""
+    if not note and m in ("on", "extract"):
+        note = _extract_summary(chunk, char_name=cname, user_name=uname)
+        if note:
+            trace = "auto-summary·extract"
     if note:
-        memory.append_experience(e.dir, note, level="持久", where="对话", trace="auto-summary")
+        memory.append_experience(e.dir, note, level="持久", where="对话", trace=trace)
+    return note
 
 
-def _summarize_safe(world: World, e: LocalEntity, chunk: list[dict], cut: int) -> None:
+def _mark_summary_ready(e: LocalEntity, *, preview: str, cut: int, extract: bool) -> None:
+    """落一条可被前端 poll 消费的 summary_ready(toast 一次)。"""
+    meta = load_json(_meta_path(e), {}) or {}
+    meta.pop("summary_pending", None)
+    meta["summary_ready"] = {
+        "preview": (preview or "")[:80],
+        "cut": int(cut),
+        "extract": bool(extract),
+        "ts": clock.now_iso(),
+    }
+    save_json(_meta_path(e), meta)
+
+
+def pop_summary_ready(e: LocalEntity) -> dict | None:
+    """取出并清除 summary_ready(前端 toast 消费;无则 None)。"""
+    meta = load_json(_meta_path(e), {}) or {}
+    ready = meta.pop("summary_ready", None)
+    if ready is not None:
+        save_json(_meta_path(e), meta)
+    return ready if isinstance(ready, dict) else None
+
+
+def summary_status(e: LocalEntity, *, consume: bool = False) -> dict:
+    """轻量状态:pending / ready。consume=True 时取走 ready(toast 用)。"""
+    meta = load_json(_meta_path(e), {}) or {}
+    pending = bool(meta.get("summary_pending"))
+    if consume:
+        ready = pop_summary_ready(e)
+    else:
+        ready = meta.get("summary_ready") if isinstance(meta.get("summary_ready"), dict) else None
+    out = {"pending": pending, "done": bool(ready)}
+    if ready:
+        out["preview"] = ready.get("preview") or ""
+        out["extract"] = bool(ready.get("extract"))
+    return out
+
+
+def _summarize_safe(world: World, e: LocalEntity, chunk: list[dict], cut: int,
+                    mode: str | None = None) -> dict:
+    """跑总结;成功返回 {done, preview, extract},失败/空返回 {}。"""
     key = (str(e.dir), cut)
+    result: dict = {}
     try:
-        _summarize_chunk(world, e, chunk)
-        _set_summary_upto(e, cut)               # 成功才推进标记;失败下轮再试,不会永久丢这段记忆
+        note = _summarize_chunk(world, e, chunk, mode=mode)
+        if note:
+            _set_summary_upto(e, cut)
+            m = mode or _chat_summary_mode()
+            extract = (m == "extract" or (m == "on" and not llm.available())
+                       or note.startswith("（对话印象）"))
+            _mark_summary_ready(e, preview=note, cut=cut, extract=extract)
+            result = {"done": True, "preview": note[:80], "extract": extract}
     except Exception:  # noqa: BLE001 — 后台总结绝不影响对话主流程
         pass
     finally:
         with _summary_lock:
             _summary_inflight.discard(key)
+        if not result:  # 失败:清 pending,下轮可再 kick
+            try:
+                meta = load_json(_meta_path(e), {}) or {}
+                if meta.pop("summary_pending", None) is not None:
+                    save_json(_meta_path(e), meta)
+            except Exception:  # noqa: BLE001
+                pass
+    return result
 
 
-def _kick_summary(world: World, e: LocalEntity) -> None:
-    """对话推进后:把滚出 HISTORY_WINDOW 又没总结过的整段,丢后台线程压缩进记忆(不阻塞回复)。
-    用 in-flight 集合防同段重复总结;标记推进改到 worker 成功后,LLM 挂了不会把这段永久踢出记忆。"""
-    if not llm.available():
-        return
+def _kick_summary(world: World, e: LocalEntity) -> dict:
+    """对话推进后:压缩滚出窗口的对话进记忆。
+
+    返回 {done, preview?, extract?} 同步完成;或 {pending: True} 后台 LLM 中;或 {} 未触发。
+    门控 SV_CHAT_SUMMARY(on/extract/llm/off)+ SV_SUMMARY_EVERY。
+    """
+    mode = _chat_summary_mode()
+    if mode == "off":
+        return {}
+    if mode == "llm" and not llm.available():
+        return {}
     h = history(e)
-    cut = len(h) - HISTORY_WINDOW            # 已滚出模型上下文窗口的边界
+    cut = len(h) - HISTORY_WINDOW
     upto = _summary_upto(e)
-    if cut - upto < max(2, config.SUMMARY_EVERY):
-        return
+    if cut - upto < max(2, int(getattr(config, "SUMMARY_EVERY", 5) or 5)):
+        return {}
     chunk = h[upto:cut]
+    if not chunk:
+        return {}
     key = (str(e.dir), cut)
     with _summary_lock:
         if key in _summary_inflight:
-            return
+            return {"pending": True}
         _summary_inflight.add(key)
-    threading.Thread(target=_summarize_safe, args=(world, e, chunk, cut), daemon=True).start()
+    # 抽取式极快:同步;LLM 路径后台 + pending 供前端 poll
+    if mode == "extract" or (mode == "on" and not llm.available()):
+        return _summarize_safe(world, e, chunk, cut, mode=mode)
+    meta = load_json(_meta_path(e), {}) or {}
+    meta["summary_pending"] = int(cut)
+    save_json(_meta_path(e), meta)
+    threading.Thread(target=_summarize_safe, args=(world, e, chunk, cut, mode),
+                     daemon=True).start()
+    return {"pending": True}

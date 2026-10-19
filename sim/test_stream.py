@@ -172,11 +172,14 @@ try:
     _t.sleep(0.2)
     ok(chat._summary_upto(e) == after, "无新内容时不重复推进标记")
     ok(any(x.get("trace") == "auto-summary" for x in memory.all_experiences(e.dir)), "后台总结落一条记忆")
-    # 关键回归:总结线程挂了不能永久丢这段;标记应回到上次成功的位置(此处仍为 after)
+    # 关键回归:llm 模式下总结挂了不能永久丢这段;标记应留在上次成功位置
+    # (on 模式会回退抽取式并推进——那是有意的 stub 友好路径,另测)
     failbox = {"n": 0}
     def _fail(*a, **k):
         failbox["n"] += 1; raise RuntimeError("primary down")
     _save_gen = llm.generate; llm.generate = _fail
+    _save_mode = getattr(config, "CHAT_SUMMARY", "on")
+    config.CHAT_SUMMARY = "llm"
     try:
         append_jsonl(e.dir / "chat.jsonl", {"role": "user", "text": "新句X", "ts": clock.now_iso()})
         append_jsonl(e.dir / "chat.jsonl", {"role": "char", "text": "回X", "ts": clock.now_iso()})
@@ -188,15 +191,44 @@ try:
             if failbox["n"] > 0: break
             _t.sleep(0.1)
         _t.sleep(0.2)
-        ok(chat._summary_upto(e) == after, "LLM 失败时标记不前移(下轮可重试,这段不会被永久踢出记忆)")
+        ok(chat._summary_upto(e) == after, "llm 模式:LLM 失败时标记不前移(下轮可重试)")
     finally:
         llm.generate = _save_gen
+        config.CHAT_SUMMARY = _save_mode
     # 共享 chat_meta.json 不能被总结写抹掉 greeting_id(consistency-1)
     chat.set_greeting(e, 0)
     chat._set_summary_upto(e, 999)
     ok(chat.greeting_id(e) == 0 and chat._summary_upto(e) == 999, "_set_summary_upto 是 read-merge,不抹 greeting_id")
 finally:
     llm.available, llm.generate = _av3, _gen3
+
+# ---------- 8b) stub/抽取式:无 LLM 也能落记忆(不破坏 stub 流程)----------
+chat.clear(e)
+_save_mode2 = getattr(config, "CHAT_SUMMARY", "on")
+config.CHAT_SUMMARY = "on"          # on + available=False → extract 同步路径
+llm.available = lambda: False
+try:
+    for i in range(chat.HISTORY_WINDOW + config.SUMMARY_EVERY + 2):
+        append_jsonl(e.dir / "chat.jsonl",
+                     {"role": "char" if i % 2 else "user", "text": f"情节点{i}", "ts": clock.now_iso()})
+    expected_cut = len(chat.history(e)) - chat.HISTORY_WINDOW
+    chat._kick_summary(w, e)        # 同步抽取,无需 sleep
+    ok(chat._summary_upto(e) == expected_cut, "stub/on:抽取式同步推进标记")
+    exps = memory.all_experiences(e.dir)
+    ok(any(str(x.get("trace", "")).startswith("auto-summary") for x in exps), "stub/on:落 auto-summary 记忆")
+    ok(any("对话印象" in str(x.get("text", "")) for x in exps), "stub/on:抽取式带对话印象前缀")
+    # off 门控
+    config.CHAT_SUMMARY = "off"
+    before = chat._summary_upto(e)
+    for _ in range(config.SUMMARY_EVERY + 2):
+        append_jsonl(e.dir / "chat.jsonl", {"role": "user", "text": "x", "ts": clock.now_iso()})
+        append_jsonl(e.dir / "chat.jsonl", {"role": "char", "text": "y", "ts": clock.now_iso()})
+    chat._kick_summary(w, e)
+    ok(chat._summary_upto(e) == before, "CHAT_SUMMARY=off:不触发")
+finally:
+    config.CHAT_SUMMARY = _save_mode2
+    llm.available = _av3
+
 chat.clear(e)
 ok(chat._summary_upto(e) == 0, "clear 后总结标记复位")
 
@@ -289,6 +321,60 @@ try:
        "floor_regenerate user 楼:基线扫到首个被丢弃 char 楼的 vars_before(0),新增 +1 应得 1,不是 14")
 finally:
     llm.available, llm.generate = _av5, _g5
+
+# ---------- 14) 自动总结 toast 信号:同步 done + status poll/consume ----------
+chat.clear(e)
+_save_mode3 = getattr(config, "CHAT_SUMMARY", "on")
+config.CHAT_SUMMARY = "extract"     # 强制同步抽取,可断言回执字段
+llm.available = lambda: False
+try:
+    for i in range(chat.HISTORY_WINDOW + config.SUMMARY_EVERY + 2):
+        append_jsonl(e.dir / "chat.jsonl",
+                     {"role": "char" if i % 2 else "user", "text": f"印象{i}", "ts": clock.now_iso()})
+    kick = chat._kick_summary(w, e)
+    ok(kick.get("done") is True and kick.get("preview"), "extract kick:同步返回 done+preview")
+    out = {}
+    chat._attach_summary(out, kick)
+    ok(out.get("summary_done") is True and out.get("summary_preview"),
+       "_attach_summary:挂 summary_done/preview 供前端 toast")
+    st = chat.summary_status(e, consume=False)
+    ok(st.get("done") is True and st.get("preview"), "summary_status:ready 可见(未消费)")
+    st2 = chat.summary_status(e, consume=True)
+    ok(st2.get("done") is True and chat.summary_status(e, consume=True).get("done") is False,
+       "summary_status consume:取走 ready,再 poll 为空(toast 一次)")
+    # pending 路径:llm + available 时 kick 标 pending(不跑真 LLM:立刻不可用回退已测)
+    config.CHAT_SUMMARY = "llm"
+    llm.available = lambda: True
+    # 清 meta pending/ready,再塞够窗口的新段
+    chat.clear(e)
+    for i in range(chat.HISTORY_WINDOW + config.SUMMARY_EVERY + 2):
+        append_jsonl(e.dir / "chat.jsonl",
+                     {"role": "char" if i % 2 else "user", "text": f"异步{i}", "ts": clock.now_iso()})
+    # stub generate 极快:仍走后台线程 → 先看到 pending
+    llm.generate = lambda s, u, **kw: "他们又聊了一会儿。"
+    kick2 = chat._kick_summary(w, e)
+    ok(kick2.get("pending") is True, "llm kick:立刻返回 pending(后台线程)")
+    out2 = {}
+    chat._attach_summary(out2, kick2)
+    ok(out2.get("summary_pending") is True and not out2.get("summary_done"),
+       "_attach_summary:pending 挂 summary_pending")
+    import time as _t2
+    ready = None
+    for _ in range(30):
+        ready = chat.pop_summary_ready(e)
+        if ready: break
+        _t2.sleep(0.1)
+    ok(bool(ready and ready.get("preview")), "异步完成后 pop_summary_ready 可取到 preview")
+finally:
+    config.CHAT_SUMMARY = _save_mode3
+    llm.available = _av3
+    # generate 可能被上面改过;恢复到节 8 捕获的 _gen3(若不存在则 noop)
+    try:
+        llm.generate = _gen3
+    except NameError:
+        pass
+
+chat.clear(e)
 
 if os.path.exists(os.environ["SV_LOCAL_CONF"]):
     os.remove(os.environ["SV_LOCAL_CONF"])

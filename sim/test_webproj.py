@@ -86,5 +86,37 @@ ok(all("avatar" in e for e in aw["entities"]), "api_world 实体带 avatar 字�
 rc = webapp.post_render_cover({"world": "tower"})
 ok(rc.get("enabled") is False, "render/cover:未配 SV_RENDER 时休眠回退(不报错)")
 
+
+# ---------- /api/config 含玩家身份(settings c.player 不再空)----------
+from sv import chat as chatmod  # noqa: E402
+from sv import web_routes  # noqa: E402
+chatmod.set_player("测名", "测人设一句")
+cfg = web_routes.api_config()
+ok(isinstance(cfg.get("player"), dict), "api_config:含 player 对象")
+ok(cfg["player"].get("name") == "测名" and cfg["player"].get("persona") == "测人设一句",
+   "api_config.player:与 player.json 一致(settings 表单可回填)")
+# 复位默认,避免污染同进程后续用例
+chatmod.set_player("你", "")
+
+
+# ---------- /api/rel-board 轻量关系板(酒馆 peek 复用 companion.board)----------
+from sv import varstate, attrs  # noqa: E402
+# 给起源化身落一张关系卡
+e_su = LocalEntity.load(w1, "suzhi")
+vs = varstate.load(e_su)
+data = vs.setdefault("data", {})
+rel_root = data.setdefault("关系", {})
+rel_root["你"] = attrs.relationship_with("你")
+rel_root["你"]["好感"] = 42
+rel_root["你"]["阶段"] = "朋友"
+varstate.save(e_su, vs)
+rb = web_routes.api_rel_board("tower", "suzhi")
+ok(rb.get("name") == "苏栀" and rb.get("has_rel") is True, "api_rel_board:名 + has_rel")
+ok(rb.get("rel", {}).get("好感") == 42 and rb["rel"].get("阶段") == "朋友", "api_rel_board:复用 companion.board 关系值")
+ok(rb.get("voice") and "spec" in rb, "api_rel_board:带 voice + spec")
+# 无关系卡实体
+rb2 = web_routes.api_rel_board("tower", "blank")
+ok(rb2.get("has_rel") is False and isinstance(rb2.get("rel"), dict), "api_rel_board:无存储卡 → has_rel=False,仍给 schema 默认 rel")
+
 print(f"\n{len(P)} 通过 / {len(F)} 失败")
 sys.exit(1 if F else 0)

@@ -31,7 +31,13 @@ async function viewSettings(){
       <div class="field"><label>你的名字（{{user}}）</label><input id="cf_pl_name" value="${esc((c.player&&c.player.name)||'你')}"></div>
       <div class="field"><label>你的人设（可空，让角色认得你）</label><textarea id="cf_pl_persona" rows="3">${esc((c.player&&c.player.persona)||'')}</textarea></div>
       <div class="toolrow"><button class="btn" onclick="savePlayer()">💾 保存身份</button></div>
-      <p class="note">流式输出、世界书触发等行为，已默认开启 / 由引擎管理。</p>
+      <h3 style="margin-top:18px">对话记忆 · 自动总结</h3>
+      <p class="note">滚出上下文窗口的对话会压缩进长期记忆（retrieve 可召回）。stub / 无 LLM 时走抽取式，不打断流程。</p>
+      <div class="row2">
+        <div class="field"><label>总结模式</label><select id="cf_chat_summary">${opt(['on','extract','llm','off'],c.chat_summary||'on')}</select></div>
+        <div class="field"><label>阈值（未总结楼数 ≥ N 才触发）</label><input id="cf_summary_every" value="${esc(c.summary_every!=null?c.summary_every:5)}" placeholder="5"></div>
+      </div>
+      <div class="toolrow"><button class="btn" onclick="saveChatSummary()">💾 保存总结设置</button></div>
     </div>
     <div class="set-pane" data-st="render">
       <div class="row2"><div class="field"><label>render</label><select id="cf_render">${opt(['none','gitee'],c.render)}</select></div>
@@ -69,6 +75,7 @@ async function saveSettings(){const g=id=>{const e=el(id);return e?e.value.trim(
   ['cf_openai_key:OPENAI_API_KEY','cf_anthropic_key:ANTHROPIC_API_KEY','cf_gitee_key:GITEE_API_KEY'].forEach(p=>{const[id,k]=p.split(':');const v=g(id);if(v)body[k]=v;});
   try{await post('/config',body);await refresh();renderNav('settings');toast('✓ 设置已保存，即时生效');}catch(e){toast('✗ '+e.message,true)}}
 async function savePlayer(){try{await post('/player',{name:el('cf_pl_name').value.trim()||'你',persona:el('cf_pl_persona').value});toast('✓ 已保存你的身份');}catch(e){toast('✗ '+e.message,true)}}
+async function saveChatSummary(){try{await post('/config',{SV_CHAT_SUMMARY:el('cf_chat_summary').value,SV_SUMMARY_EVERY:el('cf_summary_every').value.trim()||'5'});await refresh();toast('✓ 总结设置已保存');}catch(e){toast('✗ '+e.message,true)}}
 async function clearSecret(k){if(!confirm('清除已存密钥 '+k+'?'))return;try{await post('/config',{[k]:''});await refresh();route();toast('✓ 已清除');}catch(e){toast('✗ '+e.message,true)}}
 async function testLLM(){const box=el('cf_test');box.style.display='block';box.textContent='测试中…（先保存再测）';
   try{const r=await post('/llm-test',{});box.innerHTML=r.ok?`<b style="color:var(--good)">✓ ${esc(r.provider)}${r.stub?'（stub 占位）':''}</b>\n回复样本：${esc(r.sample)}`:`<b style="color:var(--bad)">✗ ${esc(r.provider)} 连接失败</b>\n${esc(r.error)}`;
@@ -76,4 +83,4 @@ async function testLLM(){const box=el('cf_test');box.style.display='block';box.t
 
 
 /* —— 暴露到全局命名空间（内联 onclick + 跨模块裸引用）—— */
-Object.assign(window, { viewSettings, settab, saveSettings, savePlayer, clearSecret, testLLM });
+Object.assign(window, { viewSettings, settab, saveSettings, savePlayer, saveChatSummary, clearSecret, testLLM });

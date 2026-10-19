@@ -42,6 +42,39 @@ CARD_SIZE_LIMIT = 8 * 1024 * 1024     # 角色卡(含 PNG)上限 8MB
 ASSET_SIZE_LIMIT = 12 * 1024 * 1024   # 世界书/预设/正则上限 12MB
 
 
+# ST 卡无标准 gender 字段;社区卡常塞 extensions.gender / 顶层 gender / tags(female|male|女|男)
+_VOICE_TAG_SHE = {"female", "girl", "woman", "f", "女", "女性", "少女", "女主", "she", "her"}
+_VOICE_TAG_HE = {"male", "boy", "man", "m", "男", "男性", "男主", "he", "him"}
+
+
+def infer_voice(card: dict) -> str | None:
+    """从 ST 卡推断 card.voice key(she/he/they)。无法判断 → None(不覆盖默认)。"""
+    if not isinstance(card, dict):
+        return None
+    ext = card.get("extensions") if isinstance(card.get("extensions"), dict) else {}
+    raw = (card.get("voice") or card.get("gender") or (ext or {}).get("gender")
+           or (ext or {}).get("voice") or "")
+    if raw:
+        from . import companion
+        return companion.resolve_voice(raw=str(raw))["key"]
+    tags = {str(x).strip().lower() for x in (card.get("tags") or []) if x is not None}
+    # tags 整词匹配(避免 "m" 误中 "female");正文只认明确性别词,低噪声
+    she_hit = bool(tags & _VOICE_TAG_SHE)
+    he_hit = bool(tags & _VOICE_TAG_HE)
+    desc = (card.get("description") or "")[:120]
+    notes = " ".join(str(card.get(k) or "") for k in ("creator_notes", "personality"))[:300]
+    blob = desc + " " + notes
+    if ("女性" in blob) or blob.lstrip().startswith("她") or ("她是" in desc):
+        she_hit = True
+    if ("男性" in blob) or blob.lstrip().startswith("他") or ("他是" in desc):
+        he_hit = True
+    if she_hit and not he_hit:
+        return "she"
+    if he_hit and not she_hit:
+        return "he"
+    return None
+
+
 def parse_card(data) -> dict:
     """把 JSON 字符串 / dict / PNG bytes 统一成规范卡字典。"""
     util.guard_size(data, limit=CARD_SIZE_LIMIT, what="角色卡")
@@ -77,6 +110,11 @@ def parse_card(data) -> dict:
         "appearance": (sd.get("positive") or "").strip() if isinstance(sd, dict) else "",
         "depth_prompt": ext.get("depth_prompt") if isinstance(ext.get("depth_prompt"), dict) else None,
         "talkativeness": ext.get("talkativeness"),
+        "gender": (d.get("gender") or ext.get("gender") or "").strip()
+                  if isinstance(d.get("gender") or ext.get("gender") or "", str) else "",
+        "voice": (d.get("voice") or ext.get("voice") or "").strip()
+                 if isinstance(d.get("voice") or ext.get("voice") or "", str) else "",
+        "extensions": ext if isinstance(ext, dict) else {},
         "spec": data.get("spec", "v1"),
     }
 
@@ -128,6 +166,9 @@ def import_card(world: World, card: dict, *, role: str = "secondary", as_id: str
         c["depth_prompt"] = card["depth_prompt"]    # 角色私货,运行时 @D 注入(见 promptkit)
     if card.get("talkativeness") is not None:
         c["talkativeness"] = card["talkativeness"]  # 群聊发言倾向
+    voice = infer_voice(card)
+    if voice:
+        c["voice"] = voice                          # she/he/they → companion.persona 人称
     save_json(e.card_path, c)
     avatar = e.set_avatar(avatar_png, "png") if avatar_png else None   # PNG 卡图 → 头像/立绘
     n = import_lorebook(world, card.get("character_book"), eid) if card.get("character_book") else 0

@@ -56,9 +56,9 @@ TOOLS = [
     ("link", "L4 世界互联:连一条暗宇宙边", {"world_a": "str", "world_b": "str", "relation": "str", "note": "str"}, ["world_a", "world_b", "relation"], ["note"], False),
     ("nexus", "L4 枢纽鸟瞰", {}, [], [], False),
     # 陪伴透镜(夺舍宿主 Agent 当灵魂 + 关系累积)
-    ("companion_persona", "夺舍:把一具魂烘焙成宿主 Agent 的【系统人格】——你注入它即**成为**她(锚点+声音+当前关系板+身份记忆+铁律+关系结算协议)。返回纯文本,用作 system prompt",
+    ("companion_persona", "夺舍:把一具魂烘焙成宿主 Agent 的【系统人格】——你注入它即**成为**此角色(锚点+可配置人称+当前关系板+身份记忆+铁律+关系结算协议)。返回纯文本,用作 system prompt",
      {"world": "str", "entity": "str", "player": "str", "recall": "str"}, ["world", "entity"], ["player", "recall"], False),
-    ("companion_commit", "陪伴累积:把你(作为她)生成的这轮对话回灌——关系板增量结算+阶段确定性推进+跃迁落里程碑+世界线 beat。reply 里可带 `===关系===` 增量块(或显式 deltas 由引擎解析)",
+    ("companion_commit", "陪伴累积:把你(作为此角色)生成的这轮对话回灌——关系板增量结算+阶段确定性推进+跃迁落里程碑+世界线 beat。reply 里可带 `===关系===` 增量块(或显式 deltas 由引擎解析)",
      {"world": "str", "entity": "str", "message": "str", "reply": "str", "player": "str", "remember": "str"}, ["world", "entity"], ["message", "reply", "player", "remember"], False),
     ("rel_board", "读关系攻略板(9 轴 + 阶段阶梯 + 隐藏真心话 + 渲染规格)", {"world": "str", "entity": "str", "player": "str"}, ["world", "entity"], ["player"], False),
     # 回溯(执钟人拨钟):世界状态/世界线快照 + 回滚

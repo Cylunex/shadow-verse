@@ -9,11 +9,11 @@
 <body>
 
 <div class="topbar">
-  <div class="brand" onclick="location.hash='#/works'"><span class="logo">暗宇宙</span><span class="en">ShadowVerse</span></div>
+  <div class="brand" onclick="location.hash='#/tavern'"><span class="logo">暗宇宙</span><span class="en">ShadowVerse</span></div>
   <nav class="nav" id="nav"></nav>
   <span class="llmpill" id="llmpill">LLM …</span>
 </div>
-<div class="banner">⟡ <b>暗宇宙</b> · 让角色在世界中经历故事，并把经历留下，成为回响。</div>
+<div class="banner">⟡ <b>混沌酒馆</b> · 三千世界交汇；点一枚 chip 入座，✦ 心灯可跨世界穿行。</div>
 
 <div id="app"><div class="loading">载入中…</div></div>
 
@@ -27,9 +27,10 @@
       <div class="kb-console" id="kbconsole">⌬ —</div>
       <div class="kb-name"><b>星瞳</b><span>向导 · 看板娘</span></div>
       <div class="kb-say" id="kbsay">在的。<b>要做点什么？</b></div>
+      <div class="kb-opt" onclick="kbGo('tavern','欢迎入座。世界们都在柜台这边')">⟡ 进酒馆</div>
       <div class="kb-opt" onclick="kbGo('works','那我带你去看看世界们')">🎴 逛作品库</div>
-      <div class="kb-opt" onclick="kbGo('chat','嗯，去听她说话')">💬 继续对话</div>
-      <div class="kb-opt" onclick="kbGo('companion','她一直在等你呢')">💗 去陪伴</div>
+      <div class="kb-opt" onclick="kbGo('chat','嗯，去听听')">💬 继续对话</div>
+      <div class="kb-opt" onclick="kbGo('companion','一直在等你呢')">💗 去陪伴</div>
       <div class="kb-opt" onclick="kbSay('新世界…我帮你起个头');actNewWorld()">✨ 造个新世界</div>
     </div>
     <div class="kb-figure">

@@ -29,9 +29,21 @@ e = LocalEntity.load(w, "mu")
 # ---------- 夺舍人格 ----------
 p = companion.persona(w, "mu")
 ok("你现在**就是**「穆」" in p, "persona:第一人称夺舍开头")
+ok("完全成为TA" in p and "TA的声音" in p, "persona:默认中性人称 TA(不硬编码她)")
 ok("守账本" in p and "真心要人挣" in p, "persona:注入魂的锚点(底线)")
 ok("【铁律】" in p and "绝不替你说话" in p.replace("「你」", "你"), "persona:带对话铁律(治身份漂移)")
 ok(companion.REL_SEP in p and "心防是逆向轴" in p, "persona:带关系结算协议")
+# 可配置人称
+ok(companion.resolve_voice(raw="")["pronoun"] == "TA", "resolve_voice:空→TA")
+ok(companion.resolve_voice(raw="女")["pronoun"] == "她", "resolve_voice:女→她")
+ok(companion.resolve_voice(raw="he")["pronoun"] == "他", "resolve_voice:he→他")
+companion.set_voice(e, "she")
+p_she = companion.persona(w, "mu")
+ok("完全成为她" in p_she and "她的声音" in p_she, "persona:card.voice=she → 她")
+companion.set_voice(e, "he")
+p_he = companion.persona(w, "mu")
+ok("完全成为他" in p_he and "他放下戒备" in p_he, "persona:card.voice=he → 他")
+companion.set_voice(e, "they")  # 还原中性,后续测试不受影响
 
 # ---------- 阶段确定性推导(心动是恋爱硬门)----------
 ok(companion.derive_stage({}) == "陌生人", "阶段:空板=陌生人")
@@ -59,6 +71,8 @@ ok(r2["rel"]["好感"] == 100 and any("封顶" in n for n in r2["guard_notes"]),
 # ---------- 关系板读取 ----------
 b = companion.board(w, "mu")
 ok(b["player"] == "你" and b["rel"]["阶段"] == "朋友" and len(b["spec"]["axes"]) == 9, "board:返回关系卡 + 渲染规格(9 轴)")
+ok(b.get("voice", {}).get("key") == "they" and b["voice"]["pronoun"] == "TA", "board:带回 voice 规格(默认 they/TA)")
+ok(any(a.get("reverse") for a in b["spec"]["axes"] if a["key"] == "心防"), "board.spec:心防轴 reverse=True")
 
 # ---------- 用户卡键恒为「你」,player.json 名只作称呼(防 seed/HUD/companion 三方分裂)----------
 from sv.config import UNIVERSE, save_json  # noqa: E402
@@ -82,6 +96,40 @@ ok("恋人" in str(varstate.load(e)["data"]["关系"]["你"]["里程碑"]), "ref
 plain = LocalEntity.create(w, "luren", "路人", role="secondary")   # 非 soul 角色
 ok(companion.refresh_stage(w, "luren") == {"advanced": False}, "非 soul 角色:refresh_stage 零行为(字节等价)")
 ok(companion.chat_addendum(plain, "影") == "", "非 soul 且无关系卡:chat_addendum 返回空")
+
+# ---------- 显著关系波动自动温层记忆(无显式 remember、无阶段跃迁)----------
+# 此刻已是恋人(好感80/心动65/亲密50/心防40);再推心动+亲密,不进挚爱(需亲密70+心防25)
+exp_path = e.dir / "experiences.jsonl"
+exps_before = len(read_jsonl(exp_path)) if exp_path.exists() else 0
+r3 = companion.commit_turn(w, "mu", "今天聊了很久",
+    '（穆合上账本。）……下次别这么晚。\n' + companion.REL_SEP + '\n{"心动":"+20","亲密":"+15"}')
+ok(not r3["advanced"] and r3["stage"] == "恋人", "显著波动:未跨阶段(仍恋人)")
+ok(r3.get("swing", 0) >= 12, "显著波动:真实落库 swing≥12")
+exps_after = len(read_jsonl(exp_path)) if exp_path.exists() else 0
+ok(exps_after == exps_before + 1, "显著波动:自动落温层相处印象(+1 experiences)")
+last = read_jsonl(exp_path)[-1]
+ok(last.get("text", "").startswith("相处印象:") and "下次别这么晚" in last["text"],
+   "显著波动:印象文本取自本轮正文")
+
+
+# ---------- 温层印象注入 + 网页 after_chat_settle ----------
+wl = companion.warm_lines(e, limit=3)
+ok(any("相处印象:" in x or x.startswith("★") for x in wl), "warm_lines:含相处印象或里程碑")
+add_w = companion.chat_addendum(e, "影")
+ok("你们最近相处留下的印象:" in add_w, "chat_addendum:注入温层印象")
+
+# 模拟网页聊天:先记下 before_rel,改轴,再 after_chat_settle
+before = dict(varstate.load(e)["data"]["关系"]["你"])
+st = varstate.load(e)
+st["data"]["关系"]["你"]["心动"] = before.get("心动", 0) + 15
+st["data"]["关系"]["你"]["亲密"] = before.get("亲密", 0) + 10
+varstate.save(e, st)   # 模拟 ===变量=== 已结算
+acs = companion.after_chat_settle(w, "mu", before_rel=before,
+                                  prose="（穆把茶推过来。）喝吧。", message="谢谢")
+ok(acs.get("swing", 0) >= 12 and acs.get("warmed"), "after_chat_settle:显著波动 → warmed")
+ok(any("喝茶" in x or "茶" in x or "喝吧" in x for x in companion.warm_lines(e)),
+   "after_chat_settle:温层印象取自本轮正文")
+
 
 print(f"\n{len(P)} 通过 / {len(F)} 失败")
 sys.exit(1 if F else 0)
